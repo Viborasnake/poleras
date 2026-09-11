@@ -1,28 +1,142 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 
-export async function createViewer(container,state,{hero=false}={}){
- const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(34,1,.1,100);
- const initial=new THREE.Vector3(hero?1.25:.5,.12,hero?5.8:6.1);camera.position.copy(initial);
- const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
- renderer.domElement.setAttribute('aria-label','Polera 3D en blanco lista para personalizar. Arrastra para girar.');container.replaceChildren(renderer.domElement);
- scene.add(new THREE.HemisphereLight(0xffffff,0x817c94,2));const key=new THREE.DirectionalLight(0xfff6e8,3);key.position.set(-3,4,5);scene.add(key);const rim=new THREE.DirectionalLight(0xc8d6ff,2);rim.position.set(3,2,-4);scene.add(rim);
- const controls=new OrbitControls(camera,renderer.domElement);controls.enablePan=false;controls.enableDamping=true;controls.enableZoom=!hero;controls.minDistance=4;controls.maxDistance=8;controls.minPolarAngle=Math.PI*.3;controls.maxPolarAngle=Math.PI*.7;controls.autoRotate=hero&&!matchMedia('(prefers-reduced-motion: reduce)').matches;controls.autoRotateSpeed=.6;controls.addEventListener('start',()=>controls.autoRotate=false);
- const group=new THREE.Group();scene.add(group);const cloth=new THREE.MeshStandardMaterial({color:state.color,roughness:1,side:THREE.DoubleSide});const seam=new THREE.MeshStandardMaterial({color:state.color,roughness:1,side:THREE.DoubleSide});
- function depth(x,y){return .115+.15*Math.sqrt(Math.max(0,1-(x/.79)**2))+.009*Math.sin(x*34+y*3)*(.3+Math.abs(x))+.018*Math.sin(y*8+x*20)*Math.pow(Math.abs(x)/.8,2)}
- function width(t){return .68+.035*Math.cos(t*5)+.025*t}
- function top(s,front){return 1.05+.08*Math.abs(s)-(front?.27:.105)*Math.exp(-Math.pow(s/.36,4))}
- function panel(front){const n=64,m=64,pos=[],uv=[],indices=[];for(let j=0;j<=m;j++){const t=j/m;for(let i=0;i<=n;i++){const s=i/n*2-1,x=s*width(t),y=-1.12+t*(top(s,front)+1.12)+.018*Math.cos(s*5)*(1-t);pos.push(x,y,(front?1:-1)*depth(x,y));uv.push(i/n,t)}}for(let j=0;j<m;j++)for(let i=0;i<n;i++){const a=j*(n+1)+i,b=a+n+1;indices.push(a,a+1,b,b,a+1,b+1)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();group.add(new THREE.Mesh(g,cloth))}
- panel(true);panel(false);
- function stitch(points,r=.008){group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),100,r,5,false),seam))}
- for(const side of [-1,1]){const g=new THREE.PlaneGeometry(1,1,1,48),a=g.attributes.position;for(let i=0;i<a.count;i++){const t=a.getY(i)+.5,y=-1.12+t*1.75,x=side*width(t*.8);a.setXYZ(i,x,y,a.getX(i)*2*depth(x,y))}g.computeVertexNormals();group.add(new THREE.Mesh(g,cloth))}
- for(const front of [true,false])for(const offset of [0,.025]){const points=[];for(let i=0;i<=64;i++){const x=(i/64*2-1)*width(0),y=-1.1+offset+.018*Math.cos(x*7);points.push(new THREE.Vector3(x,y,(front?1:-1)*depth(x,y)))}stitch(points,.005)}
- // A curved neckline and open sleeve cuffs give the garment real volume.
- const neck=[];for(let i=0;i<=100;i++){const a=i/100*Math.PI*2,x=.285*Math.cos(a),z=.252*Math.sin(a),y=1.048-(z>=0?.264:.1)*Math.sqrt(Math.max(0,1-(x/.3)**2));neck.push(new THREE.Vector3(x,y,z))}stitch(neck,.027);
- for(const side of [-1,1]){const start=new THREE.Vector3(side*.48,.83,0),end=new THREE.Vector3(side*1.19,.53,0),axis=end.clone().sub(start);const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.27,.315,axis.length(),48,12,true),cloth);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),axis.clone().normalize());mesh.position.copy(start.clone().add(end).multiplyScalar(.5));group.add(mesh);for(const off of [0,.025]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.27,.006,5,64),seam);ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),axis.clone().normalize());ring.position.copy(end.clone().addScaledVector(axis.clone().normalize(),-off));group.add(ring)}}
- // Shoulder panels join front and back across the top, outside the neck opening.
- for(const side of [-1,1]){const g=new THREE.PlaneGeometry(1,1,24,12),a=g.attributes.position;for(let i=0;i<a.count;i++){const x=side*(.285+(a.getX(i)+.5)*.44),t=a.getY(i)+.5,s=x/width(1),y=THREE.MathUtils.lerp(top(s,false),top(s,true),t);a.setXYZ(i,x,y,(t*2-1)*depth(x,y))}g.computeVertexNormals();group.add(new THREE.Mesh(g,cloth))}
- const printMaterial=new THREE.MeshStandardMaterial({transparent:true,roughness:1,side:THREE.FrontSide}),printGeometry=new THREE.PlaneGeometry(.9,1.05,40,40),original=printGeometry.attributes.position.array.slice(),print=new THREE.Mesh(printGeometry,printMaterial);group.add(print);print.visible=false;let currentImage='',generation=0;
- async function update(s){cloth.color.set(s.color);seam.color.set(s.color).multiplyScalar(.94);group.scale.set(s.kind==='over'?1.12:s.kind==='kids'?.83:1,s.kind==='kids'?.88:1,1);const img=s.image||'';print.visible=!!img;if(currentImage===img)return;currentImage=img;const token=++generation;if(!img){printMaterial.map?.dispose();printMaterial.map=null;return}try{const texture=await new THREE.TextureLoader().loadAsync(img);if(token!==generation){texture.dispose();return}texture.colorSpace=THREE.SRGBColorSpace;const aspect=texture.image.width/texture.image.height,sx=aspect>.857?1:aspect/.857,sy=aspect>.857?.857/aspect:1,a=printGeometry.attributes.position;for(let i=0;i<a.count;i++){const x=original[i*3]*sx,y=original[i*3+1]*sy+.06;a.setXYZ(i,x,y,depth(x,y)+.007)}a.needsUpdate=true;printGeometry.computeVertexNormals();printMaterial.map?.dispose();printMaterial.map=texture;printMaterial.needsUpdate=true;renderer.domElement.setAttribute('aria-label','Polera 3D con tu diseño. Arrastra para girar.')}catch{currentImage='';print.visible=false}}
- function resize(){const w=container.clientWidth,h=container.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h)}new ResizeObserver(resize).observe(container);let visible=true;new IntersectionObserver(([entry])=>visible=entry.isIntersecting).observe(container);renderer.setAnimationLoop(()=>{if(!visible||document.hidden)return;const dialog=container.closest('dialog');if(dialog&&!dialog.open)return;controls.update();renderer.render(scene,camera)});await update(state);resize();return{update,resize,reset(){controls.autoRotate=false;camera.position.set(0,.12,initial.z);controls.target.set(0,0,0);controls.update()}};
+let modelPromise;
+function loadGarment() {
+  modelPromise ??= new GLTFLoader().loadAsync('/shirt.glb').catch(error => {
+    modelPromise = undefined;
+    throw error;
+  });
+  return modelPromise;
+}
+
+export async function createViewer(container, state, { hero = false } = {}) {
+  // Load before replacing the fallback, so a failed download never leaves a blank canvas.
+  const asset = await loadGarment();
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(33, 1, .1, 100);
+  const initial = new THREE.Vector3(hero ? .42 : .22, .05, hero ? 5.7 : 5.9);
+  camera.position.copy(initial);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.domElement.setAttribute('aria-label', 'Polera 3D en blanco. Arrastra para ver frente, costados y espalda.');
+  container.replaceChildren(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a859b, 1.55));
+  const softbox = new THREE.DirectionalLight(0xfff7ed, 2.6);
+  softbox.position.set(-3, 4, 6);
+  scene.add(softbox);
+  const fill = new THREE.DirectionalLight(0xe6e7ff, .85);
+  fill.position.set(4, 1, 3);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 1.7);
+  rim.position.set(2, 3, -4);
+  scene.add(rim);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enablePan = false;
+  controls.enableDamping = true;
+  controls.enableZoom = !hero;
+  controls.minDistance = 4;
+  controls.maxDistance = 8;
+  controls.minPolarAngle = Math.PI * .25;
+  controls.maxPolarAngle = Math.PI * .75;
+  // Keep the printable front visible on arrival; rotation is always user-controlled.
+  controls.autoRotate = false;
+
+  const group = new THREE.Group();
+  scene.add(group);
+  let sourceMesh;
+  asset.scene.traverse(node => { if (node.isMesh && !sourceMesh) sourceMesh = node; });
+  if (!sourceMesh) throw new Error('El modelo no contiene una prenda.');
+  asset.scene.updateMatrixWorld(true);
+  const geometry = sourceMesh.geometry.clone().applyMatrix4(sourceMesh.matrixWorld);
+  geometry.computeBoundingBox();
+  const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+  const modelScale = 2.65 / geometry.boundingBox.getSize(new THREE.Vector3()).y;
+  geometry.translate(-center.x, -center.y, -center.z);
+  geometry.scale(modelScale, modelScale, modelScale);
+  const cloth = sourceMesh.material.clone();
+  cloth.color.set(state.color);
+  cloth.roughness = .96;
+  cloth.metalness = 0;
+  cloth.normalScale.set(.32, .32);
+  cloth.aoMapIntensity = .72;
+  const shirt = new THREE.Mesh(geometry, cloth);
+  group.add(shirt);
+
+  const printMaterial = new THREE.MeshStandardMaterial({
+    transparent: true, roughness: .98, metalness: 0,
+    polygonOffset: true, polygonOffsetFactor: -4,
+    depthWrite: false, side: THREE.FrontSide
+  });
+  let print, currentImage = '', generation = 0;
+  const ray = new THREE.Raycaster(new THREE.Vector3(0, .15, 3), new THREE.Vector3(0, 0, -1));
+  shirt.updateMatrixWorld(true);
+  const frontZ = ray.intersectObject(shirt)[0]?.point.z ?? .4;
+
+  async function update(next) {
+    cloth.color.set(next.color);
+    group.scale.set(next.kind === 'over' ? 1.1 : next.kind === 'kids' ? .85 : 1, next.kind === 'kids' ? .87 : 1, 1);
+    const url = next.image || '';
+    if (url === currentImage) return;
+    currentImage = url;
+    const token = ++generation;
+    if (print) { group.remove(print); print.geometry.dispose(); print = undefined; }
+    printMaterial.map?.dispose();
+    printMaterial.map = null;
+    if (!url) return;
+    try {
+      const texture = await new THREE.TextureLoader().loadAsync(url);
+      if (generation !== token) { texture.dispose(); return; }
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      const aspect = texture.image.width / texture.image.height;
+      const width = Math.min(.95, 1.12 * aspect);
+      const height = width / aspect;
+      // Project onto the actual cloth mesh, including wrinkles. Never a floating rectangle.
+      const previousScale = group.scale.clone();
+      group.scale.setScalar(1);
+      group.updateMatrixWorld(true);
+      const decal = new DecalGeometry(shirt, new THREE.Vector3(0, .15, frontZ + .045), new THREE.Euler(), new THREE.Vector3(width, height, .34));
+      group.scale.copy(previousScale);
+      group.updateMatrixWorld(true);
+      printMaterial.map = texture;
+      printMaterial.needsUpdate = true;
+      print = new THREE.Mesh(decal, printMaterial);
+      group.add(print);
+      renderer.domElement.setAttribute('aria-label', 'Polera 3D con tu diseño aplicado a la tela. Arrastra para girar.');
+    } catch (error) {
+      currentImage = '';
+      container.dispatchEvent(new CustomEvent('preview-error', { detail: error }));
+    }
+  }
+  function resize() {
+    const width = container.clientWidth, height = container.clientHeight;
+    if (!width || !height) return;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+  }
+  new ResizeObserver(resize).observe(container);
+  let visible = true;
+  new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }).observe(container);
+  renderer.setAnimationLoop(() => {
+    if (!visible || document.hidden) return;
+    const dialog = container.closest('dialog');
+    if (dialog && !dialog.open) return;
+    controls.update();
+    renderer.render(scene, camera);
+  });
+  await update(state);
+  resize();
+  return {
+    update, resize,
+    reset() { camera.position.set(0, .05, initial.z); controls.target.set(0, 0, 0); controls.update(); }
+  };
 }
