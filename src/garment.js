@@ -2,8 +2,33 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
+import { createGarmentCut } from './garment-cuts.js';
+import { garmentOpenings } from './garment-edges.js';
 
 let modelPromise;
+// Follow the garment's actual open edges, including its folds and sleeve angle.
+function addGarmentHems(mesh, kind = 'basic') {
+  const geometry = mesh.geometry;
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox, height = bounds.max.y - bounds.min.y;
+  for (const points of garmentOpenings(geometry)) {
+    const averageY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+    const relativeY = (averageY - bounds.min.y) / height;
+    const bottomHem = relativeY < .3;
+    const collar = relativeY > .8;
+    const curve = new THREE.CatmullRomCurve3(points, true, 'centripetal');
+    const shade = collar && kind === 'over' ? .97 : .94;
+    const material = new THREE.MeshStandardMaterial({
+      color: mesh.material.color.clone().multiplyScalar(shade), roughness: 1, metalness: 0
+    });
+    const collarRadius = kind === 'over' ? .0034 : .0032;
+    const hem = new THREE.Mesh(new THREE.TubeGeometry(curve, points.length * 2, height * (collar ? collarRadius : .0018), 8, true), material);
+    hem.name = collar ? 'Cuello · ribete' : bottomHem ? 'Basta inferior' : 'Manga · basta';
+    hem.userData.garmentHem = true;
+    hem.userData.fabricShade = shade;
+    mesh.add(hem);
+  }
+}
 function loadGarment() {
   modelPromise ??= new GLTFLoader().loadAsync('/shirt.glb').catch(error => {
     modelPromise = undefined;
@@ -12,12 +37,13 @@ function loadGarment() {
   return modelPromise;
 }
 
-export async function createViewer(container, state, { hero = false } = {}) {
+export async function createViewer(container, state, { hero = false, viewAngle = 0, cameraDistance = 4.9 } = {}) {
   // Load before replacing the fallback, so a failed download never leaves a blank canvas.
   const asset = await loadGarment();
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(33, 1, .1, 100);
-  const initial = new THREE.Vector3(hero ? .42 : .22, .05, hero ? 5.7 : 5.9);
+  const distance = hero ? 4.75 : cameraDistance;
+  const initial = new THREE.Vector3(Math.sin(viewAngle) * distance, .05, Math.cos(viewAngle) * distance);
   camera.position.copy(initial);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -27,7 +53,8 @@ export async function createViewer(container, state, { hero = false } = {}) {
   renderer.domElement.setAttribute('aria-label', 'Polera 3D en blanco. Arrastra para ver frente, costados y espalda.');
   container.replaceChildren(renderer.domElement);
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a859b, 1.55));
+  const ambient = new THREE.HemisphereLight(0xffffff, 0x8a859b, 1.55);
+  scene.add(ambient);
   const softbox = new THREE.DirectionalLight(0xfff7ed, 2.6);
   softbox.position.set(-3, 4, 6);
   scene.add(softbox);
@@ -47,7 +74,9 @@ export async function createViewer(container, state, { hero = false } = {}) {
   controls.minPolarAngle = Math.PI * .25;
   controls.maxPolarAngle = Math.PI * .75;
   // Keep the printable front visible on arrival; rotation is always user-controlled.
-  controls.autoRotate = false;
+  controls.autoRotate = hero;
+  controls.autoRotateSpeed = .65;
+  if (hero) window.setTimeout(() => { controls.autoRotate = false; }, 1800);
 
   const group = new THREE.Group();
   scene.add(group);
@@ -67,8 +96,28 @@ export async function createViewer(container, state, { hero = false } = {}) {
   cloth.metalness = 0;
   cloth.normalScale.set(.32, .32);
   cloth.aoMapIntensity = .72;
-  const shirt = new THREE.Mesh(geometry, cloth);
-  group.add(shirt);
+  const cuts = {};
+  function getCut(kind) {
+    if (!cuts[kind]) {
+      const material = cloth.clone();
+      if (kind === 'over') {
+        // The source normal map belongs to the fitted sample and creates the
+        // dark vertical stripe seen under the Over's arm. Let this cut shade
+        // from its own relaxed geometry instead.
+        material.normalMap = null;
+        material.normalScale.set(0, 0);
+        material.aoMap = null;
+        material.roughness = 1;
+        material.needsUpdate = true;
+      }
+      const cut = new THREE.Mesh(kind === 'basic' ? geometry : createGarmentCut(geometry, kind), material);
+      cut.name = `Polera ${kind}`;
+      addGarmentHems(cut, kind);
+      cuts[kind] = cut;
+      group.add(cut);
+    }
+    return cuts[kind];
+  }
 
   const printMaterial = new THREE.MeshStandardMaterial({
     transparent: true, roughness: .98, metalness: 0,
@@ -76,16 +125,27 @@ export async function createViewer(container, state, { hero = false } = {}) {
     depthWrite: false, side: THREE.FrontSide
   });
   let print, currentImage = '', generation = 0;
-  const ray = new THREE.Raycaster(new THREE.Vector3(0, .15, 3), new THREE.Vector3(0, 0, -1));
-  shirt.updateMatrixWorld(true);
-  const frontZ = ray.intersectObject(shirt)[0]?.point.z ?? .4;
+  const ray = new THREE.Raycaster();
 
   async function update(next) {
     cloth.color.set(next.color);
-    group.scale.set(next.kind === 'over' ? 1.1 : next.kind === 'kids' ? .85 : 1, next.kind === 'kids' ? .87 : 1, 1);
+    // Less fill allows the loose cotton's curved panels to read on white too.
+    ambient.intensity = next.kind === 'over' ? 1.05 : 1.55;
+    fill.intensity = next.kind === 'over' ? .5 : .85;
+    const shirt = getCut(next.kind);
+    shirt.material.color.set(next.color);
+    Object.values(cuts).forEach(cut => { cut.visible = cut === shirt; });
+    shirt.children.forEach(hem => hem.material.color.set(next.color).multiplyScalar(hem.userData.fabricShade ?? .94));
     const url = next.image || '';
-    if (url === currentImage) return;
-    currentImage = url;
+    const back = next.printSide === 'back';
+    const requestedScale = next.printScale || 1;
+    const maxScale = next.assessment?.printWidth && next.assessment?.printHeight
+      ? Math.min(1.35, 28 / next.assessment.printWidth, 40 / next.assessment.printHeight)
+      : 1.35;
+    const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
+    const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) : '';
+    if (key === currentImage) return;
+    currentImage = key;
     const token = ++generation;
     if (print) { group.remove(print); print.geometry.dispose(); print = undefined; }
     printMaterial.map?.dispose();
@@ -97,15 +157,14 @@ export async function createViewer(container, state, { hero = false } = {}) {
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       const aspect = texture.image.width / texture.image.height;
-      const width = Math.min(.95, 1.12 * aspect);
+      const printArea = next.kind === 'kids' ? { width: .82, height: 1.15, y: .12 } : next.kind === 'over' ? { width: 1.12, height: 1.40, y: .10 } : { width: .95, height: 1.357, y: .15 };
+      const width = Math.min(printArea.width, printArea.height * aspect) * printScale;
       const height = width / aspect;
-      // Project onto the actual cloth mesh, including wrinkles. Never a floating rectangle.
-      const previousScale = group.scale.clone();
-      group.scale.setScalar(1);
+      // Project onto the active cloth mesh so the artwork follows the fabric instead of floating.
       group.updateMatrixWorld(true);
-      const decal = new DecalGeometry(shirt, new THREE.Vector3(0, .15, frontZ + .045), new THREE.Euler(), new THREE.Vector3(width, height, .34));
-      group.scale.copy(previousScale);
-      group.updateMatrixWorld(true);
+      ray.set(new THREE.Vector3(0, printArea.y, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
+      const targetZ = ray.intersectObject(shirt, false)[0]?.point.z ?? (back ? -.4 : .4);
+      const decal = new DecalGeometry(shirt, new THREE.Vector3(0, printArea.y, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .5));
       printMaterial.map = texture;
       printMaterial.needsUpdate = true;
       print = new THREE.Mesh(decal, printMaterial);
@@ -137,6 +196,8 @@ export async function createViewer(container, state, { hero = false } = {}) {
   resize();
   return {
     update, resize,
+    turn(angle = 0) { group.rotation.y = angle; },
+    face(side) { camera.position.set(0, .05, side === 'back' ? -initial.z : initial.z); controls.target.set(0, 0, 0); controls.update(); },
     reset() { camera.position.set(0, .05, initial.z); controls.target.set(0, 0, 0); controls.update(); }
   };
 }

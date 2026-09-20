@@ -1,1 +1,61 @@
-<!doctype html><html lang="es-CL"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#f9f7f2"/><meta name="description" content="Tu idea favorita, puesta. Crea una polera única con tu foto, un diseño de IA o la ayuda de nuestro taller creativo."/><title>Polerama — Tu idea favorita, puesta.</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23f955a5'/%3E%3Ctext x='16' y='49' font-size='52' font-family='Arial' font-weight='bold'%3Ep%3C/text%3E%3C/svg%3E"/><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"></head><body><div id="app"></div><script type="module" src="/src/main.js"></script></body></html>
+<!doctype html>
+<html lang="es-CL">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f9f7f2" />
+    <meta name="description" content="Tu idea favorita, puesta. Crea una polera única con tu foto, un diseño de IA o la ayuda de nuestro taller creativo." />
+    <title>droska — SHIRT</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23f955a5'/%3E%3Ctext x='10' y='47' font-size='42' font-family='Arial' font-weight='bold'%3Ed%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      body.is-preloading{margin:0;overflow:hidden;background:#f9f7f2}
+      .site-preloader{position:fixed;inset:0;z-index:9999;overflow:hidden;background:#f9f7f2;color:#262920;transition:opacity .32s ease,visibility .32s ease}
+      .site-preloader.is-leaving{opacity:0;visibility:hidden;pointer-events:none}
+      .sk-line,.sk-block,.sk-pill,.sk-card{position:relative;overflow:hidden;background:#e8e5de}
+      .sk-line::after,.sk-block::after,.sk-pill::after,.sk-card::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,#ffffffa8,transparent);animation:sk-shimmer 1.25s ease-in-out infinite}
+      @keyframes sk-shimmer{to{transform:translateX(100%)}}
+      .sk-announcement{height:33px;background:#dfff78}
+      .sk-shell{width:min(1320px,90%);margin:auto}
+      .sk-nav{height:100px;display:flex;align-items:center;gap:22px}
+      .sk-brand{width:178px;height:36px;border-radius:8px;background:#dedbd4}
+      .sk-nav-links{display:flex;gap:14px;margin-left:auto}
+      .sk-nav-links .sk-line{width:92px;height:11px;border-radius:999px}
+      .sk-pill{width:166px;height:46px;margin-left:15px;border-radius:999px;background:#d9d6cf}
+      .sk-hero{display:grid;grid-template-columns:1fr 1.05fr;gap:48px;padding-top:34px}
+      .sk-copy{padding-top:14px}
+      .sk-copy>.sk-line:first-child{width:210px;height:10px;margin-bottom:30px;border-radius:999px}
+      .sk-title{display:grid;gap:13px;margin-bottom:30px}
+      .sk-title .sk-line{height:72px;border-radius:12px;background:#dedbd4}
+      .sk-title .sk-line:nth-child(1){width:86%}.sk-title .sk-line:nth-child(2){width:94%}.sk-title .sk-line:nth-child(3){width:62%;background:#efb4cf}
+      .sk-copy-lines{display:grid;gap:10px;margin-bottom:30px}.sk-copy-lines .sk-line{width:78%;height:13px;border-radius:999px}.sk-copy-lines .sk-line:last-child{width:58%}
+      .sk-copy>.sk-pill{width:210px;height:54px;margin:0;background:#d4d1cb}
+      .sk-art{height:545px;border-radius:18px;background:#cfc5e8;position:relative;overflow:hidden}
+      .sk-shirt{position:absolute;left:23%;top:15%;width:54%;height:66%;border-radius:46% 46% 20% 20%;background:#f2f0ea;transform:rotate(-6deg)}
+      .sk-art .sk-line{position:absolute;left:28px;top:28px;width:126px;height:9px;border-radius:999px;background:#b5a8d2}
+      .sk-lower{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}.sk-card{height:118px;border-radius:14px;background:#eeeae3}
+      .sk-reader{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      @media(max-width:760px){.sk-announcement{height:29px}.sk-shell{width:88%}.sk-nav{height:80px}.sk-brand{width:145px;height:30px}.sk-nav-links{display:none}.sk-nav>.sk-pill{width:118px;height:42px;margin-left:auto}.sk-hero{grid-template-columns:1fr;gap:28px;padding-top:18px}.sk-title{gap:10px}.sk-title .sk-line{height:50px}.sk-art{height:370px}.sk-lower{grid-template-columns:1fr;margin-top:28px}.sk-card{height:92px}.sk-card:nth-child(n+2){display:none}}
+      @media(prefers-reduced-motion:reduce){.sk-line::after,.sk-block::after,.sk-pill::after,.sk-card::after{animation:none}.site-preloader{transition:none}}
+    </style>
+  </head>
+  <body class="is-preloading">
+    <div id="site-preloader" class="site-preloader" role="status" aria-live="polite" aria-label="Cargando droska SHIRT">
+      <div class="sk-announcement"></div>
+      <div class="sk-shell">
+        <div class="sk-nav"><div class="sk-brand sk-block"></div><div class="sk-nav-links"><div class="sk-line"></div><div class="sk-line"></div><div class="sk-line"></div></div><div class="sk-pill"></div></div>
+        <div class="sk-hero">
+          <div class="sk-copy"><div class="sk-line"></div><div class="sk-title"><div class="sk-line"></div><div class="sk-line"></div><div class="sk-line"></div></div><div class="sk-copy-lines"><div class="sk-line"></div><div class="sk-line"></div></div><div class="sk-pill"></div></div>
+          <div class="sk-art sk-block"><div class="sk-line"></div><div class="sk-shirt sk-block"></div></div>
+        </div>
+        <div class="sk-lower"><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+      </div>
+      <span class="sk-reader">Preparando tu estudio creativo…</span>
+    </div>
+    <div id="app" aria-busy="true"></div>
+    <script type="module" src="/src/main.js"></script>
+    <script>window.setTimeout(function(){var p=document.getElementById('site-preloader');if(p){p.classList.add('is-leaving');document.body.classList.remove('is-preloading');document.getElementById('app')?.setAttribute('aria-busy','false');window.setTimeout(function(){p.remove()},380)}},6000)</script>
+  </body>
+</html>
