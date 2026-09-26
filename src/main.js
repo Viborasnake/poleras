@@ -215,7 +215,7 @@ function syncPreview(){
  const panel=document.querySelector('#reference-panel');panel.hidden=true;panel.replaceChildren();
     viewer?.update(renderState);heroViewer?.update(heroPreviewState());
  const fallback=document.querySelector('.preview-fallback img');if(fallback){fallback.hidden=!renderState.image;if(!fallback.hidden)fallback.src=renderState.image}
- if((isForging||showMockup)&&studio.open){if(!viewerPromise)viewerPromise=import('./garment.js').then(async m=>{viewer=await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:window.matchMedia('(max-width:650px)').matches?3.6:4.9});return viewer}).catch(()=>{viewerPromise=null;document.querySelector('.viewer-note').textContent='El visor 3D no está disponible en este navegador.'});
+ if((isForging||showMockup)&&studio.open){if(!viewerPromise)viewerPromise=import('./garment.js').then(async m=>{viewer=await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:window.matchMedia('(max-width:650px)').matches?3.1:4.9});return viewer}).catch(()=>{viewerPromise=null;document.querySelector('.viewer-note').textContent='El visor 3D no está disponible en este navegador.'});
  viewerPromise?.then(()=>{viewer?.update(renderState);viewer?.resize()})}
 }
 document.querySelectorAll('[data-hero-color]').forEach(b=>b.onclick=()=>{state.color=b.dataset.heroColor;document.querySelectorAll('[data-hero-color]').forEach(s=>s.classList.toggle('chosen',s===b));syncPreview()});

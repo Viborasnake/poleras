@@ -1721,21 +1721,21 @@ footer .logo > span {
 /* Distribución vertical del estudio en móvil: preview, progreso y formulario comparten el viewport. */
 @media (max-width: 760px) {
   #studio:has(#live-preview:not([hidden])) .preview {
-    flex: 0 0 324px;
-    min-height: 324px;
+    flex: 0 0 450px;
+    min-height: 450px;
     padding: 12px 10px 10px;
     overflow: hidden;
   }
   #studio:has(#live-preview:not([hidden])) #live-preview {
     display: grid;
-    grid-template-rows: auto minmax(0, 234px) auto auto;
+    grid-template-rows: auto minmax(0, 360px) auto auto;
     align-content: start;
     gap: 6px;
     height: 100%;
   }
   #studio:has(#live-preview:not([hidden])) #viewer {
     width: 100%;
-    height: 234px;
+    height: 360px;
     min-height: 0;
   }
   #studio:has(#live-preview:not([hidden])) .viewer-note {
@@ -2044,6 +2044,3 @@ dialog.cart-drawer.is-closing::backdrop{animation:cart-backdrop-out .26s ease-in
 
 /* Mantiene las portadas grandes también en el catálogo móvil. */
 @media(max-width:650px){.catalog-collection-card .catalog-visual{min-height:440px}.catalog-collection-card .catalog-3d{transform:scale(1.38)}.catalog-collection-card .catalog-shirt{margin-top:42px;transform:rotate(-3deg) scale(1.12)}}
-
-/* El diálogo recibe foco para accesibilidad, sin añadir un marco visual al contenedor. */
-#studio:focus,#studio:focus-visible{outline:none}
