@@ -1721,8 +1721,8 @@ footer .logo > span {
 /* Distribución vertical del estudio en móvil: preview, progreso y formulario comparten el viewport. */
 @media (max-width: 760px) {
   #studio:has(#live-preview:not([hidden])) .preview {
-    flex: 0 0 450px;
-    min-height: 450px;
+    flex: 0 0 400px;
+    min-height: 400px;
     padding: 12px 10px 10px;
     overflow: hidden;
   }
