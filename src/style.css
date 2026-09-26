@@ -2063,3 +2063,22 @@ dialog:focus,dialog:focus-visible{outline:none}
  #studio .dialog-header .steps-rail .active b{width:36px;height:36px;font-size:10px}
  #studio .dialog-header .steps-rail small{max-width:76px;margin-top:8px;font-size:8px;line-height:1.15;letter-spacing:0}
 }
+
+/* Ritmo interno consistente para todos los estados del modal de cuenta. */
+#account-content{padding:24px 27px 28px}
+#account-content>.commerce-copy,
+#account-content>.account-form,
+#account-content>.commerce-note,
+#account-content>.account-welcome{margin-left:0;margin-right:0}
+#account-content>.commerce-copy{margin-top:0;margin-bottom:20px}
+#account-content>.account-form{margin-top:0}
+#account-content>.commerce-note{margin-top:18px;margin-bottom:0}
+#account-content>.account-welcome{margin-top:0;margin-bottom:20px;padding:16px 17px}
+#account-content>.account-welcome+.commerce-copy{margin-bottom:22px}
+#account-content>#logout-account{margin-top:0}
+#account-content>.account-confirmation{margin:0;padding:24px 20px}
+#account-content>.account-confirmation-actions{margin:20px 0 0}
+@media(max-width:760px){
+ #account-content{padding:21px 20px 24px}
+ #account-content>.account-welcome{padding:15px}
+}
