@@ -199,7 +199,7 @@ const primaryCtas=[...document.querySelectorAll('.nav-cta[data-start],.hero-copy
 primaryCtas.forEach(cta=>{cta.classList.add('primary-idea-cta');cta.dataset.start='ready';cta.innerHTML=primaryCtaMarkup});
 ideaLink?.classList.add('primary-idea-cta');
 function previewState(){const isSample=!state.images?.[state.printSide]&&state.isDefault;const sideImage=state.images?.[state.printSide]||(isSample?'/laika.png':'');const sideAssessment=state.assessments?.[state.printSide]||state.assessment;return {...state,image:state.mode==='ready'&&sideImage?sideImage:'',assessment:sideAssessment}}
-function heroPreviewState(){const preview=previewState();return {...preview,printScale:Math.min((preview.printScale||1)*1.35,1.5)}}
+function heroPreviewState(){const preview=previewState();return {...preview,printScale:Math.min((preview.printScale||1)*1.7,1.9)}}
 import('./garment.js').then(async m=>{heroViewer=await m.createViewer(document.querySelector('#hero-viewer'),heroPreviewState(),{hero:true})}).catch(()=>{document.querySelector('.art-bottom span').textContent='TU POLERA EN BLANCO · LISTA PARA CREAR'});
 function syncPreview(){
  const sideImage=state.images?.[state.printSide]||'';
@@ -280,7 +280,7 @@ async function prepareCatalogMockups(){
  try{
   const {createViewer}=await import('./garment.js');
   viewport=document.createElement('div');viewport.className='catalog-render-viewport';viewport.setAttribute('aria-hidden','true');document.body.append(viewport);
-  const preview={kind:'basic',color:'#ffffff',image:'',printSide:'front',printScale:1.3,assessment:null,catalogPreview:true};
+  const preview={kind:'basic',color:'#ffffff',image:'',printSide:'front',printScale:1.4,assessment:null,catalogPreview:true};
   viewer=await createViewer(viewport,preview,{cameraDistance:5.15});
   for(const design of catalogDesigns){
    const artwork=await loadCatalogArtwork(design);

@@ -257,10 +257,10 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const back = next.printSide === 'back';
     printOnBack = back;
     const requestedScale = next.printScale || 1;
-    const visualMaxScale = hero ? 1.5 : 1.35;
+    const visualMaxScale = hero ? 1.9 : 1.35;
     const maxScale = next.assessment?.printWidth && next.assessment?.printHeight
       ? Math.min(visualMaxScale, 28 / next.assessment.printWidth, 40 / next.assessment.printHeight)
-      : next.catalogPreview ? 1.4 : visualMaxScale;
+      : next.catalogPreview ? 1.5 : visualMaxScale;
     const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
     const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : 'safe-fit-v3';
     const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + fitMode : '';
@@ -274,7 +274,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     try {
       const texture = await new THREE.TextureLoader().loadAsync(url);
       if (generation !== token) { texture.dispose(); return; }
-      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .028 : hero ? .18 : .08);
+      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .08 : hero ? .18 : .08);
       texture.image = fitted.image;
       texture.needsUpdate = true;
       texture.colorSpace = THREE.SRGBColorSpace;
@@ -289,7 +289,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       group.updateMatrixWorld(true);
       ray.set(new THREE.Vector3(0, placementY, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
       const targetZ = ray.intersectObject(shirt, false)[0]?.point.z ?? (back ? -.4 : .4);
-      const decal = settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, next.catalogPreview ? .28 : .52));
+      const decal = settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, (next.catalogPreview || hero) ? -1 : .52));
       printMaterial.map = texture;
       printMaterial.needsUpdate = true;
       print = new THREE.Mesh(decal, printMaterial);
