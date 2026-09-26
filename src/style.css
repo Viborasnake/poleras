@@ -2082,3 +2082,53 @@ dialog:focus,dialog:focus-visible{outline:none}
  #account-content{padding:21px 20px 24px}
  #account-content>.account-welcome{padding:15px}
 }
+
+/* Área privada: pedidos y datos personales. */
+#account-modal{width:min(650px,calc(100vw - 28px))}
+#account-content{max-height:calc(100dvh - 132px);overflow:auto}
+.account-sections{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 22px;padding:5px;border-radius:12px;background:var(--ds-surface-subtle)}
+.account-sections button{min-height:44px;padding:9px 14px;border:1px solid transparent;border-radius:9px;background:transparent;font-size:13px;font-weight:800}
+.account-sections button:hover{background:var(--ds-surface-raised)}
+.account-sections button.active{border-color:var(--ds-border-control);background:var(--ds-surface-raised);box-shadow:0 3px 0 var(--ds-color-pink-shadow)}
+.account-panel{min-height:190px}
+.account-loading{display:grid;place-items:center;align-content:center;gap:10px;min-height:190px;color:var(--ds-text-secondary);font-size:12px;font-weight:700}
+.account-loading span{width:28px;height:28px;border:3px solid var(--ds-border-subtle);border-top-color:var(--ds-brand-accent);border-radius:50%;animation:catalog-loader-spin .8s linear infinite}
+.account-logout{display:block;margin:24px auto 0;padding:7px 10px;background:transparent;color:var(--ds-text-secondary);font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.account-orders{display:grid;gap:12px}
+.account-order{padding:17px;border:1px solid var(--ds-border-subtle);border-radius:13px;background:var(--ds-surface-raised)}
+.account-order>div{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.account-order>div:first-child span{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.account-order>div:first-child strong{font:800 18px 'Space Grotesk',sans-serif}
+.account-order>div:nth-child(2){margin-top:9px}
+.account-order-status{padding:5px 9px;border-radius:999px;background:var(--ds-lime-500);font-size:10px;font-weight:800}
+.account-order time{color:var(--ds-text-secondary);font-size:11px}
+.account-order>p{margin:12px 0 0;color:var(--ds-text-secondary);font-size:12px;line-height:1.45}
+.account-order details{margin-top:14px;padding:12px 0 0;border-top:1px solid var(--ds-border-subtle);border-bottom:0}
+.account-order details summary{font-size:12px;font-weight:800}
+.account-order details>div{display:grid;gap:10px;margin-top:12px}
+.account-order details>div>span{display:flex;align-items:start;justify-content:space-between;gap:14px;font-size:12px}
+.account-order details>div>span>span{display:grid;gap:3px}
+.account-order details small{color:var(--ds-text-secondary);font-size:10px}
+.account-empty{display:grid;justify-items:center;min-height:220px;padding:28px 20px;border:1px dashed var(--ds-border-control);border-radius:14px;background:var(--ds-surface-subtle);text-align:center}
+.account-empty>span{display:grid;place-items:center;width:45px;height:45px;margin-bottom:12px;border-radius:50%;background:var(--ds-pink-100);font-size:24px}
+.account-empty strong{font:800 18px 'Space Grotesk',sans-serif}
+.account-empty p{max-width:330px;margin:7px 0 18px;color:var(--ds-text-secondary);font-size:12px;line-height:1.5}
+.account-empty .button{min-height:44px;padding:11px 18px;font-size:12px}
+.account-empty.error{align-content:center}
+.account-data-form{display:grid;gap:18px}
+.account-data-form fieldset{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0;padding:18px;border:1px solid var(--ds-border-subtle);border-radius:13px}
+.account-data-form legend{padding:0 7px;font:800 15px 'Space Grotesk',sans-serif}
+.account-data-form label{display:grid;align-content:start;gap:7px;font-size:11px;font-weight:800}
+.account-data-form label:has(textarea),.account-data-form label:nth-last-child(1){grid-column:1/-1}
+.account-data-form label>span{color:var(--ds-text-secondary);font-size:9px;font-weight:500}
+.account-data-form input,.account-data-form textarea{width:100%;min-height:46px;padding:11px 12px;border:1px solid var(--ds-border-control);border-radius:9px;background:#fff;color:var(--ds-text-primary);font-size:13px}
+.account-data-form textarea{min-height:78px;resize:vertical}
+.account-data-form input[readonly]{background:var(--ds-surface-subtle);color:var(--ds-text-secondary)}
+.account-data-form label small{color:var(--ds-text-secondary);font-size:9px;font-weight:500;line-height:1.35}
+.account-data-form>.commerce-wide{margin-top:0}
+@media(max-width:560px){
+ #account-modal{width:calc(100vw - 18px)}
+ .account-data-form fieldset{grid-template-columns:1fr;padding:16px}
+ .account-data-form label,.account-data-form label:has(textarea),.account-data-form label:nth-last-child(1){grid-column:1}
+ .account-order>div:first-child{align-items:flex-start}
+}
