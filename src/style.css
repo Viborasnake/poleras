@@ -2046,3 +2046,7 @@ dialog.cart-drawer.is-closing::backdrop{animation:cart-backdrop-out .26s ease-in
 
 /* Mantiene las portadas grandes también en el catálogo móvil. */
 @media(max-width:650px){.catalog-collection-card .catalog-visual{min-height:440px}.catalog-collection-card .catalog-3d{transform:scale(1.38)}.catalog-collection-card .catalog-shirt{margin-top:42px;transform:rotate(-3deg) scale(1.12)}}
+
+/* El diálogo recibe el foco inicial sin simular un control seleccionado.
+   Los controles interactivos conservan sus estilos :focus-visible. */
+dialog:focus,dialog:focus-visible{outline:none}
