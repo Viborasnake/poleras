@@ -274,7 +274,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     try {
       const texture = await new THREE.TextureLoader().loadAsync(url);
       if (generation !== token) { texture.dispose(); return; }
-      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .08 : hero ? .18 : .08);
+      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .08 : hero ? .25 : .08);
       texture.image = fitted.image;
       texture.needsUpdate = true;
       texture.colorSpace = THREE.SRGBColorSpace;
