@@ -257,9 +257,10 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const back = next.printSide === 'back';
     printOnBack = back;
     const requestedScale = next.printScale || 1;
+    const visualMaxScale = hero ? 1.5 : 1.35;
     const maxScale = next.assessment?.printWidth && next.assessment?.printHeight
-      ? Math.min(1.35, 28 / next.assessment.printWidth, 40 / next.assessment.printHeight)
-      : next.catalogPreview ? 1.4 : 1.35;
+      ? Math.min(visualMaxScale, 28 / next.assessment.printWidth, 40 / next.assessment.printHeight)
+      : next.catalogPreview ? 1.4 : visualMaxScale;
     const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
     const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : 'safe-fit-v3';
     const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + fitMode : '';
@@ -273,7 +274,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     try {
       const texture = await new THREE.TextureLoader().loadAsync(url);
       if (generation !== token) { texture.dispose(); return; }
-      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .028 : hero ? .12 : .08);
+      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .028 : hero ? .18 : .08);
       texture.image = fitted.image;
       texture.needsUpdate = true;
       texture.colorSpace = THREE.SRGBColorSpace;
