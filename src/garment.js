@@ -289,10 +289,21 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       group.updateMatrixWorld(true);
       ray.set(new THREE.Vector3(0, placementY, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
       const targetZ = ray.intersectObject(shirt, false)[0]?.point.z ?? (back ? -.4 : .4);
-      const decal = settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, (next.catalogPreview || hero) ? -1 : .52));
+      // Los previews editoriales deben mostrar el PNG completo. Un DecalGeometry se
+      // recorta contra las curvaturas de hombros/torso y redondea esquinas del arte.
+      // En hero y catálogo usamos una lámina frontal muy cercana a la tela; el estudio
+      // conserva la proyección conformada para representar la impresión final.
+      const useFlatPreview = next.catalogPreview || hero;
+      const decal = useFlatPreview
+        ? new THREE.PlaneGeometry(width, height)
+        : settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, .52));
       printMaterial.map = texture;
       printMaterial.needsUpdate = true;
       print = new THREE.Mesh(decal, printMaterial);
+      if (useFlatPreview) {
+        print.position.set(0, placementY, targetZ + (back ? -.018 : .018));
+        print.rotation.y = back ? Math.PI : 0;
+      }
       group.add(print);
       renderer.domElement.setAttribute('aria-label', 'Polera 3D con tu diseño aplicado a la tela. Arrastra para girar.');
     } catch (error) {
