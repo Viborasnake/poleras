@@ -298,11 +298,13 @@ export async function createViewer(container, state, { hero = false, viewAngle =
         ? new THREE.PlaneGeometry(width, height)
         : settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, .52));
       printMaterial.map = texture;
+      printMaterial.depthTest = !useFlatPreview;
       printMaterial.needsUpdate = true;
       print = new THREE.Mesh(decal, printMaterial);
       if (useFlatPreview) {
-        print.position.set(0, placementY, targetZ + (back ? -.018 : .018));
+        print.position.set(0, placementY, targetZ + (back ? -.08 : .08));
         print.rotation.y = back ? Math.PI : 0;
+        print.renderOrder = 2;
       }
       group.add(print);
       renderer.domElement.setAttribute('aria-label', 'Polera 3D con tu diseño aplicado a la tela. Arrastra para girar.');
