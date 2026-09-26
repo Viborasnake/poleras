@@ -255,7 +255,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const back = next.printSide === 'back';
     printOnBack = back;
     const requestedScale = next.printScale || 1;
-    const visualMaxScale = hero ? 1.9 : 1.35;
+    const visualMaxScale = hero ? 1.9 : next.catalogDesign ? 1.5 : 1.35;
     const maxScale = next.assessment?.printWidth && next.assessment?.printHeight
       ? Math.min(visualMaxScale, 28 / next.assessment.printWidth, 40 / next.assessment.printHeight)
       : next.catalogPreview ? 1.5 : visualMaxScale;
@@ -272,7 +272,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     try {
       const texture = await new THREE.TextureLoader().loadAsync(url);
       if (generation !== token) { texture.dispose(); return; }
-      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .08 : hero ? .25 : .08);
+      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .08 : hero ? .25 : next.catalogDesign ? .15 : .08);
       texture.image = fitted.image;
       texture.needsUpdate = true;
       texture.colorSpace = THREE.SRGBColorSpace;

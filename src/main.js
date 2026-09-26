@@ -359,6 +359,7 @@ async function chooseCatalogDesign(button){
     state.catalogDesign=design.name;state.catalogDesignSlug=design.id;state.kind='basic';state.size='M';state.color=normalizeSampleColor(design.sampleColor);state.printScale=1.35;state.printSides=['front'];
     const loaded=await upload(new File([blob],`droska-${design.id}.png`,{type:'image/png'}),'front',true);
     if(!loaded)throw new Error('No se pudo cargar el diseño');
+    state.assessment=null;state.assessments.front=null;state.printScale=1.45;
     catalogDialog.close();
     openStudio('ready');
   }catch{toast('No pudimos abrir este diseño. Vuelve a intentarlo.')}finally{button.disabled=false;button.innerHTML='Elegir diseño <span aria-hidden="true">→</span>'}
