@@ -1029,7 +1029,7 @@ footer .logo > span {
 }
 
 /* Wizard de compra droska.shirt */
-#studio .steps{display:block;width:100%;margin:0 0 25px;padding:3px 0 14px;border-bottom:1px solid #e4e0d8;overflow:hidden}
+#studio .steps{display:block;width:100%;margin:0 0 25px;padding:7px 0 14px;border-bottom:1px solid #e4e0d8;overflow:visible}
 .steps-rail{--rail-progress:0%;position:relative;display:grid;width:100%;min-width:0;grid-template-columns:repeat(var(--step-count,5),minmax(0,1fr));align-items:start}
 .steps-rail::before,.steps-rail>i{content:'';position:absolute;left:var(--rail-edge,7.15%);right:var(--rail-edge,7.15%);top:14px;height:3px;border-radius:999px;background:#dedbd4}
 .steps-rail>i{right:auto;z-index:1;width:var(--rail-progress);background:linear-gradient(90deg,#b7a6e1,var(--ds-color-pink));transition:width .35s ease}
