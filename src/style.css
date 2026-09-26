@@ -2095,6 +2095,7 @@ dialog:focus,dialog:focus-visible{outline:none}
 .account-loading span{width:28px;height:28px;border:3px solid var(--ds-border-subtle);border-top-color:var(--ds-brand-accent);border-radius:50%;animation:catalog-loader-spin .8s linear infinite}
 .account-logout{display:block;margin:24px auto 0;padding:7px 10px;background:transparent;color:var(--ds-text-secondary);font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
 .account-orders{display:grid;gap:12px}
+.account-orders-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px;color:var(--ds-text-secondary);font-size:10px}.account-orders-head button{padding:5px 8px;border:0;background:transparent;color:var(--ds-color-link);font-size:10px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
 .account-order{padding:17px;border:1px solid var(--ds-border-subtle);border-radius:13px;background:var(--ds-surface-raised)}
 .account-order>div{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .account-order>div:first-child span{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
@@ -2109,6 +2110,8 @@ dialog:focus,dialog:focus-visible{outline:none}
 .account-order details>div>span{display:flex;align-items:start;justify-content:space-between;gap:14px;font-size:12px}
 .account-order details>div>span>span{display:grid;gap:3px}
 .account-order details small{color:var(--ds-text-secondary);font-size:10px}
+.order-progress{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:0!important;margin:18px 0 4px!important;padding:0!important;list-style:none}.order-progress li{position:relative;display:grid!important;justify-items:center;align-content:start;gap:6px!important;min-width:0;text-align:center}.order-progress li:not(:first-child)::before{position:absolute;top:13px;right:50%;width:100%;height:2px;background:var(--ds-border-subtle);content:''}.order-progress li.complete:not(:first-child)::before,.order-progress li.current:not(:first-child)::before{background:var(--ds-brand-accent)}.order-progress li>span{position:relative;z-index:1;display:grid;place-items:center;width:27px;height:27px;border:2px solid var(--ds-border-control);border-radius:50%;background:var(--ds-surface-raised);color:var(--ds-text-secondary);font-size:8px;font-weight:900}.order-progress li.complete>span{border-color:var(--ds-brand-accent);background:var(--ds-brand-accent);color:#fff}.order-progress li.current>span{border-color:var(--ds-brand-accent);box-shadow:0 0 0 3px var(--ds-pink-100);color:var(--ds-brand-accent)}.order-progress li strong{max-width:72px;color:var(--ds-text-secondary);font-size:8px;line-height:1.25}.order-progress li.current strong,.order-progress li.complete strong{color:var(--ds-text-primary)}.order-progress.is-cancelled{opacity:.45}
+.account-order-history{display:grid;gap:7px;margin:13px 0 0!important;padding:12px 0 0!important;border-top:1px dashed var(--ds-border-subtle);list-style:none}.account-order-history li{display:flex;justify-content:space-between;gap:12px;color:var(--ds-text-secondary);font-size:10px}.account-order-history li span{font-weight:700}.account-order-history time{font-size:9px}
 .account-empty{display:grid;justify-items:center;min-height:220px;padding:28px 20px;border:1px dashed var(--ds-border-control);border-radius:14px;background:var(--ds-surface-subtle);text-align:center}
 .account-empty>span{display:grid;place-items:center;width:45px;height:45px;margin-bottom:12px;border-radius:50%;background:var(--ds-pink-100);font-size:24px}
 .account-empty strong{font:800 18px 'Space Grotesk',sans-serif}
@@ -2131,4 +2134,5 @@ dialog:focus,dialog:focus-visible{outline:none}
  .account-data-form fieldset{grid-template-columns:1fr;padding:16px}
  .account-data-form label,.account-data-form label:has(textarea),.account-data-form label:nth-last-child(1){grid-column:1}
  .account-order>div:first-child{align-items:flex-start}
+ .order-progress{overflow-x:auto;grid-template-columns:repeat(5,76px);padding-bottom:5px!important}.order-progress li strong{font-size:7.5px}
 }

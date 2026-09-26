@@ -1,2 +1,5 @@
 [functions.create-demo-order]
 verify_jwt = true
+
+[functions.update-order-status]
+verify_jwt = true
