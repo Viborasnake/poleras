@@ -199,7 +199,7 @@ const primaryCtas=[...document.querySelectorAll('.nav-cta[data-start],.hero-copy
 primaryCtas.forEach(cta=>{cta.classList.add('primary-idea-cta');cta.dataset.start='ready';cta.innerHTML=primaryCtaMarkup});
 ideaLink?.classList.add('primary-idea-cta');
 function previewState(){const isSample=!state.images?.[state.printSide]&&state.isDefault;const sideImage=state.images?.[state.printSide]||(isSample?'/laika.png':'');const sideAssessment=state.assessments?.[state.printSide]||state.assessment;return {...state,image:state.mode==='ready'&&sideImage?sideImage:'',assessment:sideAssessment}}
-function heroPreviewState(){const preview=previewState();return {...preview,printScale:Math.min((preview.printScale||1)*1.2,1.5)}}
+function heroPreviewState(){const preview=previewState();return {...preview,printScale:Math.min((preview.printScale||1)*1.35,1.5)}}
 import('./garment.js').then(async m=>{heroViewer=await m.createViewer(document.querySelector('#hero-viewer'),heroPreviewState(),{hero:true})}).catch(()=>{document.querySelector('.art-bottom span').textContent='TU POLERA EN BLANCO · LISTA PARA CREAR'});
 function syncPreview(){
  const sideImage=state.images?.[state.printSide]||'';
