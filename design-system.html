@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="es-CL">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f9f7f2" />
+    <title>Droska — Design system</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="ds-page">
+      <header class="ds-page-header">
+        <a class="ds-brand" href="/">droska <span>SHIRT</span></a>
+        <span class="ds-page-kicker">SISTEMA VIVO · v0.1</span>
+        <a class="ds-back" href="/">Volver al sitio ↗</a>
+      </header>
+
+      <section class="ds-intro">
+        <div class="ds-intro-copy"><span class="ds-eyebrow"><i></i> SISTEMA DE DISEÑO DROSKA</span><h1>Diseñar sin improvisar.</h1><p>Reglas, tokens y componentes reales para construir nuevas pantallas con la misma voz de marca.</p></div>
+        <dl class="ds-intro-status"><div><dt>Versión</dt><dd>v0.1</dd></div><div><dt>Estado</dt><dd><i></i> En construcción</dd></div><div><dt>Cobertura</dt><dd>6 áreas documentadas</dd></div><div><dt>Accesibilidad</dt><dd>WCAG 2.0 AA</dd></div></dl>
+      </section>
+
+      <nav class="ds-nav" aria-label="Secciones del sistema">
+        <a href="#color"><span>01</span><strong>Color</strong><small>Roles, pares y contraste</small></a><a href="#type"><span>02</span><strong>Tipografía</strong><small>Familias, escala y voz</small></a><a href="#buttons"><span>03</span><strong>Botones</strong><small>Variantes, tamaños y estados</small></a><a href="#patterns"><span>04</span><strong>Patrones</strong><small>Piezas reales de producto</small></a><a href="#forms"><span>05</span><strong>Forms</strong><small>Campos, ayuda y validación</small></a><a href="#overlays"><span>06</span><strong>Modals</strong><small>Modal, drawer y capas</small></a>
+      </nav>
+
+      <section id="color" class="ds-section">
+        <div class="ds-section-heading"><span class="ds-eyebrow"><i></i> 01 / COLOR</span><h2>Paleta de marca.</h2></div>
+        <div id="color-roles" class="ds-color-roles-block">
+        <div class="ds-color-roles-head"><div><span class="ds-eyebrow"><i></i> ROLES DE COLOR</span><h3>Marca, interfaz y significado.</h3></div><p>La paleta se organiza por función: identidad principal, soporte expresivo y feedback del producto.</p></div>
+        <div class="ds-color-groups">
+          <article class="ds-color-group"><div class="ds-color-group-head"><span class="ds-eyebrow"><i></i> BRAND / PRIMARIOS</span><p>La firma visual. Énfasis y acciones de alta jerarquía.</p></div><div class="ds-role-grid"><div class="ds-role-chip" style="--c:#262920;--t:#fff"><b>Ink 900</b><code>#262920</code><small>Texto blanco · 14.8:1</small></div><div class="ds-role-chip" style="--c:#f957a4;--t:#262920"><b>Pink 500</b><code>#F957A4</code><small>Texto ink · 4.9:1</small></div></div></article>
+          <article class="ds-color-group"><div class="ds-color-group-head"><span class="ds-eyebrow"><i></i> BRAND / SECUNDARIOS</span><p>Apoyan estructura, foco y superficies expresivas.</p></div><div class="ds-role-grid"><div class="ds-role-chip" style="--c:#6652c5;--t:#fff"><b>Lilac 500</b><code>#6652C5</code><small>Texto blanco · 5.9:1</small></div><div class="ds-role-chip" style="--c:#dfff78;--t:#262920"><b>Lime 500</b><code>#DFFF78</code><small>Texto ink · 13.2:1</small></div></div></article>
+          <article class="ds-color-group ds-semantic-group"><div class="ds-color-group-head"><span class="ds-eyebrow"><i></i> SATÉLITE / SEMÁNTICOS</span><p>Estados del producto. Siempre llevan texto, ícono o etiqueta.</p></div><div class="ds-role-grid four"><div class="ds-role-chip" style="--c:#2f6b2f;--t:#fff"><b>Success</b><code>#2F6B2F</code><small>Blanco · 6.4:1</small></div><div class="ds-role-chip" style="--c:#9a4d00;--t:#fff"><b>Warning</b><code>#9A4D00</code><small>Blanco · 6.1:1</small></div><div class="ds-role-chip" style="--c:#b42318;--t:#fff"><b>Danger</b><code>#B42318</code><small>Blanco · 6.6:1</small></div><div class="ds-role-chip" style="--c:#275dab;--t:#fff"><b>Info</b><code>#275DAB</code><small>Blanco · 6.5:1</small></div></div></article>
+        </div>
+        <div class="ds-contrast-guide"><span class="ds-contrast-guide-title"><strong>WCAG 2.0 AA</strong><small>Criterio de uso accesible</small></span><span><b>Texto</b> Normal ≥ 4.5:1; grande ≥ 3:1</span><span><b>Criterio DS</b> Controles, bordes e íconos ≥ 3:1</span><span>El texto de cada muestra indica la combinación aprobada.</span></div>
+        </div>
+        <div id="color-scales" class="ds-color-scale" aria-label="Escalas de color con contraste accesible">
+          <div class="ds-color-scale-head"><div><span class="ds-eyebrow"><i></i> ESCALAS DE COLOR</span><h3>De la identidad a cada tono.</h3></div><p>Cada familia ordena intensidad, función y contraste. Los componentes usan sus tokens semánticos, no estos valores directamente.</p></div>
+          <div class="ds-scale-row"><div class="ds-scale-name"><strong>Neutral</strong><small>Texto, borde y superficie</small></div><div class="ds-scale-stops"><span style="--c:#1b1d18;--t:#fff"><b>950</b><i>#1B1D18</i><em>Blanco · 17:1</em></span><span style="--c:#262920;--t:#fff"><b>900</b><i>#262920</i><em>Blanco · 14.8:1</em></span><span style="--c:#52554d;--t:#fff"><b>700</b><i>#52554D</i><em>Blanco · 7.6:1</em></span><span style="--c:#6f726a;--t:#fff"><b>600</b><i>#6F726A</i><em>Blanco · 4.9:1</em></span><span style="--c:#d8d3ca;--t:#262920"><b>300</b><i>#D8D3CA</i><em>Ink · 9.9:1</em></span><span style="--c:#f9f7f2;--t:#262920"><b>50</b><i>#F9F7F2</i><em>Ink · 13.8:1</em></span></div></div>
+          <div class="ds-scale-row"><div class="ds-scale-name"><strong>Pink</strong><small>Marca, CTA y acento</small></div><div class="ds-scale-stops"><span style="--c:#7a063c;--t:#fff"><b>950</b><i>#7A063C</i><em>Blanco · 10.9:1</em></span><span style="--c:#b71561;--t:#fff"><b>800</b><i>#B71561</i><em>Blanco · 6.4:1</em></span><span style="--c:#cf2c78;--t:#fff"><b>700</b><i>#CF2C78</i><em>Blanco · 4.9:1</em></span><span style="--c:#f957a4;--t:#262920"><b>500</b><i>#F957A4</i><em>Ink · 4.9:1</em></span><span style="--c:#f7c6da;--t:#262920"><b>300</b><i>#F7C6DA</i><em>Ink · 9.9:1</em></span><span style="--c:#fff4f9;--t:#262920"><b>50</b><i>#FFF4F9</i><em>Ink · 13.8:1</em></span></div></div>
+          <div class="ds-scale-row"><div class="ds-scale-name"><strong>Lime</strong><small>Énfasis y feedback</small></div><div class="ds-scale-stops"><span style="--c:#405b08;--t:#fff"><b>950</b><i>#405B08</i><em>Blanco · 7.7:1</em></span><span style="--c:#759c18;--t:#262920"><b>700</b><i>#759C18</i><em>Ink · 4.6:1</em></span><span style="--c:#94bd2d;--t:#262920"><b>600</b><i>#94BD2D</i><em>Ink · 6.7:1</em></span><span style="--c:#dfff78;--t:#262920"><b>500</b><i>#DFFF78</i><em>Ink · 13.2:1</em></span><span style="--c:#edfac8;--t:#262920"><b>200</b><i>#EDFAC8</i><em>Ink · 13.5:1</em></span><span style="--c:#fbfff1;--t:#262920"><b>50</b><i>#FBFFF1</i><em>Ink · 14.6:1</em></span></div></div>
+          <div class="ds-scale-row"><div class="ds-scale-name"><strong>Lilac</strong><small>Superficies y foco</small></div><div class="ds-scale-stops"><span style="--c:#38235f;--t:#fff"><b>950</b><i>#38235F</i><em>Blanco · 13.3:1</em></span><span style="--c:#6a529c;--t:#fff"><b>700</b><i>#6A529C</i><em>Blanco · 6.4:1</em></span><span style="--c:#6652c5;--t:#fff"><b>Focus</b><i>#6652C5</i><em>Blanco · 5.9:1</em></span><span style="--c:#b8a6df;--t:#262920"><b>400</b><i>#B8A6DF</i><em>Ink · 6.7:1</em></span><span style="--c:#ded6f5;--t:#262920"><b>200</b><i>#DED6F5</i><em>Ink · 10.6:1</em></span><span style="--c:#f5f2ff;--t:#262920"><b>50</b><i>#F5F2FF</i><em>Ink · 13.4:1</em></span></div></div>
+        </div>
+        <div id="approved-pairs" class="ds-approved-pairs">
+          <div class="ds-approved-pairs-head"><div><span class="ds-eyebrow"><i></i> PARES OFICIALES · NORMA</span><h3>Estas son las combinaciones de Droska.</h3></div><p>Lista cerrada para producto. Cada par define contenido, superficie y contexto; una combinación del explorador no entra aquí automáticamente.</p></div>
+          <section class="ds-pair-group" aria-labelledby="pair-base"><h4 id="pair-base"><span>01</span> Base y lectura</h4><div class="ds-pair-cards">
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-page);--pair-fg:var(--ds-text-primary)"><div class="ds-pair-demo"><small>Página</small><strong>Título y contenido</strong><span>13.8:1 · AA</span></div><footer><code>text-primary / page</code><b>Uso general</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-raised);--pair-fg:var(--ds-text-primary)"><div class="ds-pair-demo"><small>Superficie elevada</small><strong>Tarjetas y modales</strong><span>14.6:1 · AA</span></div><footer><code>text-primary / raised</code><b>Contenido principal</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-subtle);--pair-fg:var(--ds-text-primary)"><div class="ds-pair-demo"><small>Superficie sutil</small><strong>Panel informativo</strong><span>13.4:1 · AA</span></div><footer><code>text-primary / subtle</code><b>Paneles suaves</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-page);--pair-fg:var(--ds-text-secondary)"><div class="ds-pair-demo"><small>Página</small><strong>Texto secundario</strong><span>7.1:1 · AA</span></div><footer><code>text-secondary / page</code><b>Apoyo y descripción</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-page);--pair-fg:var(--ds-color-link)"><div class="ds-pair-demo"><small>Página</small><strong><u>Enlace de texto</u></strong><span>8.1:1 · AA</span></div><footer><code>link / page</code><b>Navegación textual</b></footer></article>
+          </div></section>
+          <section class="ds-pair-group" aria-labelledby="pair-brand"><h4 id="pair-brand"><span>02</span> Marca y acción</h4><div class="ds-pair-cards">
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-brand-primary);--pair-fg:var(--ds-text-inverse)"><div class="ds-pair-demo"><small>Ink</small><strong>Acción principal</strong><span>14.8:1 · AA</span></div><footer><code>inverse / brand-primary</code><b>CTA principal</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-brand-accent);--pair-fg:var(--ds-text-primary)"><div class="ds-pair-demo"><small>Pink</small><strong>Acento de marca</strong><span>4.9:1 · AA</span></div><footer><code>text-primary / brand-accent</code><b>Etiquetas y énfasis</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-brand-secondary);--pair-fg:var(--ds-text-inverse)"><div class="ds-pair-demo"><small>Lilac</small><strong>Bloque expresivo</strong><span>5.9:1 · AA</span></div><footer><code>inverse / brand-secondary</code><b>Marca secundaria</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-color-lime);--pair-fg:var(--ds-text-primary)"><div class="ds-pair-demo"><small>Lime</small><strong>Opción seleccionada</strong><span>13.2:1 · AA</span></div><footer><code>text-primary / lime</code><b>Selección y énfasis</b></footer></article>
+          </div></section>
+          <section class="ds-pair-group" aria-labelledby="pair-ui"><h4 id="pair-ui"><span>03</span> Interacción y estado</h4><div class="ds-pair-cards">
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-page);--pair-fg:var(--ds-focus-ring)"><div class="ds-pair-demo"><small>Página</small><strong>Foco visible</strong><span>5.5:1 · UI</span></div><footer><code>focus-ring / page</code><b>Anillo de foco</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-raised);--pair-fg:var(--ds-border-control)"><div class="ds-pair-demo"><small>Superficie elevada</small><strong>Borde de control</strong><span>4.8:1 · UI</span></div><footer><code>border-control / raised</code><b>Inputs y controles</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-surface-disabled);--pair-fg:var(--ds-text-disabled)"><div class="ds-pair-demo"><small>Disabled</small><strong>No disponible</strong><span>5.9:1 · AA</span></div><footer><code>text-disabled / disabled</code><b>Estado inactivo</b></footer></article>
+          </div></section>
+          <section class="ds-pair-group" aria-labelledby="pair-feedback"><h4 id="pair-feedback"><span>04</span> Feedback semántico</h4><div class="ds-pair-cards">
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-feedback-success);--pair-fg:var(--ds-text-inverse)"><div class="ds-pair-demo"><small>Success</small><strong>Operación exitosa</strong><span>6.4:1 · AA</span></div><footer><code>inverse / success</code><b>Confirmaciones</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-feedback-warning);--pair-fg:var(--ds-text-inverse)"><div class="ds-pair-demo"><small>Warning</small><strong>Requiere atención</strong><span>6.1:1 · AA</span></div><footer><code>inverse / warning</code><b>Advertencias</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-feedback-danger);--pair-fg:var(--ds-text-inverse)"><div class="ds-pair-demo"><small>Danger</small><strong>Hay un problema</strong><span>6.6:1 · AA</span></div><footer><code>inverse / danger</code><b>Errores críticos</b></footer></article>
+            <article class="ds-pair-card" style="--pair-bg:var(--ds-feedback-info);--pair-fg:var(--ds-text-inverse)"><div class="ds-pair-demo"><small>Info</small><strong>Información útil</strong><span>6.5:1 · AA</span></div><footer><code>inverse / info</code><b>Mensajes informativos</b></footer></article>
+          </div></section>
+          <p class="ds-pair-rule"><strong>Regla:</strong> fuera de estos pares, la combinación requiere revisión y aprobación de diseño aunque técnicamente cumpla contraste.</p>
+        </div>
+        <div id="contrast-explorer" class="ds-contrast-grid"><div class="ds-contrast-grid-head"><div><span class="ds-eyebrow"><i></i> EXPLORADOR DE CONTRASTE</span><h3>Combinaciones técnicamente posibles.</h3></div><small><b>AA</b> texto normal ≥ 4.5:1 · <b>UI</b> texto grande, íconos y bordes ≥ 3:1 · <b>NO</b> combinación no aprobada. Esta matriz informa; no autoriza uso de marca.</small></div><div class="ds-contrast-matrix-wrap"><table class="ds-contrast-matrix"><caption>Contraste calculado desde los tokens CSS activos</caption><thead><tr id="ds-contrast-head"><th scope="col">Rol / superficie</th></tr></thead><tbody id="ds-contrast-body"></tbody></table></div><div class="ds-contrast-summary" id="ds-contrast-summary" aria-live="polite"></div></div>
+        <div id="color-tokens" class="ds-tokenization"><div><span class="ds-eyebrow"><i></i> TOKENIZACIÓN · COLOR v0.1</span><h3>De escala a intención.</h3><p>Los componentes consumen roles semánticos, nunca valores de escala ni hexadecimales. Incluye marca, superficies, texto, acciones, bordes, íconos, foco, estados y feedback.</p></div><pre><code>:root {
+  /* Marca */
+  --ds-brand-primary: var(--ds-neutral-900);
+  --ds-brand-accent: var(--ds-pink-500);
+  --ds-brand-secondary: var(--ds-lilac-500);
+
+  /* Superficies y texto */
+  --ds-surface-page: var(--ds-neutral-50);
+  --ds-surface-raised: #fffdfa;
+  --ds-surface-subtle: var(--ds-lilac-50);
+  --ds-surface-disabled: #e5e3df;
+  --ds-text-primary: var(--ds-neutral-900);
+  --ds-text-secondary: var(--ds-neutral-700);
+  --ds-text-tertiary: var(--ds-neutral-600);
+  --ds-text-accent: var(--ds-pink-700);
+  --ds-text-inverse: #fff;
+  --ds-text-disabled: var(--ds-neutral-700);
+
+  /* Interacción */
+  --ds-action-primary: var(--ds-neutral-900);
+  --ds-action-primary-hover: #3e4239;
+  --ds-action-primary-active: var(--ds-neutral-950);
+  --ds-action-accent: var(--ds-pink-500);
+  --ds-border-control: var(--ds-neutral-600);
+  --ds-border-subtle: var(--ds-neutral-300);
+  --ds-focus-ring: var(--ds-lilac-500);
+  --ds-icon-default: var(--ds-neutral-900);
+  --ds-icon-muted: var(--ds-neutral-700);
+
+  /* Feedback */
+  --ds-feedback-success: var(--ds-green-700);
+  --ds-feedback-warning: var(--ds-amber-800);
+  --ds-feedback-danger: var(--ds-red-700);
+  --ds-feedback-info: var(--ds-blue-700);
+}</code></pre></div>
+      </section>
+
+      <section id="type" class="ds-section ds-type-section">
+        <div class="ds-section-heading"><span class="ds-eyebrow"><i></i> 02 / TIPOGRAFÍA</span><h2>Una voz directa,<br>con personalidad.</h2></div>
+        <div class="ds-type-system">
+          <div class="ds-type-system-head"><div><span class="ds-eyebrow"><i></i> SISTEMA TIPOGRÁFICO</span><h3>Tres voces, una misma marca.</h3></div><p>Space Grotesk construye identidad, DM Sans mantiene claridad y Caveat agrega un gesto humano en momentos expresivos.</p></div>
+          <div class="ds-type-families">
+            <article class="ds-type-family ds-type-family--display"><span class="ds-type-label">PRINCIPAL · SPACE GROTESK</span><p>Una idea<br>favorita.</p><dl><div><dt>Rol</dt><dd>Display y títulos</dd></div><div><dt>Pesos</dt><dd>500 · 600 · 700</dd></div></dl></article>
+            <article class="ds-type-family ds-type-family--body"><span class="ds-type-label">FUNCIONAL · DM SANS</span><p>Diseñada por ti. Creada contigo. Todo parte por una idea.</p><dl><div><dt>Rol</dt><dd>Interfaz y lectura</dd></div><div><dt>Pesos</dt><dd>400 · 500 · 600 · 700</dd></div></dl></article>
+            <article class="ds-type-family ds-type-family--accent"><span class="ds-type-label">COMPLEMENTARIA · CAVEAT</span><p>Hecho para ti.</p><dl><div><dt>Rol</dt><dd>Acento humano</dd></div><div><dt>Pesos</dt><dd>500 · 600 · 700</dd></div></dl></article>
+          </div>
+
+          <div class="ds-type-scale-block">
+            <div class="ds-type-block-head"><div><span class="ds-eyebrow"><i></i> ESCALA Y JERARQUÍA</span><h3>Un tamaño para cada intención.</h3></div><p>Valores base de escritorio. En pantallas pequeñas los títulos usan <code>clamp()</code>; el cuerpo nunca baja de 14 px.</p></div>
+            <div class="ds-type-scale" role="table" aria-label="Escala tipográfica Droska">
+              <div class="ds-type-scale-row is-head" role="row"><span role="columnheader">Token</span><span role="columnheader">Muestra</span><span role="columnheader">Fuente</span><span role="columnheader">Valor</span><span role="columnheader">Uso</span></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">display-xl</b><span class="sample-display-xl" role="cell">Idea sin límites</span><span role="cell">Space Grotesk 700</span><code role="cell">72 / 68 · −4 px</code><small role="cell">Hero principal</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">heading-1</b><span class="sample-heading-1" role="cell">Diseña tu polera</span><span role="cell">Space Grotesk 700</span><code role="cell">52 / 52 · −2.4 px</code><small role="cell">Título de página</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">heading-2</b><span class="sample-heading-2" role="cell">Elige tu camino</span><span role="cell">Space Grotesk 700</span><code role="cell">38 / 40 · −1.6 px</code><small role="cell">Sección</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">heading-3</b><span class="sample-heading-3" role="cell">Detalles del pedido</span><span role="cell">Space Grotesk 700</span><code role="cell">26 / 30 · −.8 px</code><small role="cell">Bloque o modal</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">body-lg</b><span class="sample-body-lg" role="cell">Una explicación breve y cercana.</span><span role="cell">DM Sans 400</span><code role="cell">18 / 28</code><small role="cell">Introducción</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">body-md</b><span class="sample-body-md" role="cell">Información para decidir sin esfuerzo.</span><span role="cell">DM Sans 400</span><code role="cell">15 / 24</code><small role="cell">Lectura general</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">label</b><span class="sample-label" role="cell">Nombre completo</span><span role="cell">DM Sans 700</span><code role="cell">12 / 16</code><small role="cell">Controles</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">eyebrow</b><span class="sample-eyebrow" role="cell">PRIMER PASO</span><span role="cell">DM Sans 700</span><code role="cell">10 / 15 · +1.5 px</code><small role="cell">Categoría</small></div>
+              <div class="ds-type-scale-row" role="row"><b role="cell">accent</b><span class="sample-accent" role="cell">Tu idea, a tu manera.</span><span role="cell">Caveat 600</span><code role="cell">32 / 34</code><small role="cell">Nota expresiva</small></div>
+            </div>
+          </div>
+
+          <div class="ds-type-guidance">
+            <article><span class="ds-eyebrow"><i></i> REGLAS DE USO</span><h3>La personalidad también necesita límites.</h3><ul><li><b>Space Grotesk</b> para titulares, cifras y nombres de producto.</li><li><b>DM Sans</b> para navegación, formularios, botones y textos largos.</li><li><b>Caveat</b> solo para frases breves, anotaciones y gestos editoriales.</li><li>No usar Caveat en controles, precios, errores ni información crítica.</li></ul></article>
+            <article><span class="ds-eyebrow"><i></i> FALLBACK Y ACCESIBILIDAD</span><h3>Legible incluso si la webfont falla.</h3><dl><div><dt>Display</dt><dd><code>'Space Grotesk', Arial, sans-serif</code></dd></div><div><dt>Body</dt><dd><code>'DM Sans', Arial, sans-serif</code></dd></div><div><dt>Accent</dt><dd><code>'Caveat', 'Comic Sans MS', cursive</code></dd></div></dl><p><b>WCAG 2.0 AA:</b> texto normal ≥ 4.5:1. Texto grande ≥ 3:1 solo desde 24 px regular o 18.7 px en negrita. Caveat se usa a 24 px o más y nunca reemplaza información esencial.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="buttons" class="ds-section">
+        <div class="ds-section-heading"><span class="ds-eyebrow"><i></i> 03 / BOTONES Y ESTADOS</span><h2>Todos los botones,<br>sin improvisar.</h2></div>
+        <div class="ds-state-legend" aria-label="Estados de componentes"><div><b>01</b><strong>Reposo</strong><span>Estado base.</span></div><div><b>02</b><strong>Hover</strong><span>Cursor sobre el control.</span></div><div><b>03</b><strong>Activo</strong><span>Durante el click o tap.</span></div><div><b>04</b><strong>Foco</strong><span>Navegación por teclado.</span></div><div><b>05</b><strong>Disabled</strong><span>Acción no disponible.</span></div><div><b>↗</b><strong>Visited</strong><span>Solo para enlaces.</span></div></div>
+        <div class="ds-cta-system">
+          <div class="ds-cta-system-head"><div><span class="ds-eyebrow"><i></i> SISTEMA DE CTA</span><h3>Una acción, todas sus versiones.</h3></div><p>El primario conduce el siguiente paso. El secundario acompaña sin competir. El ícono es opcional y solo aparece cuando aporta dirección.</p></div>
+
+          <section class="ds-cta-part" aria-labelledby="cta-variants-title">
+            <div class="ds-cta-part-head"><div><span>01 · VARIANTES</span><h4 id="cta-variants-title">Jerarquía antes que decoración.</h4></div><p>Usa un solo primario por contexto. La flecha refuerza el avance, pero nunca reemplaza el texto.</p></div>
+            <div class="ds-cta-variants">
+              <article><span class="ds-variant-label">PRIMARIO / CON ÍCONO</span><button class="ds-cta ds-cta--md">Empezar mi idea <b aria-hidden="true">→</b></button><code>.ds-cta</code></article>
+              <article><span class="ds-variant-label">PRIMARIO / SIN ÍCONO</span><button class="ds-cta ds-cta--md">Crear mi cuenta</button><code>.ds-cta</code></article>
+              <article><span class="ds-variant-label">SECUNDARIO / CON ÍCONO</span><button class="ds-cta-ghost ds-cta--md">Ver detalles <b aria-hidden="true">→</b></button><code>.ds-cta-ghost</code></article>
+              <article><span class="ds-variant-label">SECUNDARIO / SIN ÍCONO</span><button class="ds-cta-ghost ds-cta--md">Volver</button><code>.ds-cta-ghost</code></article>
+            </div>
+          </section>
+
+          <section class="ds-cta-part" aria-labelledby="cta-sizes-title">
+            <div class="ds-cta-part-head"><div><span>02 · TAMAÑOS</span><h4 id="cta-sizes-title">Escala según el momento.</h4></div><p>La altura incluye el área táctil. Padding, tipografía e ícono crecen juntos.</p></div>
+            <div class="ds-cta-sizing"><div><span>S · NAVEGACIÓN</span><button class="ds-cta ds-cta--sm">Ingresar</button><small>44 px alto · 17 px horizontal</small></div><div><span>M · ESTÁNDAR</span><button class="ds-cta ds-cta--md">Empezar mi idea <b aria-hidden="true">→</b></button><small>54 px alto · 22 px horizontal</small></div><div><span>L · MOMENTO CLAVE</span><button class="ds-cta ds-cta--lg">Crear mi polera <b aria-hidden="true">→</b></button><small>62 px alto · 27 px horizontal</small></div></div>
+            <dl class="ds-cta-specs"><div><dt>Radio</dt><dd>999 px</dd></div><div><dt>Borde secundario</dt><dd>1 px</dd></div><div><dt>Texto–ícono</dt><dd>28 / 18 px</dd></div><div><dt>Foco</dt><dd>3 px</dd></div><div><dt>Offset</dt><dd>3 px</dd></div></dl>
+          </section>
+
+          <section class="ds-cta-part" aria-labelledby="cta-states-title">
+            <div class="ds-cta-part-head"><div><span>03 · ESTADOS</span><h4 id="cta-states-title">La respuesta debe sentirse.</h4></div><p>Hover eleva; activo se asienta; foco queda fuera del control y disabled conserva lectura sin sugerir interacción.</p></div>
+            <div class="ds-cta-states"><article><span>REPOSO</span><button class="ds-cta ds-cta--sm">Empezar mi idea <b aria-hidden="true">→</b></button></article><article><span>HOVER</span><button class="ds-cta ds-cta--sm" data-state="hover">Empezar mi idea <b aria-hidden="true">→</b></button></article><article><span>ACTIVO</span><button class="ds-cta ds-cta--sm" data-state="active">Empezar mi idea <b aria-hidden="true">→</b></button></article><article><span>FOCO</span><button class="ds-cta ds-cta--sm" data-state="focus">Empezar mi idea <b aria-hidden="true">→</b></button></article><article><span>DISABLED</span><button class="ds-cta ds-cta--sm" disabled>Empezar mi idea <b aria-hidden="true">→</b></button></article></div>
+          </section>
+        </div>
+        <div class="ds-button-library">
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>CTA principal</strong><code>.ds-cta</code><small>Acción principal de página, modal y carro.</small></div><div class="ds-button-samples"><button class="ds-cta">Empezar mi idea <b>→</b></button><button class="ds-cta" data-state="hover">Empezar mi idea <b>→</b></button><button class="ds-cta" data-state="active">Empezar mi idea <b>→</b></button><button class="ds-cta" data-state="focus">Empezar mi idea <b>→</b></button><button class="ds-cta" disabled>Empezar mi idea <b>→</b></button></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Secundario</strong><code>.ds-secondary-button</code><small>Acciones alternativas o de navegación dentro de una sección.</small></div><div class="ds-button-samples"><button class="ds-secondary-button">Ver detalles <b>→</b></button><button class="ds-secondary-button" data-state="hover">Ver detalles <b>→</b></button><button class="ds-secondary-button" data-state="active">Ver detalles <b>→</b></button><button class="ds-secondary-button" data-state="focus">Ver detalles <b>→</b></button><button class="ds-secondary-button" disabled>Ver detalles <b>→</b></button></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Acción contextual</strong><code>.ds-guide-button</code><small>Acceso compacto a información auxiliar, como la guía de tallas.</small></div><div class="ds-button-samples"><button class="ds-guide-button"><span>⌁</span>Guía de tallas <b>→</b></button><button class="ds-guide-button" data-state="hover"><span>⌁</span>Guía de tallas <b>→</b></button><button class="ds-guide-button" data-state="active"><span>⌁</span>Guía de tallas <b>→</b></button><button class="ds-guide-button" data-state="focus"><span>⌁</span>Guía de tallas <b>→</b></button><button class="ds-guide-button" disabled><span>⌁</span>Guía de tallas <b>→</b></button></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Texto / link</strong><code>.ds-text-link</code><small>Acción de baja jerarquía, como alternar entre acceso y registro.</small></div><div class="ds-button-samples"><a class="ds-text-link" href="#visited-link">Crear cuenta</a><a class="ds-text-link" data-state="hover" href="#visited-link">Crear cuenta</a><a class="ds-text-link" data-state="active" href="#visited-link">Crear cuenta</a><a class="ds-text-link" data-state="focus" href="#buttons">Crear cuenta</a><a class="ds-text-link" data-state="visited" href="#visited-link">Crear cuenta</a></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Visited</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Ícono</strong><code>.ds-icon-button</code><small>Cierre de modal. La X rota al hover y se asienta al presionar.</small></div><div class="ds-button-samples ds-icon-samples"><button class="ds-icon-button close-button" aria-label="Cerrar"><span></span></button><button class="ds-icon-button close-button" data-state="hover" aria-label="Cerrar hover"><span></span></button><button class="ds-icon-button close-button" data-state="active" aria-label="Cerrar activo"><span></span></button><button class="ds-icon-button close-button" data-state="focus" aria-label="Cerrar con foco"><span></span></button><button class="ds-icon-button close-button" disabled aria-label="Cerrar deshabilitado"><span></span></button></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Carro compacto</strong><code>.ds-cart-button</code><small>Acceso del menú: solo ícono y contador.</small></div><div class="ds-button-samples ds-icon-samples"><button class="ds-cart-button" aria-label="Carro"><svg viewBox="0 0 24 24"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>0</b></button><button class="ds-cart-button" data-state="hover" aria-label="Carro hover"><svg viewBox="0 0 24 24"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>0</b></button><button class="ds-cart-button" data-state="active" aria-label="Carro activo"><svg viewBox="0 0 24 24"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>0</b></button><button class="ds-cart-button" data-state="focus" aria-label="Carro con foco"><svg viewBox="0 0 24 24"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>0</b></button><button class="ds-cart-button" disabled aria-label="Carro deshabilitado"><svg viewBox="0 0 24 24"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>0</b></button></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Selector</strong><code>.ds-choice-button</code><small>Tallas, tipos de polera y alternativas del estudio.</small></div><div class="ds-button-samples"><button class="ds-choice-button">M</button><button class="ds-choice-button" data-state="hover">M</button><button class="ds-choice-button" data-state="active">M</button><button class="ds-choice-button" data-state="focus">M</button><button class="ds-choice-button" disabled>M</button><button class="ds-choice-button is-selected">M</button></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span><span>Selected</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Cantidad</strong><code>.ds-quantity</code><small>Ajuste de unidades dentro del carro.</small></div><div class="ds-button-samples"><div class="ds-quantity"><button aria-label="Reducir">−</button><span>1</span><button aria-label="Aumentar">+</button></div><div class="ds-quantity" data-state="hover"><button aria-label="Reducir">−</button><span>1</span><button aria-label="Aumentar">+</button></div><div class="ds-quantity" data-state="active"><button aria-label="Reducir">−</button><span>1</span><button aria-label="Aumentar">+</button></div><div class="ds-quantity" data-state="focus"><button aria-label="Reducir">−</button><span>1</span><button aria-label="Aumentar">+</button></div><div class="ds-quantity is-disabled"><button disabled aria-label="Reducir">−</button><span>1</span><button disabled aria-label="Aumentar">+</button></div></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span></div></article>
+          <article class="ds-button-row"><div class="ds-button-meta"><strong>Swatch</strong><code>.ds-swatch-button</code><small>Color de la polera. La selección se comunica con anillo, no solo color.</small></div><div class="ds-button-samples ds-swatch-buttons"><button class="ds-swatch-button" style="--shirt-color:#fff" aria-label="Blanco"></button><button class="ds-swatch-button" data-state="hover" style="--shirt-color:#fff" aria-label="Blanco hover"></button><button class="ds-swatch-button" data-state="active" style="--shirt-color:#fff" aria-label="Blanco activo"></button><button class="ds-swatch-button" data-state="focus" style="--shirt-color:#fff" aria-label="Blanco foco"></button><button class="ds-swatch-button" style="--shirt-color:#fff" disabled aria-label="Blanco deshabilitado"></button><button class="ds-swatch-button is-selected" style="--shirt-color:#fff" aria-label="Blanco seleccionado"></button></div><div class="ds-state-note"><span>Reposo</span><span>Hover</span><span>Activo</span><span>Foco</span><span>Disabled</span><span>Selected</span></div></article>
+        </div>
+      </section>
+
+      <section id="patterns" class="ds-section">
+        <div class="ds-section-heading"><span class="ds-eyebrow"><i></i> 04 / PATRONES DE CONTENIDO</span><h2>Las piezas que construyen<br>la tienda.</h2></div>
+        <div class="ds-patterns-showcase">
+          <article class="ds-pattern-specimen ds-pattern-specimen--wide">
+            <div class="ds-pattern-caption"><span>ENCABEZADO DE SECCIÓN</span><code>.section-heading</code></div>
+            <div class="ds-pattern-responsive-head"><div><span class="ds-eyebrow"><i></i> VARIANTES DE ENCABEZADO</span><h3>Una entrada clara para cada sección.</h3></div><p>El título siempre identifica el contenido. La ceja y el apoyo son opcionales; el divisor separa secciones, no reemplaza espacio.</p></div>
+            <div class="ds-heading-variants">
+              <figure><figcaption>EDITORIAL · CON APOYO</figcaption><div class="ds-content-heading"><div><span>PRIMER PASO · ELIGE TU CAMINO</span><h3>¿Qué tienes en mente?</h3></div><p>Un camino para llegar<br>a tu polera favorita.</p></div></figure>
+              <figure><figcaption>COMPACTO · SIN APOYO</figcaption><div class="ds-content-heading ds-content-heading--compact"><div><span>PRODUCTOS</span><h3>Elige tu base.</h3></div></div></figure>
+              <figure><figcaption>MÓVIL · APILADO</figcaption><div class="ds-content-heading ds-content-heading--stacked"><div><span>PRIMER PASO</span><h3>¿Qué tienes en mente?</h3></div><p>Un camino para llegar a tu polera favorita.</p></div></figure>
+            </div>
+            <div class="ds-pattern-anatomy"><span>Eyebrow opcional</span><span>Título obligatorio</span><span>Texto de apoyo opcional</span><span>Divisor contextual</span></div>
+          </article>
+
+          <article class="ds-pattern-specimen ds-pattern-specimen--wide">
+            <div class="ds-pattern-caption"><span>HEADER · ESTUDIO</span><code>.dialog-header</code></div>
+            <div class="ds-header-system-head"><div><span class="ds-eyebrow"><i></i> VARIANTES DE HEADER</span><h3>La misma estructura, según el espacio.</h3></div><p>La marca y la acción de cierre son persistentes. El contexto se mantiene completo, se abrevia o pasa a una segunda línea.</p></div>
+            <div class="ds-header-variants">
+              <figure class="ds-header-variant ds-header-variant--full">
+                <figcaption><div><b>COMPLETO</b><span>Diálogo y estudio en desktop</span></div><code>≥ 1024 px · 82 px</code></figcaption>
+                <div class="ds-studio-shell-header"><a class="ds-shell-brand" href="/" tabindex="-1">droska <span>SHIRT</span></a><span>TU ESTUDIO CREATIVO</span><button class="ds-icon-button close-button" type="button" aria-label="Cerrar ejemplo"><span></span></button></div>
+              </figure>
+              <figure class="ds-header-variant ds-header-variant--compact">
+                <figcaption><div><b>COMPACTO</b><span>Paneles y ventanas medianas</span></div><code>640–1023 px · 68 px</code></figcaption>
+                <div class="ds-studio-shell-header ds-studio-shell-header--compact"><a class="ds-shell-brand" href="/" tabindex="-1">droska <span>SHIRT</span></a><span>TU ESTUDIO</span><button class="ds-icon-button close-button" type="button" aria-label="Cerrar ejemplo"><span></span></button></div>
+              </figure>
+              <figure class="ds-header-variant ds-header-variant--mobile">
+                <figcaption><div><b>MÓVIL</b><span>Flujo de personalización</span></div><code>≤ 639 px · 64 + 28 px</code></figcaption>
+                <div class="ds-studio-shell-header ds-studio-shell-header--mobile"><a class="ds-shell-brand" href="/" tabindex="-1">droska <span>SHIRT</span></a><button class="ds-icon-button close-button" type="button" aria-label="Cerrar ejemplo"><span></span></button><span>TU ESTUDIO CREATIVO</span></div>
+              </figure>
+            </div>
+            <div class="ds-pattern-anatomy"><span>Marca</span><span>Contexto</span><span>Acción de cierre</span><span>Divisor</span></div>
+          </article>
+
+          <article class="ds-pattern-specimen ds-pattern-specimen--wide">
+            <div class="ds-pattern-caption"><span>PROGRESO · ESTUDIO</span><code>.steps</code></div>
+            <div class="ds-progress-standalone"><ol class="ds-progress" aria-label="Ejemplo de progreso"><li class="is-current" aria-current="step"><b>01</b><span>Detalles</span></li><li><b>02</b><span>Diseño</span></li><li><b>03</b><span>Calidad</span></li><li><b>04</b><span>Resumen</span></li><li><b>05</b><span>Pago</span></li></ol></div>
+            <div class="ds-pattern-anatomy"><span>Current</span><span>Upcoming</span><span>Conector</span><span>Etiqueta</span></div>
+          </article>
+
+          <article class="ds-pattern-specimen ds-pattern-specimen--wide">
+            <div class="ds-pattern-caption"><span>TARJETA · CAMINO CREATIVO</span><code>.path[data-start="custom"]</code></div>
+            <div class="ds-pattern-responsive-head"><div><span class="ds-eyebrow"><i></i> COMPORTAMIENTO RESPONSIVE</span><h3>Una pieza, dos composiciones.</h3></div><p>En escritorio el proceso se lee en horizontal. En móvil el contenido se apila, el visual acompaña y el CTA conserva todo el ancho útil.</p></div>
+            <div class="ds-path-previews">
+              <figure class="ds-path-preview ds-path-preview--desktop">
+                <figcaption><b>ESCRITORIO</b><span>≥ 1024 px</span></figcaption>
+                <button class="ds-path-card" type="button">
+                  <span class="ds-path-kicker">01 / MI IDEA</span><span class="ds-path-badge">TU IDEA · TU POLERA</span>
+                  <h3>Mi idea, desde cero.</h3>
+                  <div class="ds-path-steps">
+                    <div><b>01</b><i>✣</i><span>Haz tu diseño con IA.<small>Foto, dibujo o lo que quieras.</small></span></div>
+                    <div><b>02</b><i>⇩</i><span>Descárgalo y envíanoslo.</span></div>
+                    <div><b>03</b><i>◯</i><span>Aquí lo mejoramos contigo.</span></div>
+                  </div>
+                  <img src="/idea-shirt.png" alt="Ejemplo de polera personalizada">
+                  <span class="ds-path-cta">Empezar mi idea <b aria-hidden="true">→</b></span>
+                </button>
+              </figure>
+              <figure class="ds-path-preview ds-path-preview--mobile">
+                <figcaption><b>MÓVIL</b><span>≤ 640 px</span></figcaption>
+                <button class="ds-path-card" type="button">
+                  <span class="ds-path-kicker">01 / MI IDEA</span><span class="ds-path-badge">TU IDEA · TU POLERA</span>
+                  <h3>Mi idea,<br>desde cero.</h3>
+                  <div class="ds-path-steps">
+                    <div><b>01</b><i>✣</i><span>Haz tu diseño con IA.</span></div>
+                    <div><b>02</b><i>⇩</i><span>Descárgalo y envíanoslo.</span></div>
+                    <div><b>03</b><i>◯</i><span>Aquí lo mejoramos contigo.</span></div>
+                  </div>
+                  <img src="/idea-shirt.png" alt="Ejemplo de polera personalizada">
+                  <span class="ds-path-cta">Empezar mi idea <b aria-hidden="true">→</b></span>
+                </button>
+              </figure>
+            </div>
+            <div class="ds-pattern-anatomy"><span>Kicker</span><span>Título</span><span>Stepper</span><span>Visual</span><span>CTA</span></div>
+          </article>
+
+          <article class="ds-pattern-specimen ds-pattern-specimen--wide ds-product-specimen">
+            <div class="ds-pattern-caption"><span>TARJETA · PRODUCTO</span><code>.garment</code></div>
+            <div class="ds-product-system-head"><div><span class="ds-eyebrow"><i></i> DISTRIBUCIONES</span><h3>El mismo producto, según el contexto.</h3></div><p>La información no cambia de orden: etiqueta, nombre, descripción y acción. Solo cambia la relación entre visual y contenido.</p></div>
+            <div class="ds-product-variants">
+              <figure class="ds-product-variant ds-product-variant--vertical">
+                <figcaption><div><b>VERTICAL</b><span>Grillas y catálogo</span></div><code>min 280 px</code></figcaption>
+                <button class="ds-product-card" type="button">
+                  <span class="ds-product-visual"><small>EL CLÁSICO DE SIEMPRE</small><img src="/idea-shirt.png" alt="Polera básica personalizada"><i aria-hidden="true">→</i></span>
+                  <span class="ds-product-meta"><strong>Básica</strong><b>Elige en el estudio</b></span>
+                  <span class="ds-product-copy">Tu favorita para todos los días.</span>
+                </button>
+              </figure>
+
+              <figure class="ds-product-variant ds-product-variant--lateral">
+                <figcaption><div><b>LATERAL</b><span>Destacados y recomendaciones</span></div><code>min 560 px</code></figcaption>
+                <button class="ds-product-card ds-product-card--lateral" type="button">
+                  <span class="ds-product-visual"><small>EL CLÁSICO DE SIEMPRE</small><img src="/idea-shirt.png" alt="Polera básica personalizada"></span>
+                  <span class="ds-product-content"><small>POLERA ESENCIAL</small><strong>Básica</strong><span class="ds-product-copy">Una base versátil para crear tu diseño y usarlo todos los días.</span><span class="ds-product-action">Elige en el estudio <i aria-hidden="true">→</i></span></span>
+                </button>
+              </figure>
+
+              <figure class="ds-product-variant ds-product-variant--compact">
+                <figcaption><div><b>COMPACTA</b><span>Listas, resumen y relacionados</span></div><code>min 320 px</code></figcaption>
+                <button class="ds-product-card ds-product-card--compact" type="button">
+                  <span class="ds-product-visual"><img src="/idea-shirt.png" alt="Polera básica personalizada"></span>
+                  <span class="ds-product-content"><small>EL CLÁSICO DE SIEMPRE</small><strong>Básica</strong><span class="ds-product-copy">Tu favorita para todos los días.</span></span>
+                  <i class="ds-product-compact-action" aria-hidden="true">→</i>
+                </button>
+              </figure>
+            </div>
+            <div class="ds-pattern-anatomy"><span>Visual</span><span>Etiqueta</span><span>Nombre</span><span>Acción</span><span>Descripción</span></div>
+          </article>
+
+          <article class="ds-pattern-specimen ds-pattern-specimen--wide">
+            <div class="ds-pattern-caption"><span>ACORDEÓN · FAQ</span><code>.faq-list details</code></div>
+            <div class="ds-faq-system-head"><div><span class="ds-eyebrow"><i></i> VARIANTES DE ACORDEÓN</span><h3>Respuestas que se abren sin perder contexto.</h3></div><p>Cada grupo permite una sola respuesta abierta. El control comunica su estado visualmente y conserva interacción nativa por teclado.</p></div>
+            <div class="ds-faq-variants">
+              <figure class="ds-faq-variant">
+                <figcaption><div><b>SIMPLE</b><span>FAQ corta y homogénea</span></div><code>pregunta + respuesta</code></figcaption>
+                <div class="ds-faq-specimen ds-faq-group" data-exclusive-accordion>
+                  <details name="faq-simple" open><summary><span class="ds-faq-question">¿Puedo subir un diseño hecho con IA?</span><i class="ds-faq-toggle" aria-hidden="true"></i></summary><p>Sí. Comprobamos formato, tamaño y resolución para un estampado de hasta 28 × 40 cm.</p></details>
+                  <details name="faq-simple"><summary><span class="ds-faq-question">¿Cuándo pago la cuota?</span><i class="ds-faq-toggle" aria-hidden="true"></i></summary><p>La cuota previa se descuenta del precio final de tu polera y no se cobra dos veces.</p></details>
+                </div>
+              </figure>
+
+              <figure class="ds-faq-variant ds-faq-variant--labeled">
+                <figcaption><div><b>CON ETIQUETA</b><span>Temas mixtos o centros de ayuda</span></div><code>label + contexto + pregunta</code></figcaption>
+                <div class="ds-faq-specimen ds-faq-group" data-exclusive-accordion>
+                  <details name="faq-labeled" open><summary><span class="ds-faq-summary-copy"><em>DISEÑO</em><strong>¿Qué archivos puedo enviar?</strong><small>Formato, peso y resolución</small></span><i class="ds-faq-toggle" aria-hidden="true"></i></summary><p>Aceptamos PNG, JPG y PDF de hasta 50 MB. Si el archivo necesita ajustes, te lo indicamos antes de producir.</p></details>
+                  <details name="faq-labeled"><summary><span class="ds-faq-summary-copy"><em>PAGO</em><strong>¿La revisión se cobra dos veces?</strong><small>Cuota y total del pedido</small></span><i class="ds-faq-toggle" aria-hidden="true"></i></summary><p>No. La cuota de revisión se acredita al total cuando confirmas la polera.</p></details>
+                </div>
+              </figure>
+            </div>
+            <div class="ds-pattern-anatomy"><span>Pregunta</span><span>Etiqueta opcional</span><span>Contexto opcional</span><span>Control sincronizado</span><span>Respuesta</span><span>Collapsed</span><span>Expanded</span></div>
+          </article>
+
+          <article class="ds-pattern-specimen ds-pattern-specimen--wide">
+            <div class="ds-pattern-caption"><span>FORMULARIO · FLUJO DEL ESTUDIO</span><code>#design-form / .studio-controls</code></div>
+            <div class="ds-studio-flow">
+              <ol class="ds-progress" aria-label="Progreso de personalización">
+                <li class="is-current" aria-current="step"><b>01</b><span>Detalles</span></li><li><b>02</b><span>Diseño</span></li><li><b>03</b><span>Calidad</span></li><li><b>04</b><span>Resumen</span></li><li><b>05</b><span>Pago</span></li>
+              </ol>
+              <div class="ds-studio-heading"><span>PASO 1 · DETALLES</span><h3>Elige tu polera.</h3></div>
+              <form class="ds-studio-form">
+                <fieldset><legend><span>Modelo</span><small>PRECIO BASE</small></legend><div class="ds-model-options"><button class="is-selected" type="button"><strong>Básica</strong><small>$14.990</small></button><button type="button"><strong>Over</strong><small>$21.990</small></button><button type="button"><strong>Kid</strong><small>$8.990</small></button></div></fieldset>
+                <fieldset><legend><span>Color</span><small>ELIGE UNO</small></legend><div class="ds-studio-swatches"><button class="is-selected" type="button" aria-label="Blanco" style="--shirt-color:#fff"></button><button type="button" aria-label="Negro" style="--shirt-color:#202124"></button><button type="button" aria-label="Marfil" style="--shirt-color:#e8e0cf"></button><button type="button" aria-label="Azul" style="--shirt-color:#8daec3"></button></div></fieldset>
+                <fieldset><legend><span>Talla</span><button class="ds-guide-button ds-size-guide" type="button"><span>⌁</span>Guía de tallas <b>→</b></button></legend><div class="ds-size-options"><button type="button">XS</button><button type="button">S</button><button class="is-selected" type="button">M</button><button type="button">L</button><button type="button">XL</button><button type="button">XXL</button></div></fieldset>
+                <label class="ds-studio-email"><strong>Indícanos tu email</strong><small>Para seguir en contacto.</small><input class="ds-field" type="email" placeholder="tu@email.com"></label>
+                <button class="ds-cta ds-studio-next" type="button">Siguiente → Sube tu diseño</button>
+              </form>
+            </div>
+            <div class="ds-pattern-anatomy"><span>Stepper</span><span>Encabezado</span><span>Selector de modelo</span><span>Swatches</span><span>Selector de talla</span><span>Input</span><span>CTA</span></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="forms" class="ds-section">
+        <div class="ds-section-heading"><span class="ds-eyebrow"><i></i> 05 / FORMS</span><h2>Claridad antes que ruido.</h2></div>
+        <div class="ds-form-demo">
+          <form>
+            <label>Nombre completo<input class="ds-field" autocomplete="name" placeholder="Cómo te llamas"></label>
+            <label>Email<input class="ds-field" type="email" autocomplete="email" placeholder="tu@email.com"></label>
+            <label>Contraseña<input class="ds-field" type="password" placeholder="Mínimo 6 caracteres"></label>
+            <button class="ds-cta" type="button">Crear mi cuenta</button>
+          </form>
+          <aside class="ds-form-states"><strong>Estados del mismo campo</strong><div class="ds-form-state-grid"><label><span>Reposo</span><input class="ds-field" placeholder="tu@email.com" tabindex="-1"></label><label><span>Foco</span><input class="ds-field" data-state="focus" value="tu@email.com" tabindex="-1"></label><label><span>Completo</span><input class="ds-field" value="hola@droska.cl" tabindex="-1"></label><label><span>Error</span><input class="ds-field" aria-invalid="true" value="correo inválido" tabindex="-1"><small class="ds-field-message is-error">Revisa el formato del correo.</small></label><label><span>Éxito</span><input class="ds-field" data-state="success" value="hola@droska.cl" tabindex="-1"><small class="ds-field-message is-success">Correo validado.</small></label><label><span>Disabled</span><input class="ds-field" value="No editable" disabled tabindex="-1"></label><label><span>Solo lectura</span><input class="ds-field" value="Pedido #1042" readonly tabindex="-1"></label><label><span>Ayuda</span><input class="ds-field" placeholder="Mínimo 6 caracteres" aria-describedby="password-help" tabindex="-1"><small id="password-help" class="ds-field-message">Usa letras y números.</small></label></div></aside>
+        </div>
+        <div class="ds-form-controls">
+          <div class="ds-form-controls-head"><div><span class="ds-eyebrow"><i></i> CONTROLES DE ELECCIÓN Y ENTRADA</span><h3>Más que campos de texto.</h3></div><p>Controles nativos con etiqueta visible, área táctil suficiente, selección explícita y respuesta inmediata.</p></div>
+          <div class="ds-form-controls-grid">
+            <fieldset class="ds-control-card"><legend>Radio · elige uno</legend><p>Modelo de polera</p><label class="ds-option"><input type="radio" name="demo-model" value="basica" checked><span>Básica</span></label><label class="ds-option"><input type="radio" name="demo-model" value="over"><span>Over</span></label><label class="ds-option"><input type="radio" name="demo-model" value="kid"><span>Kid</span></label></fieldset>
+            <fieldset class="ds-control-card"><legend>Checkbox · combina opciones</legend><p>Preferencias de diseño</p><label class="ds-option"><input type="checkbox" checked><span>Recibir una vista previa</span></label><label class="ds-option"><input type="checkbox"><span>Guardar mi diseño</span></label><label class="ds-option"><input type="checkbox" disabled><span>Opción no disponible</span></label></fieldset>
+            <div class="ds-control-card ds-control-card--search"><label for="ds-product-search">Búsqueda</label><p>Buscar por nombre</p><div class="ds-search-field"><span aria-hidden="true">⌕</span><input id="ds-product-search" type="search" placeholder="Busca una polera" autocomplete="off"></div><small id="ds-search-result" role="status">Escribe para filtrar los resultados.</small><ul class="ds-search-results" id="ds-search-results"><li>Básica</li><li>Over</li><li>Kid</li></ul></div>
+            <div class="ds-control-card"><label for="ds-product-filter">Filtro</label><p>Tipo de producto</p><select id="ds-product-filter" class="ds-field"><option value="all">Todos los modelos</option><option value="adult">Adulto</option><option value="kid">Infantil</option></select><small id="ds-filter-result" role="status">Mostrando todos los modelos.</small></div>
+            <div class="ds-control-card"><label for="ds-quantity-range">Rango · arrastra o usa flechas</label><p>Cantidad: <output id="ds-range-output" for="ds-quantity-range">3</output> unidades</p><input id="ds-quantity-range" type="range" min="1" max="10" value="3"><div class="ds-range-labels"><span>1</span><span>10</span></div></div>
+            <div class="ds-control-card ds-control-card--drop"><label for="ds-file-input">Arrastrar archivo</label><p>Imagen para tu polera</p><label class="ds-dropzone" id="ds-dropzone" for="ds-file-input"><span aria-hidden="true">⇧</span><strong>Arrastra aquí o selecciona un archivo</strong><small>PNG, JPG o PDF · máximo 50 MB</small></label><input id="ds-file-input" class="ds-visually-hidden" type="file" accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"><small id="ds-file-status" role="status">Ningún archivo seleccionado.</small></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="overlays" class="ds-section">
+        <div class="ds-section-heading"><span class="ds-eyebrow"><i></i> 06 / MODALS Y DRAWERS</span><h2>Capas que no rompen<br>el contexto.</h2></div>
+        <p class="ds-overlay-note">Especímenes visibles: el modal usa superficie crema, borde de separación y backdrop con blur. El carro se ancla al lateral derecho y entra desde fuera de la pantalla.</p>
+        <div class="ds-overlay-showcase">
+          <article class="ds-overlay-specimen"><div class="ds-overlay-caption"><span>MODAL · CUENTA</span><code>dialog / .commerce-modal</code></div><div class="ds-static-modal"><header><div><span class="ds-eyebrow"><i></i> TU ESPACIO</span><h3>Qué bueno verte.</h3></div><button class="ds-icon-button close-button" aria-label="Cerrar ejemplo"><span></span></button></header><div class="ds-static-modal-body"><p>Ingresa para recuperar tus datos y avanzar más rápido.</p><label>Email<input class="ds-field" placeholder="tu@email.com"></label><label>Contraseña<input class="ds-field" placeholder="Mínimo 6 caracteres"></label><button class="ds-cta ds-cta--sm">Ingresar</button></div></div></article>
+          <article class="ds-overlay-specimen"><div class="ds-overlay-caption"><span>DRAWER · CARRO</span><code>dialog / .cart-drawer</code></div><div class="ds-static-drawer"><header><div><span class="ds-eyebrow"><i></i> TU PEDIDO</span><h3>Carro de compras</h3></div><button class="ds-icon-button close-button" aria-label="Cerrar ejemplo"><span></span></button></header><div class="ds-static-drawer-body"><span>✳</span><strong>Aún no hay poleras aquí.</strong><p>Termina de personalizar una y agrégala cuando estés lista.</p><button class="ds-cta ds-cta--sm">Crear mi polera</button></div></div></article>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/design-system-page.js"></script>
+  </body>
+</html>

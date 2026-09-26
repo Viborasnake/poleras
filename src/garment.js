@@ -4,8 +4,125 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { createGarmentCut } from './garment-cuts.js';
 import { garmentOpenings } from './garment-edges.js';
+import { automaticPrintScale, visibleAlphaBounds } from './artwork-fit.js';
 
 let modelPromise;
+
+function withArtworkSafetyMargin(image, width = image.naturalWidth || image.width, height = image.naturalHeight || image.height, marginRatio = .08) {
+  const padding = Math.max(8, Math.round(Math.max(width, height) * marginRatio));
+  const outputScale = Math.min(1, 1600 / Math.max(width + padding * 2, height + padding * 2));
+  const framed = document.createElement('canvas');
+  framed.width = Math.max(1, Math.round((width + padding * 2) * outputScale));
+  framed.height = Math.max(1, Math.round((height + padding * 2) * outputScale));
+  const inset = padding * outputScale;
+  framed.getContext('2d').drawImage(image, 0, 0, width, height, inset, inset, width * outputScale, height * outputScale);
+  return { image: framed, aspect: framed.width / framed.height };
+}
+
+function fittedArtworkImage(image, marginRatio = .08) {
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  if (!sourceWidth || !sourceHeight) return { image, aspect: 1 };
+  try {
+    // Preserve delicate halftones and soft edge details before trimming transparent padding.
+    const analysisScale = Math.min(1, 768 / Math.max(sourceWidth, sourceHeight));
+    const analysis = document.createElement('canvas');
+    analysis.width = Math.max(1, Math.round(sourceWidth * analysisScale));
+    analysis.height = Math.max(1, Math.round(sourceHeight * analysisScale));
+    const analysisContext = analysis.getContext('2d', { willReadFrequently: true });
+    analysisContext.drawImage(image, 0, 0, analysis.width, analysis.height);
+    const bounds = visibleAlphaBounds(analysisContext.getImageData(0, 0, analysis.width, analysis.height).data, analysis.width, analysis.height, 1);
+    if (!bounds) return { image, aspect: sourceWidth / sourceHeight };
+
+    const padding = Math.max(6, Math.round(Math.max(bounds.width, bounds.height) * .08));
+    const left = Math.max(0, bounds.x - padding);
+    const top = Math.max(0, bounds.y - padding);
+    const right = Math.min(analysis.width, bounds.x + bounds.width + padding);
+    const bottom = Math.min(analysis.height, bounds.y + bounds.height + padding);
+    const coverage = ((right - left) * (bottom - top)) / (analysis.width * analysis.height);
+    // Even a full-bleed PNG needs a small transparent gutter. DecalGeometry can
+    // trim its outer vertices along fabric seams; the gutter keeps artwork corners intact.
+    if (coverage > .97) return withArtworkSafetyMargin(image, sourceWidth, sourceHeight, marginRatio);
+
+    const sourceX = left / analysisScale;
+    const sourceY = top / analysisScale;
+    const cropWidth = (right - left) / analysisScale;
+    const cropHeight = (bottom - top) / analysisScale;
+    const outputScale = Math.min(1, 1600 / Math.max(cropWidth, cropHeight));
+    const cropped = document.createElement('canvas');
+    cropped.width = Math.max(1, Math.round(cropWidth * outputScale));
+    cropped.height = Math.max(1, Math.round(cropHeight * outputScale));
+    cropped.getContext('2d').drawImage(image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, cropped.width, cropped.height);
+    return withArtworkSafetyMargin(cropped, cropped.width, cropped.height, marginRatio);
+  } catch {
+    // A third-party image without CORS cannot be inspected, but it can still be shown.
+    return { image, aspect: sourceWidth / sourceHeight };
+  }
+}
+
+export function isPrintableFacing(normalZ, back = false, threshold = .52) {
+  const facing = back ? -1 : 1;
+  return normalZ * facing >= threshold;
+}
+
+export function printVisibilityForFacing(facing, fadeStart = .16, fullyVisible = .42) {
+  if (facing <= fadeStart) return 0;
+  if (facing >= fullyVisible) return 1;
+  const progress = (facing - fadeStart) / (fullyVisible - fadeStart);
+  // Smooth the transition so rotating the garment never produces a visible pop.
+  return progress * progress * (3 - 2 * progress);
+}
+
+export function responsiveCameraDistance(distance, aspect, hero = false) {
+  if (!hero) return distance;
+  // A perspective camera preserves vertical FOV. On tall mobile cards the
+  // horizontal FOV becomes too narrow, so move back enough to keep sleeves in frame.
+  const safeAspect = Math.max(.5, Number(aspect) || 1);
+  return distance * Math.max(1, .96 / safeAspect);
+}
+
+function keepForwardFacingDecal(geometry, back = false, threshold = .52) {
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  const uv = geometry.getAttribute('uv');
+  if (!position || !normal || !uv) return geometry;
+  const positions = [], normals = [], uvs = [];
+  for (let index = 0; index < position.count; index += 3) {
+    const averageZ = (normal.getZ(index) + normal.getZ(index + 1) + normal.getZ(index + 2)) / 3;
+    // Do not let a front print wrap around the side panels. At grazing angles
+    // that wrap reads like a separate floating card instead of ink on fabric.
+    if (!isPrintableFacing(averageZ, back, threshold)) continue;
+    for (let vertex = index; vertex < index + 3; vertex += 1) {
+      positions.push(position.getX(vertex), position.getY(vertex), position.getZ(vertex));
+      normals.push(normal.getX(vertex), normal.getY(vertex), normal.getZ(vertex));
+      uvs.push(uv.getX(vertex), uv.getY(vertex));
+    }
+  }
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function settleDecalOnFabric(geometry, distance = .0012) {
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  if (!position || !normal) return geometry;
+  for (let index = 0; index < position.count; index += 1) {
+    position.setXYZ(
+      index,
+      position.getX(index) + normal.getX(index) * distance,
+      position.getY(index) + normal.getY(index) * distance,
+      position.getZ(index) + normal.getZ(index) * distance,
+    );
+  }
+  position.needsUpdate = true;
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
 // Follow the garment's actual open edges, including its folds and sleeve angle.
 function addGarmentHems(mesh, kind = 'basic') {
   const geometry = mesh.geometry;
@@ -121,11 +238,11 @@ export async function createViewer(container, state, { hero = false, viewAngle =
 
   const printMaterial = new THREE.MeshStandardMaterial({
     transparent: true, roughness: .98, metalness: 0,
-    polygonOffset: true, polygonOffsetFactor: -4,
     depthWrite: false, side: THREE.FrontSide
   });
-  let print, currentImage = '', generation = 0;
+  let print, currentImage = '', generation = 0, printOnBack = false;
   const ray = new THREE.Raycaster();
+  const localCameraPosition = new THREE.Vector3();
 
   async function update(next) {
     cloth.color.set(next.color);
@@ -138,12 +255,14 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     shirt.children.forEach(hem => hem.material.color.set(next.color).multiplyScalar(hem.userData.fabricShade ?? .94));
     const url = next.image || '';
     const back = next.printSide === 'back';
+    printOnBack = back;
     const requestedScale = next.printScale || 1;
     const maxScale = next.assessment?.printWidth && next.assessment?.printHeight
       ? Math.min(1.35, 28 / next.assessment.printWidth, 40 / next.assessment.printHeight)
-      : 1.35;
+      : next.catalogPreview ? 1.4 : 1.35;
     const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
-    const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) : '';
+    const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : 'safe-fit-v3';
+    const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + fitMode : '';
     if (key === currentImage) return;
     currentImage = key;
     const token = ++generation;
@@ -154,17 +273,22 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     try {
       const texture = await new THREE.TextureLoader().loadAsync(url);
       if (generation !== token) { texture.dispose(); return; }
+      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .028 : hero ? .12 : .08);
+      texture.image = fitted.image;
+      texture.needsUpdate = true;
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-      const aspect = texture.image.width / texture.image.height;
+      const aspect = fitted.aspect;
+      const safeScale = automaticPrintScale(aspect);
       const printArea = next.kind === 'kids' ? { width: .82, height: 1.15, y: .12 } : next.kind === 'over' ? { width: 1.12, height: 1.40, y: .10 } : { width: .95, height: 1.357, y: .15 };
-      const width = Math.min(printArea.width, printArea.height * aspect) * printScale;
+      const width = Math.min(printArea.width, printArea.height * aspect) * printScale * safeScale;
       const height = width / aspect;
+      const placementY = printArea.y + (1 - safeScale) * .35;
       // Project onto the active cloth mesh so the artwork follows the fabric instead of floating.
       group.updateMatrixWorld(true);
-      ray.set(new THREE.Vector3(0, printArea.y, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
+      ray.set(new THREE.Vector3(0, placementY, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
       const targetZ = ray.intersectObject(shirt, false)[0]?.point.z ?? (back ? -.4 : .4);
-      const decal = new DecalGeometry(shirt, new THREE.Vector3(0, printArea.y, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .5));
+      const decal = settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, next.catalogPreview ? .28 : .52));
       printMaterial.map = texture;
       printMaterial.needsUpdate = true;
       print = new THREE.Mesh(decal, printMaterial);
@@ -179,23 +303,59 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const width = container.clientWidth, height = container.clientHeight;
     if (!width || !height) return;
     camera.aspect = width / height;
+    if (hero) camera.position.setLength(responsiveCameraDistance(distance, camera.aspect, true));
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
   }
-  new ResizeObserver(resize).observe(container);
+  const resizeObserver = new ResizeObserver(resize);
+  resizeObserver.observe(container);
   let visible = true;
-  new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }).observe(container);
+  const visibilityObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; });
+  visibilityObserver.observe(container);
   renderer.setAnimationLoop(() => {
     if (!visible || document.hidden) return;
     const dialog = container.closest('dialog');
     if (dialog && !dialog.open) return;
     controls.update();
+    if (print) {
+      group.updateMatrixWorld(true);
+      camera.getWorldPosition(localCameraPosition);
+      group.worldToLocal(localCameraPosition);
+      const facing = (localCameraPosition.z / Math.max(localCameraPosition.length(), .0001)) * (printOnBack ? -1 : 1);
+      const opacity = printVisibilityForFacing(facing);
+      printMaterial.opacity = opacity;
+      print.visible = opacity > .001;
+    }
     renderer.render(scene, camera);
   });
   await update(state);
   resize();
   return {
     update, resize,
+    snapshot() {
+      controls.update();
+      renderer.render(scene, camera);
+      return renderer.domElement.toDataURL('image/png');
+    },
+    dispose() {
+      ++generation;
+      renderer.setAnimationLoop(null);
+      resizeObserver.disconnect();
+      visibilityObserver.disconnect();
+      controls.dispose();
+      if (print) print.geometry.dispose();
+      printMaterial.map?.dispose();
+      printMaterial.dispose();
+      Object.values(cuts).forEach(cut => {
+        cut.geometry.dispose();
+        cut.children.forEach(hem => { hem.geometry.dispose(); hem.material.dispose(); });
+        cut.material.dispose();
+      });
+      cloth.dispose();
+      renderer.dispose();
+      renderer.forceContextLoss();
+      renderer.domElement.remove();
+    },
     turn(angle = 0) { group.rotation.y = angle; },
     face(side) { camera.position.set(0, .05, side === 'back' ? -initial.z : initial.z); controls.target.set(0, 0, 0); controls.update(); },
     reset() { camera.position.set(0, .05, initial.z); controls.target.set(0, 0, 0); controls.update(); }

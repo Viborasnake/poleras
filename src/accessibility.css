@@ -1,0 +1,41 @@
+/* Tokens semánticos y mínimos WCAG 2.1 AA aplicados a componentes interactivos. */
+/* Controles de formulario: borde perceptible (4.82:1 contra la superficie). */
+.ds-field,
+.account-form input.ds-field,
+.commerce-modal input.ds-field,
+.ds-static-modal input.ds-field{
+  border-color:var(--ds-border-control);
+  color:var(--ds-text-primary);
+}
+.ds-field::placeholder,
+.account-form input.ds-field::placeholder{color:var(--ds-text-tertiary);opacity:1}
+
+/* El foco es uniforme, visible con teclado y no depende del color del control. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible{
+  outline:3px solid var(--ds-focus-ring);
+  outline-offset:3px;
+}
+
+/* Disabled conserva legibilidad; no se usa como única pista de estado. */
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled,
+[aria-disabled='true']{
+  background:var(--ds-surface-disabled);
+  color:var(--ds-text-disabled);
+  border-color:var(--ds-border-subtle);
+  cursor:not-allowed;
+}
+
+.ds-icon-button,.commerce-close,.account-icon,.cart-trigger svg{color:var(--ds-icon-default)}
+.commerce-copy,.commerce-note,.cart-item-copy small{color:var(--ds-text-secondary)}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
