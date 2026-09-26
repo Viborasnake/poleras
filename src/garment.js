@@ -186,14 +186,12 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   controls.enablePan = false;
   controls.enableDamping = true;
   controls.enableZoom = !hero;
+  controls.enableRotate = !hero;
   controls.minDistance = 4;
   controls.maxDistance = 8;
   controls.minPolarAngle = Math.PI * .25;
   controls.maxPolarAngle = Math.PI * .75;
-  // Keep the printable front visible on arrival; rotation is always user-controlled.
-  controls.autoRotate = hero;
-  controls.autoRotateSpeed = .65;
-  if (hero) window.setTimeout(() => { controls.autoRotate = false; }, 1800);
+  controls.autoRotate = false;
 
   const group = new THREE.Group();
   scene.add(group);
@@ -289,9 +287,9 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       group.updateMatrixWorld(true);
       ray.set(new THREE.Vector3(0, placementY, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
       const targetZ = ray.intersectObject(shirt, false)[0]?.point.z ?? (back ? -.4 : .4);
-      // Las miniaturas de catálogo necesitan mostrar el PNG entero. El hero, en cambio,
-      // sigue la tela para no verse flotando al girar la polera.
-      const useFlatPreview = next.catalogPreview;
+      // Hero y catálogo son vistas frontales editoriales: preservan el PNG completo.
+      // El giro queda disponible únicamente en el estudio, donde la proyección se ajusta a la tela.
+      const useFlatPreview = next.catalogPreview || hero;
       const decal = useFlatPreview
         ? new THREE.PlaneGeometry(width, height)
         : settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, .52));
