@@ -187,7 +187,8 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   controls.enableDamping = true;
   controls.enableZoom = !hero;
   controls.enableRotate = !hero;
-  controls.minDistance = 4;
+  // Mantiene la prenda completa dentro del visor incluso después de hacer zoom.
+  controls.minDistance = hero ? 4 : 4.65;
   controls.maxDistance = 8;
   controls.minPolarAngle = Math.PI * .25;
   controls.maxPolarAngle = Math.PI * .75;
