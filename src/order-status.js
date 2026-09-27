@@ -64,6 +64,7 @@ export function nextOrderStatus(status, orderOrFulfillment = 'delivery') {
 export function orderKanbanStage(status) {
   if (incoming.includes(status)) return 'incoming';
   if (processing.includes(status)) return 'processing';
+  if (['shipped', 'ready_for_pickup', 'delivered', 'cancelled'].includes(status)) return 'completed';
   return 'handoff';
 }
 

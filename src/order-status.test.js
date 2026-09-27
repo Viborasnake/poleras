@@ -22,7 +22,7 @@ test('separa el cierre operativo según despacho o retiro', () => {
   assert.equal(nextOrderStatus('in_production', 'pickup').status, 'ready_for_pickup');
   assert.equal(nextOrderStatus('ready_for_pickup', 'pickup'), null);
   assert.equal(orderSteps('pickup').length, 3);
-  assert.equal(orderKanbanStage('ready_for_pickup'), 'handoff');
+  assert.equal(orderKanbanStage('ready_for_pickup'), 'completed');
 });
 
 test('muestra nombres comprensibles al cliente', () => {
