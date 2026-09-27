@@ -37,6 +37,10 @@ body, button, a, summary, .logo, .announcement span, .path-top > span, .text-lin
   font-variant-emoji: text;
 }
 
+/* El flujo de pedidos cambia de ancho según despacho o retiro. */
+.order-progress{grid-template-columns:repeat(var(--order-step-count,4),minmax(0,1fr))!important}
+@media(max-width:520px){.order-progress{grid-template-columns:repeat(var(--order-step-count,4),76px)!important}}
+
 /* La imagen 2D imita el giro real que realizan los modelos 3D sobre su eje Y. */
 .custom-shirt-image {
   rotate: y var(--shirt-turn, 0deg);
@@ -1248,6 +1252,7 @@ footer .logo > span {
 @media(max-width:520px){.fulfillment-options,.delivery-fields,.fulfillment-contact{grid-template-columns:1fr}.fulfillment-contact-summary{align-items:flex-end}.fulfillment-contact-summary>div{grid-template-columns:1fr}.fulfillment-choice{min-height:72px}}
 .checkout-total{display:flex;justify-content:space-between;align-items:center;margin:22px 0 12px;padding:17px;border-radius:10px;background:var(--ds-color-ink);color:#fff}
 .checkout-total strong{font-size:20px}
+.checkout-coupon{display:grid;gap:7px;margin-top:16px;padding:13px;border:1px solid var(--ds-border-subtle);border-radius:10px;background:var(--ds-surface-raised)}.checkout-coupon>label{font-size:10px;font-weight:800}.checkout-coupon>div{display:grid;grid-template-columns:1fr auto;gap:7px}.checkout-coupon input{min-width:0;padding:11px 12px;border:1px solid var(--ds-border-control);border-radius:8px;text-transform:uppercase}.checkout-coupon button{padding:0 14px;border-radius:8px;background:var(--ds-color-ink);color:#fff;font-size:10px;font-weight:800}.checkout-coupon small{color:var(--ds-text-secondary);font-size:8px}.checkout-coupon small[data-tone="success"]{color:var(--ds-feedback-success)}.checkout-coupon small[data-tone="error"]{color:var(--ds-feedback-danger)}
 .shipping-calculation-note{margin:14px 0 0;padding:11px 13px;border:1px dashed var(--ds-border-control);border-radius:10px;background:var(--ds-surface-subtle);color:var(--ds-text-secondary);font-size:12px;line-height:1.45}
 .shipping-quote{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;margin:14px 0 0;padding:13px;border:1px solid var(--ds-border-control);border-radius:12px;background:var(--ds-lime-500)}
 .shipping-quote-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--ds-surface-raised);color:var(--ds-text-primary);font-weight:800}

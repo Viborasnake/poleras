@@ -106,6 +106,18 @@ Deno.serve(async request => {
   const now = new Date().toISOString()
   const shipping = shippingFor(fulfillment, String(body?.shippingAddress?.region || ''), items.reduce((sum: number, item: any) => sum + item.quantity, 0))
   if (body?.shippingQuoteClp !== undefined && body.shippingQuoteClp !== null && Number(body.shippingQuoteClp) !== shipping) return json({ error: 'El valor del despacho cambió. Vuelve a calcularlo antes de pagar.' }, 409)
+  const couponCode = String(body?.couponCode || '').trim().toUpperCase()
+  let coupon: any = null
+  let discount = 0
+  if (couponCode) {
+    const { data } = await admin.from('coupons').select('*').eq('code', couponCode).eq('active', true).maybeSingle()
+    const timestamp = Date.now()
+    if (!data || (data.starts_at && new Date(data.starts_at).getTime() > timestamp) || (data.ends_at && new Date(data.ends_at).getTime() < timestamp) || (data.max_uses !== null && data.used_count >= data.max_uses) || subtotal < data.min_subtotal_clp) return json({ error: 'El cupón ya no es válido para esta compra.' }, 409)
+    coupon = data
+    discount = data.kind === 'percent' ? Math.floor(subtotal * data.value / 100) : data.value
+    if (data.max_discount_clp !== null) discount = Math.min(discount, data.max_discount_clp)
+    discount = Math.min(subtotal, discount)
+  }
   const shippingAddress = {
     fulfillment,
     customer: {
@@ -126,11 +138,13 @@ Deno.serve(async request => {
   const { data: order, error: orderError } = await admin.from('orders').insert({
     user_id: userData.user.id,
     status: 'paid',
+    source: 'online',
+    coupon_code: coupon?.code || null,
     subtotal_clp: subtotal,
     shipping_clp: shipping,
-    discount_clp: 0,
-    total_clp: subtotal + shipping,
-    price_snapshot: { demo: true, request_id: requestId, provider: 'mercado_pago_simulation', shipping_calculated: true, shipping_quote_clp: shipping },
+    discount_clp: discount,
+    total_clp: subtotal + shipping - discount,
+    price_snapshot: { demo: true, request_id: requestId, provider: 'mercado_pago_simulation', shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null },
     shipping_address: shippingAddress,
     submitted_at: now,
   }).select('id,total_clp').single()
@@ -151,10 +165,16 @@ Deno.serve(async request => {
       provider_reference: requestId,
       kind: 'full',
       status: 'approved',
-      amount_clp: subtotal + shipping,
+      amount_clp: subtotal + shipping - discount,
       confirmed_at: now,
     })
     if (paymentError) throw paymentError
+    if (coupon) {
+      const { error: redemptionError } = await admin.from('coupon_redemptions').insert({ coupon_id: coupon.id, order_id: order.id, amount_clp: discount })
+      if (redemptionError) throw redemptionError
+      const { error: couponUpdateError } = await admin.from('coupons').update({ used_count: coupon.used_count + 1, updated_at: now }).eq('id', coupon.id).eq('used_count', coupon.used_count)
+      if (couponUpdateError) throw couponUpdateError
+    }
   } catch (error) {
     await admin.from('orders').delete().eq('id', order.id)
     console.error(error)

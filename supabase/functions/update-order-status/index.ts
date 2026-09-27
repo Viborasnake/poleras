@@ -10,18 +10,20 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
 })
 
-const workflow = ['paid', 'in_production', 'ready', 'shipped', 'delivered'] as const
+const deliveryWorkflow = ['paid', 'in_production', 'ready', 'shipped'] as const
+const pickupWorkflow = ['paid', 'in_production', 'ready_for_pickup'] as const
 const labels: Record<string, string> = {
   paid: 'Pedido ingresado',
   in_production: 'Preparando pedido',
-  ready: 'Listo para despacho',
-  shipped: 'En despacho',
+  ready: 'Pedido preparado',
+  shipped: 'Entregado a transportista',
+  ready_for_pickup: 'Listo en tienda para retirar',
   delivered: 'Entregado',
 }
 const aliases: Record<string, number> = {
   draft: 0, submitted: 0, quoted: 0, awaiting_deposit: 0, deposit_paid: 0, paid: 0,
   in_design: 1, proposal_ready: 1, approved: 1, awaiting_balance: 1, in_production: 1,
-  ready: 2, shipped: 3, delivered: 4,
+  ready: 2, shipped: 3, ready_for_pickup: 2, delivered: 3,
 }
 const htmlEntities: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -79,15 +81,16 @@ Deno.serve(async request => {
   try { body = await request.json() } catch { return json({ error: 'Solicitud inválida.' }, 400) }
   const orderId = String(body.orderId || '').trim()
   const status = String(body.status || '').trim()
-  if (!orderId || !workflow.includes(status as typeof workflow[number])) return json({ error: 'Estado de pedido inválido.' }, 400)
+  if (!orderId || ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any)) return json({ error: 'Estado de pedido inválido.' }, 400)
 
   const { data: order, error: orderError } = await admin.from('orders')
     .select('id,user_id,status,shipping_address')
     .eq('id', orderId)
     .single()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)
+  const workflow = order.shipping_address?.fulfillment === 'pickup' ? pickupWorkflow : deliveryWorkflow
   const currentIndex = aliases[order.status]
-  const requestedIndex = workflow.indexOf(status as typeof workflow[number])
+  const requestedIndex = workflow.indexOf(status as any)
   if (currentIndex === undefined || requestedIndex !== currentIndex + 1) {
     return json({ error: 'El pedido debe avanzar una etapa a la vez.' }, 409)
   }
@@ -101,7 +104,7 @@ Deno.serve(async request => {
   if (updateError) return json({ error: 'No pudimos actualizar el pedido.' }, 503)
   if (!updatedOrder) return json({ error: 'El pedido cambió en otra sesión. Recarga el panel.' }, 409)
   const customer = order.shipping_address?.customer || {}
-  const authUser = customer.email ? null : await admin.auth.admin.getUserById(order.user_id)
+  const authUser = customer.email || !order.user_id ? null : await admin.auth.admin.getUserById(order.user_id)
   const email = String(customer.email || authUser?.data?.user?.email || '').trim()
   const name = String(customer.first_name || authUser?.data?.user?.user_metadata?.full_name || '').trim()
   let emailResult: Record<string, unknown> = { sent: false, reason: 'missing_customer_email' }
