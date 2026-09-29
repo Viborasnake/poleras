@@ -123,9 +123,9 @@
 .admin-payment-toggle input{display:block!important;width:42px!important;height:24px!important;min-width:42px!important;min-height:24px!important;flex:0 0 42px!important;margin:0!important;border:0!important;padding:0!important}
 .admin-payment-toggle input::after{width:18px;height:18px;top:3px;left:3px}
 .admin-payment-toggle input:checked::after{transform:translateX(18px)}
-.admin-payment-toggle span{display:grid;gap:0;min-width:0;line-height:1.15;overflow:hidden}
+.admin-payment-toggle span{display:block;min-width:0;line-height:1.15;overflow:hidden}
 .admin-payment-toggle strong{font:800 12px/1.15 var(--ds-font-body)}
-.admin-payment-toggle small{font:500 10px/1.25 var(--ds-font-body)}
+.admin-payment-toggle small{display:none}
 .admin-payment-toggle small{font-size:10px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
 .admin-payment-toggle:has(input:checked) small{color:var(--ds-text-secondary)}
 .admin-dialog-toast{position:fixed;left:50%;bottom:88px;z-index:20;width:max-content;max-width:calc(100% - 32px);transform:translate(-50%,20px)}
@@ -138,7 +138,7 @@
 .admin-kanban-card-meta strong{font-size:13px}
 .admin-card-open{padding-top:8px}
 .admin-order-progress-actions>div{align-items:stretch;gap:10px}
-.admin-payment-toggle,.admin-order-progress-actions [data-next-status]{box-sizing:border-box;width:220px;min-width:220px;height:48px;min-height:48px}
+.admin-payment-toggle,.admin-order-progress-actions [data-next-status]{box-sizing:border-box;width:220px;min-width:220px;height:44px;min-height:44px}
 .admin-payment-toggle{width:220px;align-items:center;padding:6px 10px}
 .admin-order-progress-actions [data-next-status]{display:inline-flex;align-items:center;justify-content:center}
 .admin-payment-instructions>div:not(.admin-payment-actions){display:flex;flex-wrap:nowrap;align-items:stretch;gap:8px}
