@@ -2,13 +2,15 @@ export const DELIVERY_STEPS = [
   { status: 'paid', label: 'Pedido ingresado', adminAction: 'Pedido ingresado' },
   { status: 'in_production', label: 'Preparando pedido', adminAction: 'Tomar pedido' },
   { status: 'ready', label: 'Pedido preparado', adminAction: 'Marcar preparado' },
-  { status: 'shipped', label: 'Entregado a transportista', adminAction: 'Entregar a transportista' },
+  { status: 'shipped', label: 'En despacho', adminAction: 'Entregar a transportista' },
+  { status: 'delivered', label: 'Entregado', adminAction: 'Confirmar entrega' },
 ];
 
 export const PICKUP_STEPS = [
   { status: 'paid', label: 'Pedido ingresado', adminAction: 'Pedido ingresado' },
   { status: 'in_production', label: 'Preparando pedido', adminAction: 'Tomar pedido' },
-  { status: 'ready_for_pickup', label: 'Listo en tienda para retirar', adminAction: 'Listo para retirar' },
+  { status: 'ready_for_pickup', label: 'Listo para retirar', adminAction: 'Listo para retirar' },
+  { status: 'delivered', label: 'Retirado', adminAction: 'Confirmar retiro' },
 ];
 
 export const ORDER_STEPS = DELIVERY_STEPS;
@@ -26,8 +28,8 @@ export const ORDER_STATUS_LABELS = {
   paid: 'Pedido ingresado',
   in_production: 'Preparando pedido',
   ready: 'Pedido preparado',
-  shipped: 'Entregado a transportista',
-  ready_for_pickup: 'Listo en tienda para retirar',
+  shipped: 'En despacho',
+  ready_for_pickup: 'Listo para retirar',
   delivered: 'Entregado',
   cancelled: 'Cancelado',
 };
@@ -64,10 +66,11 @@ export function nextOrderStatus(status, orderOrFulfillment = 'delivery') {
 export function orderKanbanStage(status) {
   if (incoming.includes(status)) return 'incoming';
   if (processing.includes(status)) return 'processing';
-  if (['shipped', 'ready_for_pickup', 'delivered', 'cancelled'].includes(status)) return 'completed';
+  if (['delivered', 'cancelled'].includes(status)) return 'completed';
   return 'handoff';
 }
 
-export function orderStatusLabel(status) {
+export function orderStatusLabel(status, orderOrFulfillment = 'delivery') {
+  if (status === 'delivered' && orderFulfillment(orderOrFulfillment) === 'pickup') return 'Retirado';
   return ORDER_STATUS_LABELS[status] || status || 'Sin estado';
 }

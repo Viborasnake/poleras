@@ -1,0 +1,66 @@
+.admin-manual-dialog .admin-form-section {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 13px;
+}
+
+.admin-manual-dialog .admin-form-section > legend {
+  padding: 0 7px;
+  color: var(--ds-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-manual-item {
+  padding: 14px;
+  border: 1px solid var(--ds-border-control);
+  border-radius: 11px;
+  background: var(--ds-surface-page);
+}
+
+.admin-manual-item + .admin-manual-item {
+  margin-top: 12px;
+}
+
+.admin-manual-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 13px;
+}
+
+.admin-add-item {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.admin-form-hint { margin: 7px 0 13px; color: var(--ds-text-secondary); font-size: 12px; line-height: 1.45; }
+.admin-payment-fields { display: grid; gap: 13px; margin-top: 13px; padding: 14px; border: 1px solid var(--ds-border-subtle); border-radius: 12px; background: var(--ds-surface-subtle); }
+.admin-payment-fields .admin-form-grid { margin-top: 2px; }
+.admin-payment-fields label:not(.admin-check) { display: grid; gap: 6px; }
+.admin-payment-fields input { width: 100%; min-height: 44px; padding: 10px 11px; border: 1px solid var(--ds-border-control); border-radius: 9px; background: var(--ds-surface-page); color: var(--ds-text-primary); }
+.admin-payment-instructions { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--ds-border-subtle); border-radius: 12px; background: var(--ds-surface-subtle); }
+.admin-payment-instructions p { margin: 0; color: var(--ds-text-secondary); font-size: 12px; }
+.admin-payment-instructions > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-payment-instructions > div > span { display: grid; gap: 3px; min-width: 150px; padding: 9px 11px; border-radius: 9px; background: var(--ds-surface-raised); font-size: 12px; }
+.admin-payment-instructions > div b { color: var(--ds-text-secondary); font-size: 10px; text-transform: uppercase; }
+.admin-payment-instructions a { color: var(--ds-link); font-weight: 700; }
+.admin-payment-instructions button { width: max-content; }
+.admin-payment-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-payment-dialog { width: min(620px, calc(100vw - 30px)); }
+.admin-payment-dialog form { display: grid; gap: 14px; padding: 0 22px 22px; }
+.admin-payment-dialog .dialog-title { margin: 0 -22px; padding: 22px 27px 18px; }
+.admin-payment-dialog .admin-form-section { margin: 0; padding: 14px; border: 1px solid var(--ds-border-subtle); border-radius: 13px; }
+.admin-payment-dialog .admin-form-section > legend { padding: 0 7px; font-size: 13px; font-weight: 800; }
+.admin-payment-dialog .admin-payment-fields { margin-top: 10px; }
+.admin-payment-dialog .admin-form-grid { gap: 10px; }
+.admin-payment-dialog .dialog-actions { padding-top: 2px; }
+@media (max-width: 720px) {
+  .admin-payment-dialog form { padding: 0 16px 16px; }
+  .admin-payment-dialog .dialog-title { margin: 0 -16px; padding: 20px 20px 16px; }
+}
+.admin-payment-instructions > p { display: flex; align-items: center; gap: 8px; }
+.admin-payment-instructions > p::before { width: 8px; height: 8px; border-radius: 50%; background: var(--ds-feedback-warning); content: ''; }
+.admin-payment-instructions:has([data-send-payment-email]:disabled) > p::before { background: var(--ds-text-disabled); }
+.admin-payment-actions [data-send-payment-email]:not(:disabled) { border-color: var(--ds-brand-accent); background: var(--ds-brand-accent); color: var(--ds-text-inverse); box-shadow: 0 3px 0 var(--ds-pink-500); }

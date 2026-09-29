@@ -7,7 +7,7 @@ test('normaliza estados históricos al stepper operativo', () => {
   assert.equal(orderProgressIndex('in_design'), 1);
   assert.equal(orderProgressIndex('ready'), 2);
   assert.equal(orderProgressIndex('shipped'), 3);
-  assert.equal(orderProgressIndex('delivered'), 3);
+  assert.equal(orderProgressIndex('delivered'), 4);
 });
 
 test('entrega la próxima acción operativa', () => {
@@ -19,10 +19,11 @@ test('entrega la próxima acción operativa', () => {
 test('separa el cierre operativo según despacho o retiro', () => {
   assert.equal(nextOrderStatus('in_production', 'delivery').status, 'ready');
   assert.equal(nextOrderStatus('ready', 'delivery').status, 'shipped');
+  assert.equal(nextOrderStatus('shipped', 'delivery').status, 'delivered');
   assert.equal(nextOrderStatus('in_production', 'pickup').status, 'ready_for_pickup');
-  assert.equal(nextOrderStatus('ready_for_pickup', 'pickup'), null);
-  assert.equal(orderSteps('pickup').length, 3);
-  assert.equal(orderKanbanStage('ready_for_pickup'), 'completed');
+  assert.equal(nextOrderStatus('ready_for_pickup', 'pickup').status, 'delivered');
+  assert.equal(orderSteps('pickup').length, 4);
+  assert.equal(orderKanbanStage('ready_for_pickup'), 'handoff');
 });
 
 test('muestra nombres comprensibles al cliente', () => {

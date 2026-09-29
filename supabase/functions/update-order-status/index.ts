@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
+import { orderEmailLabels, sendOrderEmail } from '../_shared/order-email.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,48 +11,13 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
 })
 
-const deliveryWorkflow = ['paid', 'in_production', 'ready', 'shipped'] as const
-const pickupWorkflow = ['paid', 'in_production', 'ready_for_pickup'] as const
-const labels: Record<string, string> = {
-  paid: 'Pedido ingresado',
-  in_production: 'Preparando pedido',
-  ready: 'Pedido preparado',
-  shipped: 'Entregado a transportista',
-  ready_for_pickup: 'Listo en tienda para retirar',
-  delivered: 'Entregado',
-}
+const deliveryWorkflow = ['paid', 'in_production', 'ready', 'shipped', 'delivered'] as const
+const pickupWorkflow = ['paid', 'in_production', 'ready_for_pickup', 'delivered'] as const
 const aliases: Record<string, number> = {
   draft: 0, submitted: 0, quoted: 0, awaiting_deposit: 0, deposit_paid: 0, paid: 0,
   in_design: 1, proposal_ready: 1, approved: 1, awaiting_balance: 1, in_production: 1,
   ready: 2, shipped: 3, ready_for_pickup: 2, delivered: 3,
 }
-const htmlEntities: Record<string, string> = {
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-}
-const escapeHtml = (value: unknown) => String(value || '').replace(/[&<>"']/g, char => htmlEntities[char] || char)
-
-async function sendStatusEmail(to: string, name: string, orderId: string, status: string) {
-  const apiKey = Deno.env.get('RESEND_API_KEY')
-  const from = Deno.env.get('RESEND_FROM_EMAIL')
-  if (!apiKey || !from) return { sent: false, reason: 'email_not_configured' }
-  const siteUrl = (Deno.env.get('SITE_URL') || 'https://poleras-smoky.vercel.app').replace(/\/$/, '')
-  const label = labels[status]
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: `Tu pedido #${orderId} · ${label}`,
-      text: `Hola ${name || 'creativa/o'}, tu pedido #${orderId} ahora está en: ${label}. Revisa el detalle en ${siteUrl}/?panel=account`,
-      html: `<div style="font-family:Arial,sans-serif;color:#262920;line-height:1.55"><p>Hola ${escapeHtml(name || 'creativa/o')},</p><h1 style="font-size:24px">${escapeHtml(label)}</h1><p>Tu pedido <strong>#${escapeHtml(orderId)}</strong> avanzó a una nueva etapa.</p><p><a href="${escapeHtml(siteUrl)}/?panel=account" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#262920;color:#fff;text-decoration:none;font-weight:700">Ver mis pedidos</a></p><p style="color:#6d6b64">Droska · Hecho a tu pinta.</p></div>`,
-    }),
-  })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(payload?.message || 'No se pudo enviar el correo.')
-  return { sent: true, id: payload?.id }
-}
-
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return json({ error: 'Método no permitido.' }, 405)
@@ -77,23 +43,33 @@ Deno.serve(async request => {
   if (userError || !userData.user) return json({ error: 'La sesión no es válida.' }, 401)
   if (adminError || !isAdmin) return json({ error: 'No tienes permisos de administración.' }, 403)
 
-  let body: { orderId?: string; status?: string; note?: string }
+  let body: { orderId?: string; status?: string; note?: string; rollback?: boolean }
   try { body = await request.json() } catch { return json({ error: 'Solicitud inválida.' }, 400) }
   const orderId = String(body.orderId || '').trim()
   const status = String(body.status || '').trim()
   if (!orderId || ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any)) return json({ error: 'Estado de pedido inválido.' }, 400)
 
   const { data: order, error: orderError } = await admin.from('orders')
-    .select('id,user_id,status,shipping_address')
+    .select('id,user_id,status,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_confirmed_at,edit_pending_approval,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
     .eq('id', orderId)
     .single()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)
+  if (order.edit_pending_approval) return json({ error: 'Este pedido tiene cambios pendientes de revisión. Compáralos y apruébalos o recházalos antes de avanzar.' }, 409)
+  if (body.rollback) {
+    if (status !== 'paid' || order.status === 'paid' || order.status === 'delivered') return json({ error: 'Este pedido no puede volver a Pedido ingresado.' }, 409)
+    const { data: rolledBack, error: rollbackError } = await admin.from('orders').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('id', orderId).eq('status', order.status).select('id').maybeSingle()
+    if (rollbackError) return json({ error: 'No pudimos devolver el pedido a Pedido ingresado.' }, 503)
+    if (!rolledBack) return json({ error: 'El pedido cambió en otra sesión. Recarga el panel.' }, 409)
+    await admin.from('order_status_history').insert({ order_id: orderId, status: 'paid', note: 'Pedido devuelto a Pedido ingresado por administración.' })
+    return json({ orderId, status: 'paid', label: orderEmailLabels.paid, email: { sent: false, reason: 'rollback_without_email' } })
+  }
   const workflow = order.shipping_address?.fulfillment === 'pickup' ? pickupWorkflow : deliveryWorkflow
   const currentIndex = aliases[order.status]
   const requestedIndex = workflow.indexOf(status as any)
   if (currentIndex === undefined || requestedIndex !== currentIndex + 1) {
     return json({ error: 'El pedido debe avanzar una etapa a la vez.' }, 409)
   }
+  if (status === 'in_production' && !order.payment_confirmed_at) return json({ error: 'Confirma primero que recibiste el pago antes de preparar el pedido.' }, 409)
 
   const { data: updatedOrder, error: updateError } = await admin.from('orders')
     .update({ status, updated_at: new Date().toISOString() })
@@ -103,18 +79,20 @@ Deno.serve(async request => {
     .maybeSingle()
   if (updateError) return json({ error: 'No pudimos actualizar el pedido.' }, 503)
   if (!updatedOrder) return json({ error: 'El pedido cambió en otra sesión. Recarga el panel.' }, 409)
+  await admin.from('order_status_history').insert({ order_id: orderId, status, note: 'Estado actualizado por administración.' })
   const customer = order.shipping_address?.customer || {}
+  const pickup = order.shipping_address?.fulfillment === 'pickup'
   const authUser = customer.email || !order.user_id ? null : await admin.auth.admin.getUserById(order.user_id)
   const email = String(customer.email || authUser?.data?.user?.email || '').trim()
   const name = String(customer.first_name || authUser?.data?.user?.user_metadata?.full_name || '').trim()
   let emailResult: Record<string, unknown> = { sent: false, reason: 'missing_customer_email' }
   if (email) {
-    try { emailResult = await sendStatusEmail(email, name, orderId, status) }
+    try { emailResult = await sendOrderEmail(email, name, orderId, status, pickup, { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, total_clp: order.total_clp, price_snapshot: order.price_snapshot }) }
     catch (error) {
       console.error(error)
       emailResult = { sent: false, reason: 'provider_error' }
     }
   }
 
-  return json({ orderId, status, label: labels[status], email: emailResult })
+  return json({ orderId, status, label: orderEmailLabels[status], email: emailResult })
 })
