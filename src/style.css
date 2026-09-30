@@ -2101,6 +2101,12 @@ dialog:focus,dialog:focus-visible{outline:none}
 #account-content>#logout-account{margin-top:0}
 #account-content>.account-confirmation{margin:0;padding:24px 20px}
 #account-content>.account-confirmation-actions{margin:20px 0 0}
+#account-content>.account-expired{display:block;text-align:left}
+#account-content>.account-expired .account-confirmation-icon{margin:0 auto 14px}
+#account-content>.account-expired h3{margin:0 0 8px;text-align:center;font:700 22px/28px var(--ds-font-display)}
+#account-content>.account-expired p{margin:0;color:var(--ds-text-secondary);font-size:14px;line-height:22px;text-align:center}
+#account-content>.account-expired .account-form{margin:20px 0 0}
+#account-content>.account-expired small{display:block;margin-top:14px;color:var(--ds-text-secondary);font-size:12px;line-height:18px;text-align:center}
 @media(max-width:760px){
  #account-content{padding:21px 20px 24px}
  #account-content>.account-welcome{padding:15px}

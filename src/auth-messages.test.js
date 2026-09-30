@@ -22,3 +22,10 @@ test('mantiene el mensaje específico para correo ya registrado', () => {
     'Ya existe una cuenta con este correo. Intenta iniciar sesión.'
   );
 });
+
+test('explica cómo recuperar un enlace de confirmación vencido', () => {
+  assert.equal(
+    authErrorMessage({ message: 'Email link is invalid or has expired (otp_expired)' }),
+    'El enlace de confirmación venció. Solicita uno nuevo para activar tu cuenta.'
+  );
+});
