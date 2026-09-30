@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { authErrorMessage } from './auth-messages.js';
 import { PRINT_POLICY, PRINT_EXTRAS_CLP, QUALITY_ADJUSTMENT_CLP, checkResolution, orderTotal } from './print-check.js';
 import { quoteShipping } from './shipping.js';
-import { collections as fallbackCollections, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, designCountLabel, loadCatalog, normalizeSampleColor } from './catalog.js';
+import { filterCatalog, artworkUrl, designCountLabel, loadCatalog, normalizeSampleColor } from './catalog.js';
 import { catalogCollectionPath, catalogProductPath } from './catalog-routes.js';
 import { orderSteps, orderProgressIndex, orderStatusLabel } from './order-status.js';
 import { communes, provinces } from '@clregions/data/array';
@@ -112,8 +112,10 @@ const SUPABASE_URL=import.meta.env.VITE_SUPABASE_URL||'https://dgndcklmmnnxyqfmn
 const AUTH_REDIRECT_URL=(import.meta.env.VITE_SITE_URL||window.location.origin).replace(/\/$/,'');
 const AUTH_ACCOUNT_REDIRECT=`${AUTH_REDIRECT_URL}/?panel=account`;
 const supabase=createClient(SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_J2zSgCPaW1rENVCdEuYGNQ_62EhSxtS');
-let collections=[...fallbackCollections];
-let catalogDesigns=[...fallbackCatalogDesigns];
+// El catálogo visible debe venir del contenido publicado. No mostramos el
+// catálogo histórico local mientras se resuelve la carga remota.
+let collections=[];
+let catalogDesigns=[];
 async function loadProductPrices(){
  try{
   const {data,error}=await supabase.from('product_variants').select('price_clp,product_models!inner(code)').eq('active',true);
@@ -435,7 +437,10 @@ async function refreshCatalog(){
  if(catalogRefreshPending)return catalogRefreshPending;
  catalogRefreshPending=(async()=>{
   const result=await loadCatalog(supabase);
-  if(result.source==='fallback'){console.warn('Se mantiene el catálogo local de respaldo:',result.error);return}
+  if(result.source==='fallback'){
+   console.warn('No se pudo cargar el catálogo publicado:',result.error);
+   return;
+  }
   const before=JSON.stringify([collections,catalogDesigns]);
   const after=JSON.stringify([result.collections,result.designs]);
   collections=result.collections;catalogDesigns=result.designs;
