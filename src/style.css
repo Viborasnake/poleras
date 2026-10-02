@@ -2306,3 +2306,6 @@ dialog:focus,dialog:focus-visible{outline:none}
 
 /* Carro vacío: dos caminos explícitos para continuar. */
 .cart-empty-actions{display:grid;gap:10px;margin-top:22px}.cart-empty-actions .commerce-wide{margin:0}.cart-empty-create{width:100%;min-height:48px;border:1px solid var(--ds-border-control);border-radius:var(--ds-radius-pill);background:transparent;color:var(--ds-text-primary);font-size:14px;font-weight:800}.cart-empty-create:hover{border-color:var(--ds-text-primary);background:var(--ds-surface-subtle)}
+
+.payment-methods{display:grid;gap:9px;margin:20px 0}.payment-method{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:start;padding:13px 14px;border:1px solid var(--ds-border-control);border-radius:11px;background:var(--ds-surface-raised);cursor:pointer}.payment-method input{margin:3px 0 0;accent-color:var(--ds-action-primary)}.payment-method span{display:grid;gap:3px}.payment-method strong{font-size:13px}.payment-method small{color:var(--ds-text-secondary);font-size:10px;line-height:1.45}.payment-method.is-selected{border-color:var(--ds-action-primary);background:var(--ds-surface-subtle);box-shadow:0 0 0 2px color-mix(in srgb,var(--ds-action-primary) 18%,transparent)}
+
