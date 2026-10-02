@@ -45,20 +45,28 @@ Los archivos de catálogo admiten PNG, JPG y WebP de hasta 50 MB como origen. El
 - Modelo GLB de polera con pliegues, cuello, mangas y textura de tela; rotación manual con Three.js y estampado proyectado sobre la malla mediante DecalGeometry. Vista frontal inicial e iluminación mate. Es una referencia visual, no una simulación física del calce o impresión; oversize y niños son variaciones de escala del mismo modelo.
 - Laika se carga como diseño de muestra por defecto (`public/laika.png`) para que el visor no abra vacío; al subir otro archivo se reemplaza y se ejecuta la validación técnica.
 - Resumen de precio base y mitad correspondiente. Diseño y entrega pendientes de cotización; el abono definitivo se calcula sobre el total aprobado.
-- Borrador local eliminable en navegador. Los archivos quedan en IndexedDB durante 15 días; si el cliente elige guardarlos en su cuenta, también se envían a su carpeta privada de Supabase. Quitar un archivo del estudio borra la copia local, no la copia remota.
-- Checkout visual de Mercado Pago en modo simulación. No crea preferencias ni cobra, pero la Edge Function `create-demo-order` recalcula el total, registra el pedido, sus productos, historial y pago aprobado de prueba para mostrarlo en Administración. Desde allí el flujo operativo continúa por Pedido ingresado → Preparando pedido → Listo para despacho → En despacho → Entregado.
+- Borrador local eliminable en navegador. Los archivos quedan en IndexedDB durante 15 días; si el cliente elige guardarlos en su cuenta, también se envían a su carpeta privada de Supabase. Al iniciar un pago, los originales de los artículos personalizados se suben al bucket privado para poder producir el pedido. Quitar un archivo del estudio borra la copia local, no la copia remota.
+- Checkout Pro de Mercado Pago: una Edge Function recalcula el total en servidor, crea el pedido pendiente y la preferencia de pago; el webhook firmado consulta el pago y solo entonces marca el pedido como pagado. Los diseños propios del carro se guardan por artículo y se suben al bucket privado antes de iniciar el pago; el servidor verifica los archivos y registra sus rutas, color y revisión técnica. El panel de administración permite descargar los originales mediante enlaces firmados de corta duración. El retorno del navegador es informativo y no confirma pagos por sí solo. La migración y ambas funciones están desplegadas en el proyecto Droska; todavía faltan el despliegue del frontend y una compra de prueba antes de aceptar cobros reales.
 
 ## Pendiente para operar comercialmente
 
 El recurso `public/shirt.glb` proviene del proyecto `Starklord17/threejs-t-shirt`; su licencia MIT y atribución se incluyen en `public/shirt-LICENSE.txt`.
 
-Esta versión **registra pedidos de demostración en Administración, pero no procesa pagos reales**. Supabase Auth, Storage privado, perfiles, precios base y pedidos de prueba ya operan; la interfaz conserva el checkout como simulación hasta conectar Mercado Pago y sus webhooks.
+El diálogo de confirmación usa el [logo oficial RGB de Mercado Pago](https://www.mercadopago.com.ar/mp/logo-oficial), guardado localmente en `public/mercado-pago-logo.svg`. La URL pública de la tienda es `https://droska.frontbook.cl`: úsala para `VITE_SITE_URL` en el build web y para `SITE_URL` en Supabase. Para activar los cobros configura `MERCADOPAGO_ACCESS_TOKEN` y `MERCADOPAGO_WEBHOOK_SECRET` como secretos de las Edge Functions, aplica la migración y despliega `create-payment-preference` y `mercado-pago-webhook`. Esta integración de Checkout Pro no usa Public Key, Client ID ni Client Secret. Configura en el panel de Mercado Pago el Webhook de **Pagos** con URL `https://dgndcklmmnnxyqfmnckh.supabase.co/functions/v1/mercado-pago-webhook`; la firma secreta debe corresponder a esa configuración. El token y la firma nunca se exponen al navegador. En un proyecto vinculado:
+
+```bash
+npx supabase db push
+npx supabase functions deploy create-payment-preference
+npx supabase functions deploy mercado-pago-webhook --no-verify-jwt
+```
+
+Carga los tres secretos desde el Dashboard de Supabase, en **Edge Functions → Secrets**. Para desarrollo local, usa un archivo ignorado `supabase/functions/.env` con esas mismas variables. Prueba primero con credenciales y cuentas de prueba de Mercado Pago antes de habilitar producción.
 
 ### Alcance del backend de la tienda
 
 Supabase será el backend de la operación completa, no solo de los archivos. Debe administrar cuentas y perfiles, colecciones y productos, variantes y disponibilidad, lista de precios y cargos vigentes, diseños privados, carros y pedidos, cotizaciones y revisiones del taller, estados, pagos confirmados por webhooks, y trazabilidad de los cambios. Las personas podrán consultar únicamente sus datos y pedidos; el personal del taller tendrá permisos diferenciados. La primera estructura y sus políticas RLS viven en [`supabase/commerce-setup.sql`](supabase/commerce-setup.sql); la creación final de pedidos, cambios de estado y pagos queda reservada para una Edge Function de confianza.
 
-Los precios que hoy aparecen en `src/main.js` y `src/print-check.js` son referencias de la demo, **no importes confiables para cobrar**. Antes de habilitar compras, el servidor tendrá que calcular cada total desde precios vigentes, guardar un desglose y una instantánea del precio aceptado en el pedido, y verificar allí las transiciones y los pagos. El cliente solo mostrará la cotización recibida; nunca decidirá el importe final ni podrá marcar un pedido como pagado. El carro actual en `localStorage` tampoco constituye un pedido persistente.
+Los precios que aparecen en `src/main.js` y `src/print-check.js` siguen siendo referencias visuales; la Edge Function calcula el total desde precios vigentes, guarda la instantánea aceptada y el webhook verifica el monto antes de marcar un pedido como pagado. El cliente nunca decide el importe final ni confirma pagos. El carro actual en `localStorage` tampoco constituye un pedido persistente.
 
 Completar el panel del taller para cotizar, subir propuestas y gestionar revisiones; configurar proveedor de pago y webhooks verificados para abono del 50% y saldo; definir guía de tallas, disponibilidad, entrega y condiciones comerciales. El seguimiento operativo y la notificación por email ya están implementados; requieren aplicar la migración, desplegar la Edge Function y cargar los secretos de Resend. `vercel.json` prepara el build Vite para un despliegue futuro, pero no se ha modificado DNS.
 

@@ -324,3 +324,39 @@ const rollbackOrderObserver=new MutationObserver(addRollbackOrderAction);rollbac
 function normalizePaymentToggleCopy(){root.querySelectorAll('.admin-payment-toggle').forEach(toggle=>{const input=toggle.querySelector('input[data-confirm-payment]'),strong=toggle.querySelector('strong');if(!input||!strong)return;const label=input.checked?'Pago confirmado':'Confirmar pago';if(strong.textContent!==label)strong.textContent=label})}
 root.addEventListener('change',event=>{if(event.target.matches('.admin-payment-toggle input[data-confirm-payment]'))normalizePaymentToggleCopy()});
 const paymentToggleCopyObserver=new MutationObserver(normalizePaymentToggleCopy);paymentToggleCopyObserver.observe(root,{childList:true,subtree:true});
+
+// Los originales permanecen privados: el enlace se firma únicamente al
+// solicitar la descarga desde una sesión de administración autorizada.
+root.addEventListener('click',async event=>{
+ const trigger=event.target.closest('[data-open-order]');
+ if(!trigger)return;
+ const orderId=trigger.dataset.openOrder,content=root.querySelector('#order-dialog-content');
+ if(!content||!/^\d+$/.test(orderId))return;
+ content.dataset.artworkOrderId=orderId;
+ const {data,error}=await supabase.from('order_items').select('id,name_snapshot,color_hex,quality_review,front_design_path,back_design_path').eq('order_id',orderId).order('id');
+ if(error){toast('No pudimos cargar los archivos del pedido.');return}
+ if(content.dataset.artworkOrderId!==orderId||!root.querySelector('#order-dialog')?.open)return;
+ const products=content.querySelector('.admin-order-products'),artwork=(data||[]).filter(item=>item.front_design_path||item.back_design_path);
+ if(!products||!artwork.length)return;
+ const section=document.createElement('section');section.className='admin-order-products';
+ const heading=document.createElement('span');heading.className='admin-eyebrow';heading.textContent='ARCHIVOS ORIGINALES';section.append(heading);
+ for(const item of artwork){
+  const row=document.createElement('div'),description=document.createElement('span'),name=document.createElement('strong'),details=document.createElement('small');
+  name.textContent=item.name_snapshot;details.textContent=[item.color_hex&&`Color ${item.color_hex}`,item.quality_review&&'Revisión de calidad'].filter(Boolean).join(' · ');
+  description.append(name,details);row.append(description);
+  for(const [side,path] of [['Frente',item.front_design_path],['Espalda',item.back_design_path]]){
+   if(!path)continue;
+   const button=document.createElement('button');button.type='button';button.className='admin-secondary';button.textContent=`Descargar ${side.toLowerCase()}`;
+   button.addEventListener('click',async()=>{
+    const tab=window.open('about:blank','_blank');if(!tab){toast('Permite ventanas emergentes para descargar el diseño.');return}
+    tab.opener=null;button.disabled=true;
+    const {data:signed,error:signError}=await supabase.storage.from('customer-designs').createSignedUrl(path,60,{download:true});
+    button.disabled=false;
+    if(signError||!signed?.signedUrl){tab.close();toast('No pudimos descargar el diseño.');return}
+    tab.location.replace(signed.signedUrl);
+   });row.append(button);
+  }
+  section.append(row);
+ }
+ products.after(section);
+});
