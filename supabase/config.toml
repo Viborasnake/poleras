@@ -1,5 +1,11 @@
 [functions.create-demo-order]
 verify_jwt = true
 
+[functions.create-payment-preference]
+verify_jwt = true
+
+[functions.mercado-pago-webhook]
+verify_jwt = false
+
 [functions.update-order-status]
 verify_jwt = true
