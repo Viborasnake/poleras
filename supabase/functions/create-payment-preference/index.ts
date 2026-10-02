@@ -20,11 +20,12 @@ Deno.serve(async request => {
   const auth = request.headers.get('Authorization')
   const url = Deno.env.get('SUPABASE_URL'), secret = Deno.env.get('SUPABASE_SECRET_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), token = auth?.replace(/^Bearer\s+/, '')
   const mpToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN'), siteUrl = (Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || '').replace(/\/$/, '')
-  if (!auth || !token || !url || !secret || !mpToken || !siteUrl) return json({ error: 'La integración de pago no está configurada.' }, 500)
+  if (!auth || !token || !url || !secret) return json({ error: 'La integración de pago no está configurada.' }, 500)
   const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data: userData, error: userError } = await admin.auth.getUser(token)
   if (userError || !userData.user) return json({ error: 'La sesión no es válida.' }, 401)
-  const body = await request.json().catch(() => null) as any
+  const body = await request.json().catch(() => null) as any, paymentMethod = body?.paymentMethod === 'transfer' ? 'transfer' : 'mercado_pago'
+  if (paymentMethod === 'mercado_pago' && (!mpToken || !siteUrl)) return json({ error: 'La integración de Mercado Pago no está configurada.' }, 500)
   const items = Array.isArray(body?.items) ? body.items : [], customer = body?.customer || {}, fulfillment = body?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
   if (!items.length || items.length > 20 || !customer.firstName || !customer.lastName || !String(customer.email).includes('@') || !customer.phone) return json({ error: 'Faltan datos de contacto o productos.' }, 400)
   if (fulfillment === 'delivery' && (!body.shippingAddress?.region || !body.shippingAddress?.commune || !body.shippingAddress?.address)) return json({ error: 'Falta la dirección de despacho.' }, 400)
@@ -54,10 +55,15 @@ Deno.serve(async request => {
   const couponCode = String(body.couponCode || '').trim().toUpperCase(); let coupon: any = null; let discount = 0
   if (couponCode) { const { data } = await admin.from('coupons').select('*').eq('code', couponCode).eq('active', true).maybeSingle(); const now = Date.now(); if (!data || (data.starts_at && new Date(data.starts_at).getTime() > now) || (data.ends_at && new Date(data.ends_at).getTime() < now) || (data.max_uses !== null && data.used_count >= data.max_uses) || subtotal < data.min_subtotal_clp) return json({ error: 'El cupón ya no es válido para esta compra.' }, 409); coupon = data; discount = data.kind === 'percent' ? Math.floor(subtotal * data.value / 100) : data.value; if (data.max_discount_clp !== null) discount = Math.min(discount, data.max_discount_clp); discount = Math.min(subtotal, discount) }
   const total = subtotal + shipping - discount, now = new Date().toISOString(), address = { fulfillment, customer: { first_name: String(customer.firstName).trim(), last_name: String(customer.lastName).trim(), email: String(customer.email).trim(), phone: String(customer.phone).trim() }, ...(fulfillment === 'delivery' ? { region: String(body.shippingAddress.region).trim(), commune: String(body.shippingAddress.commune).trim(), address: String(body.shippingAddress.address).trim(), address_extra: String(body.shippingAddress.addressExtra || '').trim(), notes: String(body.shippingAddress.notes || '').trim() } : {}) }
-  const { data: order, error: orderError } = await admin.from('orders').insert({ user_id: userData.user.id, status: 'submitted', source: 'online', coupon_code: coupon?.code || null, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, total_clp: total, price_snapshot: { provider: 'mercado_pago', shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null }, shipping_address: address, submitted_at: now }).select('id,total_clp').single()
+  const { data: order, error: orderError } = await admin.from('orders').insert({ user_id: userData.user.id, status: 'submitted', source: 'online', coupon_code: coupon?.code || null, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, total_clp: total, price_snapshot: { provider: paymentMethod === 'transfer' ? 'bank_transfer' : 'mercado_pago', shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null }, shipping_address: address, submitted_at: now }).select('id,total_clp').single()
   if (orderError || !order) return json({ error: 'No pudimos crear el pedido.' }, 503)
   try {
     const { error: itemError } = await admin.from('order_items').insert(prepared.map(item => ({ ...item, order_id: order.id }))); if (itemError) throw itemError
+    if (paymentMethod === 'transfer') {
+      const { error: paymentError } = await admin.from('payments').insert({ order_id: order.id, provider: 'transferencia_bancaria', kind: 'full', status: 'pending', amount_clp: total }); if (paymentError) throw paymentError
+      await admin.from('order_status_history').insert({ order_id: order.id, status: 'submitted', note: 'Pedido creado; esperando confirmación de transferencia bancaria.' })
+      return json({ orderId: order.id, totalClp: total, paymentMethod }, 201)
+    }
     const externalReference = `DROSKA-${order.id}`
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', { method: 'POST', headers: { Authorization: `Bearer ${mpToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ id: externalReference, title: `Pedido Droska #${order.id}`, description: `${quantity} producto${quantity === 1 ? '' : 's'} personalizados`, currency_id: 'CLP', quantity: 1, unit_price: total }], payer: { name: address.customer.first_name, surname: address.customer.last_name, email: address.customer.email }, external_reference: externalReference, back_urls: { success: `${siteUrl}/?mp_status=success&order_id=${order.id}`, failure: `${siteUrl}/?mp_status=failure&order_id=${order.id}`, pending: `${siteUrl}/?mp_status=pending&order_id=${order.id}` }, auto_return: 'approved' }) })
     const preference = await mpResponse.json(); if (!mpResponse.ok || !preference.id || !preference.init_point) throw new Error(preference.message || 'Mercado Pago rechazó la preferencia')

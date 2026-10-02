@@ -242,11 +242,12 @@ document.querySelector('#cart-content').addEventListener('click',event=>{const i
 function openPaymentConfirmation(){
  const target=document.querySelector('#payment-content'),shipping=state.shippingQuote?.amount||0,total=cartTotal()+shipping-state.couponDiscount,items=cart.reduce((sum,item)=>sum+item.quantity,0);
  studio.close();
- target.innerHTML=`<div class="mp-payment-head"><img class="mp-payment-logo" src="/mercado-pago-logo.svg" alt="Mercado Pago"><button type="button" class="close-button mp-payment-close ds-icon-button" aria-label="Cerrar confirmación de pago"><span aria-hidden="true"></span></button></div><div class="mp-payment-body"><span class="eyebrow">PAGO SEGURO</span><h2 id="payment-title">Revisa tu pedido.</h2><p class="mp-payment-lead">El despacho ya fue calculado. Confirmaremos el importe con los precios vigentes antes de enviarte a Mercado Pago.</p><div class="mp-payment-summary"><span>${items} ${items===1?'producto':'productos'}<small>Despacho ${money(shipping)}</small></span><strong>${money(total)}</strong></div><p class="mp-payment-error" role="alert" hidden></p><button type="button" class="button mp-payment-button" id="continue-to-mercado-pago">Continuar a Mercado Pago</button><small class="mp-payment-legal">El pago se completa en Mercado Pago. Tu pedido aparecerá como pagado cuando recibamos su confirmación.</small></div>`;
+ target.innerHTML=`<div class="mp-payment-head"><img class="mp-payment-logo" src="/mercado-pago-logo.svg" alt="Mercado Pago"><button type="button" class="close-button mp-payment-close ds-icon-button" aria-label="Cerrar confirmación de pago"><span aria-hidden="true"></span></button></div><div class="mp-payment-body"><span class="eyebrow">ELIGE CÓMO PAGAR</span><h2 id="payment-title">Revisa tu pedido.</h2><p class="mp-payment-lead">El despacho ya fue calculado. Confirmaremos el importe con los precios vigentes antes de crear tu pedido.</p><div class="mp-payment-summary"><span>${items} ${items===1?'producto':'productos'}<small>Despacho ${money(shipping)}</small></span><strong>${money(total)}</strong></div><div class="payment-methods" role="radiogroup" aria-label="Medio de pago"><label class="payment-method is-selected"><input type="radio" name="payment-method" value="mercado_pago" checked><span><strong>Mercado Pago</strong><small>Tarjetas, transferencia y otros medios disponibles en Checkout Pro.</small></span></label><label class="payment-method"><input type="radio" name="payment-method" value="transfer"><span><strong>Transferencia bancaria</strong><small>Ingresa el pedido y te enviaremos los datos para transferir. Quedará pendiente de confirmación.</small></span></label></div><p class="mp-payment-error" role="alert" hidden></p><button type="button" class="button mp-payment-button" id="continue-to-payment">Continuar a Mercado Pago</button><small class="mp-payment-legal">El pedido solo pasará a producción cuando confirmemos el pago.</small></div>`;
  openDialog(paymentModal);
  target.querySelector('.mp-payment-close').onclick=()=>paymentModal.close();
- target.querySelector('#continue-to-mercado-pago').onclick=openMercadoPagoCheckout;
+ const submit=target.querySelector('#continue-to-payment'),methods=[...target.querySelectorAll('[name="payment-method"]')];const syncMethod=()=>{const selected=target.querySelector('[name="payment-method"]:checked')?.value==='transfer';target.querySelectorAll('.payment-method').forEach(method=>method.classList.toggle('is-selected',method.querySelector('input')?.checked));submit.textContent=selected?'Solicitar pago por transferencia':'Continuar a Mercado Pago'};methods.forEach(method=>method.onchange=syncMethod);submit.onclick=()=>target.querySelector('[name="payment-method"]:checked')?.value==='transfer'?submitTransferOrder():openMercadoPagoCheckout();
 }
+
 accountButton.onclick=()=>{renderAccount();accountModal.showModal()};cartButton.onclick=()=>{renderCart();cartModal.showModal()};document.querySelectorAll('[data-commerce-close]').forEach(button=>button.onclick=()=>button.closest('#cart-modal')?closeCartDrawer():button.closest('dialog').close());accountModal.addEventListener('close',()=>{stopAccountOrdersWatch();if(!account)resumeCheckoutAfterAuth=false});updateCommerceNav();supabase.auth.getUser().then(({data})=>{account=accountFromUser(data.user);updateCommerceNav()});supabase.auth.onAuthStateChange((event,session)=>{const nextAccount=accountFromUser(session?.user);if(account?.id!==nextAccount?.id)state.cloudSaved={front:false,back:false};account=nextAccount;updateCommerceNav();if(event==='PASSWORD_RECOVERY'){renderAccount('update-password');if(!accountModal.open)accountModal.showModal()}});
 const requestedCommercePanel=new URLSearchParams(location.search).get('panel');if(requestedCommercePanel==='account'||requestedCommercePanel==='cart'){const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('panel');history.replaceState(null,'',`${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);queueMicrotask(()=>requestedCommercePanel==='account'?accountButton.click():cartButton.click())}
 if(expiredConfirmationLink()){clearExpiredConfirmationLink();queueMicrotask(()=>{renderAccount('expired',state.email);accountModal.showModal()})}
@@ -692,7 +693,7 @@ async function paymentArtworkFor(item,userId){
  return paths;
 }
 async function openMercadoPagoCheckout(){
- const button=document.querySelector('#continue-to-mercado-pago'),errorNode=document.querySelector('#payment-content .mp-payment-error');
+ const button=document.querySelector('#continue-to-payment'),errorNode=document.querySelector('#payment-content .mp-payment-error');
  if(button){button.disabled=true;button.textContent='Guardando diseños…'}
  if(errorNode)errorNode.hidden=true;
  try{
@@ -722,6 +723,23 @@ async function openMercadoPagoCheckout(){
   if(errorNode){errorNode.textContent=error.message||'No pudimos guardar los diseños para el pedido.';errorNode.hidden=false}
  }
 }
+async function submitTransferOrder(){
+ const button=document.querySelector('#continue-to-payment'),errorNode=document.querySelector('#payment-content .mp-payment-error');
+ if(button){button.disabled=true;button.textContent='Guardando pedido…'}
+ if(errorNode)errorNode.hidden=true;
+ try{
+  const {data:{user},error:userError}=await supabase.auth.getUser();
+  if(userError||!user)throw new Error('Inicia sesión o continúa como invitado antes de solicitar el pago.');
+  const items=[];
+  for(const item of cart){const artwork=await paymentArtworkFor(item,user.id);items.push({modelCode:item.modelCode||Object.entries(products).find(([,product])=>product.name===item.kind)?.[0]||'basic',size:item.size,color:item.color,printSides:item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front'),quantity:item.quantity,qualityReview:Boolean(item.qualityReview),catalogDesignSlug:item.catalogDesignSlug||null,...artwork})}
+  const payload={paymentMethod:'transfer',items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
+  const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});
+  if(error||!data?.orderId)throw new Error(data?.error||'No pudimos ingresar el pedido por transferencia. Intenta nuevamente.');
+  const submittedCart=[...cart];cart=[];state.cartItemId=null;saveLocal(CART_KEY,cart);updateCommerceNav();for(const item of submittedCart)removeCartDesignFiles(item.id).catch(()=>{});
+  const target=document.querySelector('#payment-content');target.innerHTML=`<div class="mp-success"><div class="mp-success-icon" aria-hidden="true">✓</div><span class="eyebrow">PEDIDO RECIBIDO</span><h2>Te contactaremos para el pago.</h2><p>Tu pedido #${data.orderId} quedó ingresado y pendiente de confirmación. Te enviaremos los datos de transferencia para completar el pago.</p><button type="button" class="button dark" id="transfer-done">Entendido</button><small>El pedido no pasa a producción hasta confirmar el abono.</small></div>`;target.querySelector('#transfer-done').onclick=()=>paymentModal.close();persistDraft();
+ }catch(error){if(button){button.disabled=false;button.textContent='Solicitar pago por transferencia'}if(errorNode){errorNode.textContent=error.message||'No pudimos ingresar el pedido por transferencia.';errorNode.hidden=false}}
+}
+
 async function showMercadoPagoReturn(){
  const params=new URLSearchParams(location.search),status=params.get('mp_status');
  if(!status)return;
