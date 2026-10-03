@@ -168,6 +168,7 @@
   .admin-order-dialog-actions .admin-order-footer-contact a{flex:0 0 44px}
   .admin-order-progress-actions>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .admin-payment-toggle,.admin-order-progress-actions [data-next-status]{width:100%;min-width:0}
+  .admin-order-progress-actions .admin-order-complete{grid-column:2;justify-self:end}
 }
 @media(min-width:721px) and (max-width:1000px){
   .admin-order-dialog-actions{grid-template-columns:minmax(145px,auto) minmax(0,1fr);gap:12px 16px}
@@ -177,6 +178,7 @@
   .admin-order-dialog-actions .admin-order-progress-actions{grid-column:2;grid-row:2/4;min-width:0}
   .admin-order-progress-actions>div{display:grid;grid-template-columns:1fr;gap:10px}
   .admin-payment-toggle,.admin-order-progress-actions [data-next-status]{width:100%;min-width:0}
+  .admin-order-progress-actions .admin-order-complete{justify-self:stretch}
 }
 @media(max-width:720px){.admin-order-dialog-actions{display:grid;grid-template-columns:1fr;gap:12px}.admin-order-dialog-actions>*{grid-column:1!important;grid-row:auto!important}}
 .admin-kanban{grid-template-columns:repeat(5,minmax(210px,1fr))}.admin-kanban-card.is-archived{opacity:.86}.admin-kanban-column.is-archived-column{background:var(--ds-lilac-50)}
