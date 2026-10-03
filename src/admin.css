@@ -184,8 +184,8 @@
   .admin-order-dialog-actions.is-archived .admin-order-progress-actions{grid-column:2;grid-row:2}
 }
 @media(max-width:720px){.admin-order-dialog-actions{display:grid;grid-template-columns:1fr;gap:12px}.admin-order-dialog-actions>*{grid-column:1!important;grid-row:auto!important}}
-.admin-kanban{grid-template-columns:repeat(5,minmax(210px,1fr))}.admin-kanban-card.is-archived{opacity:.86}.admin-kanban-column.is-archived-column{background:var(--ds-lilac-50)}
-@media(max-width:1050px){.admin-kanban{grid-template-columns:repeat(5,300px)}}
+.admin-kanban{grid-template-columns:repeat(6,minmax(210px,1fr))}.admin-kanban-card.is-archived{opacity:.86}.admin-kanban-column.is-archived-column{background:var(--ds-lilac-50)}
+@media(max-width:1050px){.admin-kanban{grid-template-columns:repeat(6,300px)}}
 .admin-order-detail-grid{min-width:0;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr)}
 @media(max-width:720px){.admin-order-detail-grid{grid-template-columns:1fr}}
 .admin-order-products{display:grid;gap:0;margin-top:16px;padding-top:14px;border-top:1px solid var(--ds-border-subtle)}

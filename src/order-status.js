@@ -64,6 +64,7 @@ export function nextOrderStatus(status, orderOrFulfillment = 'delivery') {
 }
 
 export function orderKanbanStage(status) {
+  if (status === 'draft') return 'cart';
   if (incoming.includes(status)) return 'incoming';
   if (processing.includes(status)) return 'processing';
   if (['delivered', 'cancelled'].includes(status)) return 'completed';
