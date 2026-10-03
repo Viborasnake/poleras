@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nextOrderStatus, orderProgressIndex, orderStatusLabel, orderSteps, orderKanbanStage } from './order-status.js';
 
+test('separa los pedidos en borrador como intentos de compra', () => {
+  assert.equal(orderKanbanStage('draft'), 'cart');
+});
+
 test('normaliza estados históricos al stepper operativo', () => {
   assert.equal(orderProgressIndex('submitted'), 0);
   assert.equal(orderProgressIndex('in_design'), 1);
