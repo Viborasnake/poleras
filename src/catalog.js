@@ -30,6 +30,26 @@ export const catalogDesigns = [
   {id:'peliculas-creditos',collection:'peliculas',name:'Aún no termina',caption:'Todavía quedan escenas por vivir.',lines:['CONTINUARÁ','...'],motif:'ticket',accent:'#6652c5',surface:'lilac'},
 ];
 
+// Algunas piezas cuentan con una foto editorial además de su archivo de
+// estampado. La foto se usa únicamente como portada del catálogo: el arte que
+// llega al estudio sigue siendo `artworkPath`.
+const featuredCatalogPhotos={
+  'cliff-unger':'/death-stranding-main.webp',
+  'guardiana-celestial':'/sailor-moon-guardiana.webp',
+  'guerrera-del-fuego':'/sailor-moon-fire-main.webp',
+  'meryl-cyberpunk':'/resident-evil-claire.webp',
+  'jill-valentine-comisaria-racoon-city':'/resident-evil-jill.webp',
+  'solid-snake-shadow-moses':'/metal-gear-solid-snake.webp',
+};
+const featuredCatalogHoverPhotos={
+  'guardiana-celestial':'/sailor-moon-guerrera.webp',
+  'guerrera-del-fuego':'/sailor-moon-fire-hover.webp',
+  'cliff-unger':'/death-stranding-hover.webp',
+  'meryl-cyberpunk':'/resident-evil-claire-hover.webp',
+  'jill-valentine-comisaria-racoon-city':'/resident-evil-jill-hover.webp',
+  'solid-snake-shadow-moses':'/metal-gear-solid-snake-hover.webp',
+};
+
 export function filterCatalog(collection='all',designs=catalogDesigns){
   const visible=designs.filter(design=>design.active!==false);
   return collection==='all'?visible:visible.filter(design=>design.collection===collection);
@@ -45,7 +65,10 @@ export function catalogFromRows(collectionRows=[],designRows=[]){
   })).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)||a.label.localeCompare(b.label,'es'));
   const collectionIds=new Map(collectionRows.map(collection=>[collection.id,collection.slug]));
   const localDesigns=new Map(catalogDesigns.map(design=>[design.id,design]));
-  const remoteDesigns=designRows.flatMap(row=>{
+  const remoteDesigns=[...designRows].sort((a,b)=>{
+    const newest=new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();
+    return Number.isFinite(newest)?newest:0;
+  }).flatMap(row=>{
     const local=localDesigns.get(row.slug)||{};
     const collection=collectionIds.get(row.collection_id)||local.collection;
     if(!collection)return [];
@@ -57,6 +80,8 @@ export function catalogFromRows(collectionRows=[],designRows=[]){
       name:row.name,
       caption:row.caption||'',
       artworkPath:row.artwork_path,
+      featuredPhoto:featuredCatalogPhotos[row.slug]||'',
+      featuredPhotoHover:featuredCatalogHoverPhotos[row.slug]||'',
       active:row.active,
       surface:local.surface||'pink',
       sampleColor:normalizeSampleColor(row.sample_color||local.sampleColor),
@@ -72,7 +97,9 @@ export async function loadCatalog(client){
   try{
     const [collectionResult,designResult]=await Promise.all([
       client.from('catalog_collections').select('id,slug,name,active,sort_order,catalog_product_types!inner(slug)').eq('active',true).eq('catalog_product_types.slug','poleras').order('sort_order').order('name'),
-      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,sample_color,active').eq('active',true).order('id'),
+      // La pieza más reciente abre cada colección: además de respetar el orden
+      // editorial, permite que la portada refleje la última polera publicada.
+      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,sample_color,active,created_at').eq('active',true).order('created_at',{ascending:false}),
     ]);
     if(collectionResult.error)throw collectionResult.error;
     if(designResult.error)throw designResult.error;

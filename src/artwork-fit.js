@@ -15,11 +15,11 @@ export function visibleAlphaBounds(pixels, width, height, threshold = 12) {
 }
 
 // 100% means the largest visually safe chest placement for the artwork's shape.
-// Tall poster-like pieces need more breathing room than compact or horizontal marks.
+// Tall poster-like pieces retain a narrow safety margin while reading at a useful size.
 export function automaticPrintScale(aspect) {
   if (!Number.isFinite(aspect) || aspect <= 0) return 1;
-  if (aspect < .5) return .74;
-  if (aspect < .72) return .82;
-  if (aspect < .9) return .91;
+  if (aspect < .5) return .82;
+  if (aspect < .72) return .88;
+  if (aspect < .9) return .95;
   return 1;
 }

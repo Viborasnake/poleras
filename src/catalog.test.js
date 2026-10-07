@@ -29,6 +29,23 @@ test('Supabase rows become the same catalog model and preserve empty collections
   assert.equal(filterCatalog('mascota',result.designs).length,0);
 });
 
+test('the newest published design is first so a collection cover follows the latest upload',()=>{
+  const result=catalogFromRows([{id:10,slug:'papa',name:'Para Papá',active:true,sort_order:1}],[
+    {id:20,collection_id:10,slug:'papa-leyenda',name:'Anterior',caption:'',artwork_path:'local:papa-leyenda',sample_color:'#202124',active:true,created_at:'2026-10-01T10:00:00Z'},
+    {id:21,collection_id:10,slug:'papa-ruta',name:'Reciente',caption:'',artwork_path:'local:papa-ruta',sample_color:'#ffffff',active:true,created_at:'2026-10-07T10:00:00Z'},
+  ]);
+  assert.deepEqual(result.designs.map(item=>item.name),['Reciente','Anterior']);
+});
+
+test('editorial photos remain attached to the matching uploaded designs',()=>{
+  const result=catalogFromRows([{id:7,slug:'death-stranding',name:'Death Stranding',active:true,sort_order:1},{id:9,slug:'metal-gear',name:'Metal Gear',active:true,sort_order:2}],[
+    {id:18,collection_id:7,slug:'cliff-unger',name:'Cliff Unger',caption:'',artwork_path:'https://example.test/cliff.png',sample_color:'#202124',active:true,created_at:'2026-10-07T03:35:50Z'},
+    {id:19,collection_id:9,slug:'meryl-cyberpunk',name:'Meryl Cyberpunk',caption:'',artwork_path:'https://example.test/meryl.png',sample_color:'#202124',active:true,created_at:'2026-10-07T03:40:27Z'},
+  ]);
+  assert.equal(result.designs.find(item=>item.id==='cliff-unger').featuredPhoto,'/death-stranding-main.webp');
+  assert.equal(result.designs.find(item=>item.id==='meryl-cyberpunk').featuredPhoto,'/resident-evil-claire.webp');
+});
+
 test('sample shirt colors accept DS options and fall back safely',()=>{
   assert.equal(normalizeSampleColor('#202124'),'#202124');
   assert.equal(normalizeSampleColor('#FFFFFF'),'#ffffff');

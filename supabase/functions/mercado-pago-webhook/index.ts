@@ -48,7 +48,7 @@ Deno.serve(async request => {
 
   const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data: pending, error: lookupError } = await admin.from('payments')
-    .select('id,order_id,amount_clp,status,provider_payment_id,orders!inner(total_clp)')
+    .select('id,order_id,amount_clp,status,provider_payment_id,orders!inner(total_clp,status)')
     .eq('provider', 'mercado_pago').eq('provider_reference', reference).eq('order_id', orderId).maybeSingle()
   if (lookupError || !pending) return json({ error: 'Pago pendiente de registro.' }, 503)
   if (pending.status === 'approved' && pending.provider_payment_id !== dataId) return json({ error: 'El pedido ya tiene un pago aprobado.' }, 409)
@@ -57,15 +57,20 @@ Deno.serve(async request => {
   if (payment.currency_id !== 'CLP' || !Number.isSafeInteger(amount) || amount !== pending.amount_clp || amount !== order?.total_clp) return json({ error: 'Monto inválido.' }, 422)
 
   const status = payment.status === 'approved' ? 'approved' : payment.status === 'rejected' ? 'rejected' : payment.status === 'cancelled' ? 'cancelled' : 'pending'
-  if (pending.status === 'approved' && status !== 'approved') return json({ ok: true })
+  if ((pending.status === 'approved' && status !== 'approved') || (pending.status === status && pending.provider_payment_id === dataId)) return json({ ok: true })
   const confirmedAt = status === 'approved' ? new Date().toISOString() : null
   const { error: updateError } = await admin.from('payments').update({ provider_payment_id: dataId, status, confirmed_at: confirmedAt }).eq('id', pending.id)
   if (updateError) return json({ error: 'No se pudo actualizar el pago.' }, 503)
-  if (status !== 'approved') return json({ ok: true })
+  if (status !== 'approved') {
+    const labels: Record<string, string> = { rejected: 'Pago rechazado por Mercado Pago.', cancelled: 'Pago cancelado en Mercado Pago.', pending: 'Pago pendiente de confirmación de Mercado Pago.' }
+    await admin.from('order_status_history').insert({ order_id: orderId, status: (order as any)?.status || 'submitted', note: labels[status] || 'Pago actualizado por Mercado Pago.' })
+    return json({ ok: true })
+  }
 
-  const { error: orderError } = await admin.from('orders')
+  const { data: paidOrder, error: orderError } = await admin.from('orders')
     .update({ status: 'paid', payment_confirmed_at: confirmedAt })
     .eq('id', orderId).eq('status', 'submitted').select('id').maybeSingle()
   if (orderError) return json({ error: 'No se pudo confirmar el pedido.' }, 503)
+  if (!paidOrder && (order as any)?.status !== 'paid') await admin.from('order_status_history').insert({ order_id: orderId, status: (order as any)?.status || 'submitted', note: 'Pago aprobado por Mercado Pago; el pedido ya había avanzado en el panel.' })
   return json({ ok: true })
 })

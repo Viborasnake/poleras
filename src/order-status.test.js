@@ -14,6 +14,10 @@ test('normaliza estados históricos al stepper operativo', () => {
   assert.equal(orderProgressIndex('delivered'), 4);
 });
 
+test('separa los pedidos en borrador como intentos de compra', () => {
+  assert.equal(orderKanbanStage('draft'), 'cart');
+});
+
 test('entrega la próxima acción operativa', () => {
   assert.deepEqual(nextOrderStatus('paid'), { status: 'in_production', label: 'Preparando pedido', adminAction: 'Tomar pedido' });
   assert.equal(nextOrderStatus('delivered'), null);

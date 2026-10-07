@@ -13,7 +13,7 @@ test('visibleAlphaBounds returns null for a fully transparent image', () => {
 });
 
 test('automaticPrintScale reduces tall artwork but leaves square artwork at the safe maximum', () => {
-  assert.equal(automaticPrintScale(.45), .74);
-  assert.equal(automaticPrintScale(.6), .82);
+  assert.equal(automaticPrintScale(.45), .82);
+  assert.equal(automaticPrintScale(.6), .88);
   assert.equal(automaticPrintScale(1), 1);
 });

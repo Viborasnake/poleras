@@ -256,11 +256,11 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const back = next.printSide === 'back';
     printOnBack = back;
     const requestedScale = next.printScale || 1;
-    const visualMaxScale = hero ? 1.9 : next.catalogDesign ? 1.5 : 1.35;
+    const visualMaxScale = hero ? 1.9 : next.catalogDesign ? 2 : 1.6;
     // La revisión técnica informa calidad; no debe encoger silenciosamente el mockup.
-    const maxScale = next.catalogPreview ? 1.5 : visualMaxScale;
+    const maxScale = next.catalogPreview ? 2 : visualMaxScale;
     const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
-    const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : 'safe-fit-v3';
+    const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : next.catalogDesign ? 'catalog-studio-flat-v1' : 'safe-fit-v3';
     const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + fitMode : '';
     if (key === currentImage) return;
     currentImage = key;
@@ -288,8 +288,11 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       ray.set(new THREE.Vector3(0, placementY, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
       const targetZ = ray.intersectObject(shirt, false)[0]?.point.z ?? (back ? -.4 : .4);
       // Hero y catálogo son vistas frontales editoriales: preservan el PNG completo.
-      // El giro queda disponible únicamente en el estudio, donde la proyección se ajusta a la tela.
-      const useFlatPreview = next.catalogPreview || hero;
+      // Los motivos de catálogo también usan esta capa en el estudio: los bordes
+      // grandes de una ilustración no deben desaparecer al cruzar una costura o
+      // el lateral curvo de la malla. Los archivos propios siguen proyectándose
+      // sobre la tela para representar su ubicación y permitir el giro.
+      const useFlatPreview = next.catalogPreview || hero || Boolean(next.catalogDesign);
       const decal = useFlatPreview
         ? new THREE.PlaneGeometry(width, height)
         : settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, .52));

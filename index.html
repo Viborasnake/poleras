@@ -3,40 +3,55 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f9f7f2" />
+    <meta name="theme-color" content="#000000" />
     <meta name="description" content="Tu idea favorita, puesta. Crea una polera única con tu foto, un diseño de IA o la ayuda de nuestro taller creativo." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Droska" />
+    <meta property="og:title" content="droska — SHIRT" />
+    <meta property="og:description" content="Tu idea favorita, puesta. Crea una polera única con tu foto, un diseño de IA o la ayuda de nuestro taller creativo." />
+    <meta property="og:url" content="https://droska.frontbook.cl/" />
+    <meta property="og:image" content="https://droska.frontbook.cl/social-preview.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1254" />
+    <meta property="og:image:height" content="1254" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="droska — SHIRT" />
+    <meta name="twitter:description" content="Tu idea favorita, puesta. Crea una polera única con tu foto, un diseño de IA o la ayuda de nuestro taller creativo." />
+    <meta name="twitter:image" content="https://droska.frontbook.cl/social-preview.jpg" />
     <title>droska — SHIRT</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23f955a5'/%3E%3Ctext x='10' y='47' font-size='42' font-family='Arial' font-weight='bold'%3Ed%3C/text%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>try{if(localStorage.getItem('droska-theme')==='light')document.documentElement.classList.add('preload-light')}catch{}</script>
     <style>
-      body.is-preloading{margin:0;overflow:hidden;background:#f9f7f2}
-      .site-preloader{position:fixed;inset:0;z-index:9999;overflow:hidden;background:#f9f7f2;color:#262920;transition:opacity .32s ease,visibility .32s ease}
+      body.is-preloading{margin:0;overflow:hidden;background:#000}
+      .site-preloader{position:fixed;inset:0;z-index:9999;overflow:hidden;background:#000;color:#fff;transition:opacity .32s ease,visibility .32s ease}
       .site-preloader.is-leaving{opacity:0;visibility:hidden;pointer-events:none}
-      .sk-line,.sk-block,.sk-pill,.sk-card{position:relative;overflow:hidden;background:#e8e5de}
-      .sk-line::after,.sk-block::after,.sk-pill::after,.sk-card::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,#ffffffa8,transparent);animation:sk-shimmer 1.25s ease-in-out infinite}
+      .sk-line,.sk-block,.sk-pill,.sk-card{position:relative;overflow:hidden;background:rgba(255,255,255,.11)}
+      .sk-line::after,.sk-block::after,.sk-pill::after,.sk-card::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:sk-shimmer 1.25s ease-in-out infinite}
       @keyframes sk-shimmer{to{transform:translateX(100%)}}
       .sk-announcement{height:33px;background:#dfff78}
       .sk-shell{width:min(1320px,90%);margin:auto}
       .sk-nav{height:100px;display:flex;align-items:center;gap:22px}
-      .sk-brand{width:178px;height:36px;border-radius:8px;background:#dedbd4}
+      .sk-brand{width:178px;height:36px;border-radius:8px;background:rgba(255,255,255,.2)}
       .sk-nav-links{display:flex;gap:14px;margin-left:auto}
       .sk-nav-links .sk-line{width:92px;height:11px;border-radius:999px}
-      .sk-pill{width:166px;height:46px;margin-left:15px;border-radius:999px;background:#d9d6cf}
+      .sk-pill{width:166px;height:46px;margin-left:15px;border-radius:999px;background:rgba(249,87,164,.72)}
       .sk-hero{display:grid;grid-template-columns:1fr 1.05fr;gap:48px;padding-top:34px}
       .sk-copy{padding-top:14px}
       .sk-copy>.sk-line:first-child{width:210px;height:10px;margin-bottom:30px;border-radius:999px}
       .sk-title{display:grid;gap:13px;margin-bottom:30px}
-      .sk-title .sk-line{height:72px;border-radius:12px;background:#dedbd4}
-      .sk-title .sk-line:nth-child(1){width:86%}.sk-title .sk-line:nth-child(2){width:94%}.sk-title .sk-line:nth-child(3){width:62%;background:#efb4cf}
+      .sk-title .sk-line{height:72px;border-radius:12px;background:rgba(255,255,255,.82)}
+      .sk-title .sk-line:nth-child(1){width:86%}.sk-title .sk-line:nth-child(2){width:94%}.sk-title .sk-line:nth-child(3){width:62%;background:#f957a4}
       .sk-copy-lines{display:grid;gap:10px;margin-bottom:30px}.sk-copy-lines .sk-line{width:78%;height:13px;border-radius:999px}.sk-copy-lines .sk-line:last-child{width:58%}
-      .sk-copy>.sk-pill{width:210px;height:54px;margin:0;background:#d4d1cb}
-      .sk-art{height:545px;border-radius:18px;background:#cfc5e8;position:relative;overflow:hidden}
-      .sk-shirt{position:absolute;left:23%;top:15%;width:54%;height:66%;border-radius:46% 46% 20% 20%;background:#f2f0ea;transform:rotate(-6deg)}
-      .sk-art .sk-line{position:absolute;left:28px;top:28px;width:126px;height:9px;border-radius:999px;background:#b5a8d2}
-      .sk-lower{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}.sk-card{height:118px;border-radius:14px;background:#eeeae3}
+      .sk-copy>.sk-pill{width:210px;height:54px;margin:0;background:#f957a4}
+      .sk-art{height:545px;border-radius:18px;background:radial-gradient(circle at 78% 28%,rgba(249,87,164,.42),transparent 32%),linear-gradient(135deg,#090909,#20132e);position:relative;overflow:hidden}
+      .sk-shirt{position:absolute;left:23%;top:15%;width:54%;height:66%;border-radius:46% 46% 20% 20%;background:rgba(255,255,255,.82);transform:rotate(-6deg)}
+      .sk-art .sk-line{position:absolute;left:28px;top:28px;width:126px;height:9px;border-radius:999px;background:#dfff78}
+      .sk-lower{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}.sk-card{height:118px;border-radius:14px;background:rgba(255,255,255,.08)}
       .sk-reader{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      html.preload-light body.is-preloading{background:#f9f7f2}html.preload-light .site-preloader{background:#f9f7f2;color:#262920}html.preload-light .sk-line,html.preload-light .sk-block,html.preload-light .sk-pill,html.preload-light .sk-card{background:#e8e5de}html.preload-light .sk-line::after,html.preload-light .sk-block::after,html.preload-light .sk-pill::after,html.preload-light .sk-card::after{background:linear-gradient(90deg,transparent,#ffffffa8,transparent)}html.preload-light .sk-brand,html.preload-light .sk-title .sk-line{background:#dedbd4}html.preload-light .sk-title .sk-line:nth-child(3){background:#efb4cf}html.preload-light .sk-pill,html.preload-light .sk-copy>.sk-pill{background:#d9d6cf}html.preload-light .sk-art{background:#cfc5e8}html.preload-light .sk-shirt{background:#f2f0ea}html.preload-light .sk-art .sk-line{background:#b5a8d2}html.preload-light .sk-card{background:#eeeae3}
       @media(max-width:760px){.sk-announcement{height:29px}.sk-shell{width:88%}.sk-nav{height:80px}.sk-brand{width:145px;height:30px}.sk-nav-links{display:none}.sk-nav>.sk-pill{width:118px;height:42px;margin-left:auto}.sk-hero{grid-template-columns:1fr;gap:28px;padding-top:18px}.sk-title{gap:10px}.sk-title .sk-line{height:50px}.sk-art{height:370px}.sk-lower{grid-template-columns:1fr;margin-top:28px}.sk-card{height:92px}.sk-card:nth-child(n+2){display:none}}
       @media(prefers-reduced-motion:reduce){.sk-line::after,.sk-block::after,.sk-pill::after,.sk-card::after{animation:none}.site-preloader{transition:none}}
     </style>

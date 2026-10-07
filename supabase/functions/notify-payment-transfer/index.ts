@@ -32,14 +32,16 @@ Deno.serve(async request => {
 
   const { data: order, error: orderError } = await admin
     .from('orders')
-    .select('id,user_id,source,payment_instructions,payment_confirmed_at,payment_transfer_notice_at')
+    .select('id,user_id,payment_instructions,payment_confirmed_at,payment_transfer_notice_at')
     .eq('id', orderId)
     .maybeSingle()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)
   if (String(order.user_id) !== String(user.id)) return json({ error: 'No puedes avisar el pago de este pedido.' }, 403)
-  if (order.source !== 'manual') return json({ error: 'Este aviso solo aplica a pedidos manuales.' }, 409)
   if (!order.payment_instructions?.transfer) return json({ error: 'Este pedido no tiene transferencia bancaria habilitada.' }, 409)
   if (order.payment_confirmed_at) return json({ error: 'Este pago ya fue confirmado por administración.' }, 409)
+  const { data: transferPayment, error: paymentError } = await admin.from('payments').select('id,status').eq('order_id', order.id).eq('provider', 'transferencia_bancaria').maybeSingle()
+  if (paymentError || !transferPayment) return json({ error: 'No encontramos una transferencia pendiente para este pedido.' }, 409)
+  if (transferPayment.status !== 'pending') return json({ error: 'Esta transferencia ya no está pendiente de revisión.' }, 409)
   if (order.payment_transfer_notice_at) return json({ noticedAt: order.payment_transfer_notice_at, alreadyNoticed: true })
 
   const noticedAt = new Date().toISOString()

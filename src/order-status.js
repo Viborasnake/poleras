@@ -64,6 +64,8 @@ export function nextOrderStatus(status, orderOrFulfillment = 'delivery') {
 }
 
 export function orderKanbanStage(status) {
+  if (typeof status === 'object' && status?.request_type === 'creative' && ['submitted', 'quoted'].includes(status.status)) return 'quote';
+  status = typeof status === 'object' ? status.status : status;
   if (status === 'draft') return 'cart';
   if (incoming.includes(status)) return 'incoming';
   if (processing.includes(status)) return 'processing';

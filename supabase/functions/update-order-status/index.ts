@@ -43,24 +43,47 @@ Deno.serve(async request => {
   if (userError || !userData.user) return json({ error: 'La sesión no es válida.' }, 401)
   if (adminError || !isAdmin) return json({ error: 'No tienes permisos de administración.' }, 403)
 
-  let body: { orderId?: string; status?: string; note?: string; rollback?: boolean }
+  let body: { orderId?: string; status?: string; note?: string; rollback?: boolean; confirmPayment?: boolean }
   try { body = await request.json() } catch { return json({ error: 'Solicitud inválida.' }, 400) }
   const orderId = String(body.orderId || '').trim()
   const status = String(body.status || '').trim()
-  if (!orderId || ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any)) return json({ error: 'Estado de pedido inválido.' }, 400)
+  const confirmingPayment = body.confirmPayment === true
+  if (!orderId || (!confirmingPayment && ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any))) return json({ error: 'Estado de pedido inválido.' }, 400)
 
   const { data: order, error: orderError } = await admin.from('orders')
-    .select('id,user_id,status,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_confirmed_at,edit_pending_approval,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
+    .select('id,user_id,status,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,edit_pending_approval,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
     .eq('id', orderId)
     .single()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)
   if (order.edit_pending_approval) return json({ error: 'Este pedido tiene cambios pendientes de revisión. Compáralos y apruébalos o recházalos antes de avanzar.' }, 409)
+  if (confirmingPayment) {
+    if (!['submitted', 'paid'].includes(order.status)) return json({ error: 'Este pedido ya avanzó y no puede confirmar un pago pendiente desde aquí.' }, 409)
+    const { data: payments, error: paymentsError } = await admin.from('payments').select('id,provider,status').eq('order_id', order.id).order('created_at', { ascending: false })
+    if (paymentsError) return json({ error: 'No pudimos revisar el estado del pago.' }, 503)
+    const mercadoPago = (payments || []).find(payment => payment.provider === 'mercado_pago')
+    if (mercadoPago && mercadoPago.status !== 'approved') return json({ error: 'Mercado Pago todavía no aprobó este cobro. Espera el webhook o pide al cliente que reintente el pago.' }, 409)
+    const transferable = (payments || []).find(payment => payment.provider === 'transferencia_bancaria')
+    const paymentAt = new Date().toISOString()
+    if (transferable) {
+      const { error: paymentUpdateError } = await admin.from('payments').update({ status: 'approved', confirmed_at: paymentAt }).eq('id', transferable.id).eq('status', 'pending')
+      if (paymentUpdateError) return json({ error: 'No pudimos confirmar la transferencia.' }, 503)
+    } else if (!mercadoPago) {
+      const provider = order.payment_instructions?.transfer ? 'transferencia_bancaria' : 'manual'
+      const { error: paymentInsertError } = await admin.from('payments').insert({ order_id: order.id, provider, kind: 'full', status: 'approved', amount_clp: order.total_clp, confirmed_at: paymentAt })
+      if (paymentInsertError) return json({ error: 'No pudimos registrar la confirmación del pago.' }, 503)
+    }
+    const { data: confirmedOrder, error: confirmOrderError } = await admin.from('orders')
+      .update({ status: 'paid', payment_confirmed_at: paymentAt, payment_confirmed_by: userData.user.id, updated_at: paymentAt })
+      .eq('id', order.id).in('status', ['submitted', 'paid']).select('id,status').maybeSingle()
+    if (confirmOrderError || !confirmedOrder) return json({ error: 'No pudimos confirmar el pago del pedido.' }, 503)
+    if (order.status === 'paid') await admin.from('order_status_history').insert({ order_id: order.id, status: 'paid', note: 'Pago confirmado manualmente por administración.' })
+    return json({ orderId, status: 'paid', label: orderEmailLabels.paid, paymentConfirmedAt: paymentAt, email: { sent: false, reason: 'payment_confirmation_without_email' } })
+  }
   if (body.rollback) {
     if (status !== 'paid' || order.status === 'paid' || order.status === 'delivered') return json({ error: 'Este pedido no puede volver a Pedido ingresado.' }, 409)
     const { data: rolledBack, error: rollbackError } = await admin.from('orders').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('id', orderId).eq('status', order.status).select('id').maybeSingle()
     if (rollbackError) return json({ error: 'No pudimos devolver el pedido a Pedido ingresado.' }, 503)
     if (!rolledBack) return json({ error: 'El pedido cambió en otra sesión. Recarga el panel.' }, 409)
-    await admin.from('order_status_history').insert({ order_id: orderId, status: 'paid', note: 'Pedido devuelto a Pedido ingresado por administración.' })
     return json({ orderId, status: 'paid', label: orderEmailLabels.paid, email: { sent: false, reason: 'rollback_without_email' } })
   }
   const workflow = order.shipping_address?.fulfillment === 'pickup' ? pickupWorkflow : deliveryWorkflow
@@ -79,7 +102,6 @@ Deno.serve(async request => {
     .maybeSingle()
   if (updateError) return json({ error: 'No pudimos actualizar el pedido.' }, 503)
   if (!updatedOrder) return json({ error: 'El pedido cambió en otra sesión. Recarga el panel.' }, 409)
-  await admin.from('order_status_history').insert({ order_id: orderId, status, note: 'Estado actualizado por administración.' })
   const customer = order.shipping_address?.customer || {}
   const pickup = order.shipping_address?.fulfillment === 'pickup'
   const authUser = customer.email || !order.user_id ? null : await admin.auth.admin.getUserById(order.user_id)

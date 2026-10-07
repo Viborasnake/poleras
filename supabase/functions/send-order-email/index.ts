@@ -30,12 +30,12 @@ Deno.serve(async request => {
   const preview = body.preview === true
   const requestedStatus = String(body.status || '').trim()
   if (!orderId) return json({ error: 'Falta el pedido.' }, 400)
-  const { data: order, error } = await admin.from('orders').select('id,status,source,user_id,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,edit_pending_approval,order_edit_version,order_edit_email_sent_at,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)').eq('id', orderId).single()
+  const { data: order, error } = await admin.from('orders').select('id,status,source,user_id,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,edit_pending_approval,order_edit_version,order_edit_email_sent_at,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)').eq('id', orderId).single()
   if (error || !order) return json({ error: 'No encontramos el pedido.' }, 404)
   const supportedStatuses = ['submitted', 'paid', 'in_production', 'ready', 'ready_for_pickup', 'shipped', 'delivered']
   const previewStatus = preview && supportedStatuses.includes(requestedStatus) ? requestedStatus : order.status
   const isStatusTransitionPreview = preview && previewStatus !== order.status
-  if (paymentEmail && order.source !== 'manual') return json({ error: 'Los datos de pago solo se pueden enviar en pedidos manuales.' }, 409)
+  if (paymentEmail && order.source !== 'manual' && order.price_snapshot?.provider !== 'bank_transfer') return json({ error: 'Este pedido no admite datos de pago por email.' }, 409)
   const approvedEditAwaitingEmail = Number(order.order_edit_version || 0) > 0 && !order.order_edit_email_sent_at && !order.edit_pending_approval
   if (orderEditEmail && !order.edit_pending_approval && !approvedEditAwaitingEmail) return json({ error: 'No hay una edición aprobada pendiente de envío.' }, 409)
   if ((order.edit_pending_approval || approvedEditAwaitingEmail) && !orderEditEmail) return json({ error: 'Este pedido tiene cambios pendientes de revisión o envío. Usa la acción correspondiente antes de enviar otro email.' }, 409)
