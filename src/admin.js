@@ -58,7 +58,7 @@ function deniedView(){root.innerHTML='<section class="admin-login"><a class="adm
 async function logout(){if(adminOrdersChannel){await supabase.removeChannel(adminOrdersChannel);adminOrdersChannel=null}await supabase.auth.signOut();sessionUser=null;adminData=null;loginView()}
 
 async function readAdminData(){
- const [variants,orders,profiles,productTypes,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories]=await Promise.all([
+ const [variants,orders,profiles,productTypes,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories,supplierComponents]=await Promise.all([
   supabase.from('product_variants').select('id,sku,size,color_name,price_clp,active,product_models!inner(name,code)').order('sku'),
   supabase.from('orders').select('id,user_id,source,request_type,request_details,request_references,quote_message,quoted_total_clp,quoted_at,quoted_by,coupon_code,status,currency,subtotal_clp,shipping_clp,discount_clp,total_clp,created_at,updated_at,submitted_at,shipping_address,price_snapshot,payment_instructions,payment_email_sent_at,payment_email_sent_by,payment_confirmed_at,payment_confirmed_by,archived_at,archived_by,archived_from_status,edit_pending_approval,edit_pending_at,edit_pending_by,edit_pending_snapshot,order_edit_version,order_edit_email_sent_at,order_edit_email_sent_by,order_items(id,name_snapshot,sku_snapshot,print_sides,quantity,unit_price_clp,line_total_clp),order_status_history(id,status,note,created_at),payments(id,provider,provider_reference,status,amount_clp,confirmed_at)').order('created_at',{ascending:false}).limit(100),
   supabase.from('profiles').select('id',{count:'exact',head:true}),
@@ -68,15 +68,16 @@ async function readAdminData(){
   supabase.from('coupons').select('*').order('created_at',{ascending:false}),
   supabase.from('supplier_costs').select('*').order('product_name'),
   supabase.from('supplier_products').select('*').order('kind').order('name'),
-  supabase.from('supplier_categories').select('*').eq('active',true).order('sort_order').order('name')
+  supabase.from('supplier_categories').select('*').eq('active',true).order('sort_order').order('name'),
+  supabase.from('supplier_product_components').select('*').order('principal_product_id').order('sort_order')
  ]);
  if(orders.error&&/archived_at|archived_by|archived_from_status/i.test(orders.error.message||'')){
   const fallback=await supabase.from('orders').select('id,user_id,source,coupon_code,status,currency,subtotal_clp,shipping_clp,discount_clp,total_clp,created_at,updated_at,submitted_at,shipping_address,price_snapshot,payment_instructions,payment_email_sent_at,payment_email_sent_by,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,edit_pending_at,edit_pending_by,edit_pending_snapshot,order_edit_version,order_edit_email_sent_at,order_edit_email_sent_by,order_items(id,name_snapshot,sku_snapshot,print_sides,quantity,unit_price_clp,line_total_clp),order_status_history(id,status,note,created_at),payments(id,provider,provider_reference,status,amount_clp,confirmed_at)').order('created_at',{ascending:false}).limit(100);
   orders.data=fallback.data;orders.error=fallback.error;
  }
- for(const result of [variants,orders,profiles,productTypes,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories])if(result.error)throw result.error;
+ for(const result of [variants,orders,profiles,productTypes,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories,supplierComponents])if(result.error)throw result.error;
   const localOrders=import.meta.env.DEV?readLocalOrders():[];
- return {variants:variants.data||[],orders:[...localOrders,...(orders.data||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)),profileCount:profiles.count||0,productTypes:productTypes.data||[],collections:collections.data||[],designs:designs.data||[],coupons:coupons.data||[],supplierCosts:supplierCosts.data||[],supplierProducts:supplierProducts.data||[],supplierCategories:supplierCategories.data||[]};
+ return {variants:variants.data||[],orders:[...localOrders,...(orders.data||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)),profileCount:profiles.count||0,productTypes:productTypes.data||[],collections:collections.data||[],designs:designs.data||[],coupons:coupons.data||[],supplierCosts:supplierCosts.data||[],supplierProducts:supplierProducts.data||[],supplierCategories:supplierCategories.data||[],supplierComponents:supplierComponents.data||[]};
 }
 
 async function ensureBaseCatalog(){
