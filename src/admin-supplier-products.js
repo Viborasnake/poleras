@@ -25,11 +25,11 @@ export function renderSupplierProducts({root,adminData,supabase,icon,refreshData
  const buying=item=>{
   if(isPrimary(item)){
    const width=n(item.print_width_cm),height=n(item.print_height_cm)
-   return width&&height?`Impresión máx. ${width} × ${height} cm`:'Impresión máx. por definir'
+   return width&&height?`${width} × ${height} cm`:'Por definir'
   }
   if(item.kind==='dtf'){
    const width=n(item.max_print_width_cm),height=n(item.max_print_height_cm)
-   return width&&height?`Impresión máx. ${width} × ${height} cm`:'Impresión máx. por definir'
+   return width&&height?`${width} × ${height} cm`:'Por definir'
   }
   return item.costing_method==='pack'?`${n(item.purchase_quantity)} ${unitName(item)} por compra`:`Por ${unitName(item)}`
  }
