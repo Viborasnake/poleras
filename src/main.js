@@ -136,7 +136,7 @@ async function loadProductPrices(){
   const {data,error}=await supabase.from('product_variants').select('price_clp,product_models!inner(code)').eq('active',true);
   if(error||!data?.length)throw error||new Error('No hay precios publicados.');
   const prices=new Map();
-  for(const variant of data){const model=Array.isArray(variant.product_models)?variant.product_models[0]:variant.product_models;const code=model?.code;if(!products[code])continue;prices.set(code,Math.min(prices.get(code)??Infinity,variant.price_clp))}
+  for(const variant of data){const model=Array.isArray(variant.product_models)?variant.product_models[0]:variant.product_models,code=model?.code==='kid'?'kids':model?.code;if(!products[code])continue;prices.set(code,Math.min(prices.get(code)??Infinity,variant.price_clp))}
   for(const [code,price] of prices)products[code].price=price;
   renderCatalog();if(studio.open)renderStep();
  }catch(error){console.warn('Se mantienen los precios de referencia locales:',error)}

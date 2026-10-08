@@ -278,3 +278,22 @@
 .supplier-create-component:hover{border-color:var(--ds-brand-accent);background:var(--ds-pink-50)}
 .supplier-create-component:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:2px}
 @media(max-width:720px){.supplier-print-settings{grid-template-columns:1fr}.supplier-recipe-tools{display:grid;grid-template-columns:1fr}.supplier-recipe-tools>*{width:100%}}
+.admin-price-list{display:grid;gap:14px;max-width:1080px}
+.admin-price-card{display:grid;gap:16px;padding:20px;border:1px solid var(--ds-border-subtle);border-radius:16px;background:var(--ds-surface-raised)}
+.admin-price-card>header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.admin-price-card h2{margin:4px 0 3px;font:700 22px/1.1 var(--ds-font-display);letter-spacing:-.025em}
+.admin-price-card header p{margin:0;color:var(--ds-text-secondary);font-size:11px}
+.admin-price-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.admin-price-metric,.admin-price-input,.admin-price-profit{display:grid;align-content:start;gap:4px;min-width:0;padding:12px;border:1px solid var(--ds-border-subtle);border-radius:11px;background:var(--ds-surface-subtle)}
+.admin-price-metric>span,.admin-price-input,.admin-price-profit>span{color:var(--ds-text-secondary);font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.admin-price-metric strong,.admin-price-profit strong{font:700 20px/1.1 var(--ds-font-display)}
+.admin-price-metric small,.admin-price-input>span,.admin-price-profit small{color:var(--ds-text-secondary);font-size:10px;line-height:1.3;text-transform:none}
+.admin-price-input{border-color:var(--ds-border-control);background:var(--ds-surface-raised);color:var(--ds-text-primary)}
+.admin-price-input input{width:100%;min-height:38px;padding:7px 9px;border:1px solid var(--ds-border-control);border-radius:8px;background:var(--ds-surface-page);color:var(--ds-text-primary);font-size:14px;font-weight:750}
+.admin-price-profit{border-color:var(--ds-lilac-300);background:var(--ds-lilac-50)}
+.admin-price-profit[data-negative="true"],.admin-price-profit:has(strong[data-negative="true"]){border-color:var(--ds-feedback-danger);background:var(--ds-pink-50)}
+.admin-price-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:2px}
+.admin-price-actions button{min-height:40px}
+.admin-price-guide{max-width:1080px}
+@media(max-width:760px){.admin-price-grid{grid-template-columns:1fr 1fr}.admin-price-input,.admin-price-profit{grid-column:1/-1}.admin-price-actions{display:grid;grid-template-columns:1fr}.admin-price-actions>*{width:100%}}
+@media(max-width:520px){.admin-price-grid{grid-template-columns:1fr}.admin-price-input,.admin-price-profit{grid-column:auto}}
