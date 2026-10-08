@@ -67,7 +67,7 @@ async function readAdminData(){
   supabase.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,sample_color,active,created_at').order('created_at',{ascending:false}),
   supabase.from('coupons').select('*').order('created_at',{ascending:false}),
   supabase.from('supplier_costs').select('*').order('product_name'),
-  supabase.from('supplier_products').select('*').order('kind').order('name'),
+  supabase.from('supplier_products').select('*').order('category_id').order('sort_order').order('name'),
   supabase.from('supplier_categories').select('*').eq('active',true).order('sort_order').order('name'),
   supabase.from('supplier_product_components').select('*').order('principal_product_id').order('sort_order')
  ]);
