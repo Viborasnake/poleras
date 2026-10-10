@@ -4,7 +4,7 @@ const extensions = Object.freeze({ 'image/png': 'png', 'image/jpeg': 'jpg', 'ima
 
 export function designObjectPath(userId, side, file, uploadId = crypto.randomUUID()) {
   if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new Error('Debes iniciar sesión para guardar el diseño.');
-  if (!['front', 'back'].includes(side)) throw new Error('Cara de impresión no válida.');
+  if (!['front', 'back', 'reference'].includes(side)) throw new Error('Tipo de archivo no válido.');
   if (!extensions[file?.type] || !file.size || file.size > DESIGN_MAX_BYTES) throw new Error('Usa JPG, PNG o WEBP de hasta 50 MB.');
   if (!/^[0-9a-f-]{36}$/i.test(uploadId)) throw new Error('Identificador de carga no válido.');
   return `${userId}/${side}/${uploadId}.${extensions[file.type]}`;

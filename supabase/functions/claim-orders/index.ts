@@ -50,7 +50,7 @@ Deno.serve(async request => {
   const { data: candidates, error: readError } = await admin
     .from('orders')
     .select('id,user_id,shipping_address')
-    .limit(100)
+    .contains('shipping_address', { customer: { email } })
   if (readError) return json({ error: 'No pudimos buscar tus pedidos.' }, 500)
 
   const matchingCandidates = (candidates || [])

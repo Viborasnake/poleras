@@ -46,6 +46,14 @@ test('editorial photos remain attached to the matching uploaded designs',()=>{
   assert.equal(result.designs.find(item=>item.id==='meryl-cyberpunk').featuredPhoto,'/resident-evil-claire.webp');
 });
 
+test('a mockup uploaded in administration overrides the legacy editorial photo',()=>{
+ const result=catalogFromRows([{id:7,slug:'death-stranding',name:'Death Stranding',active:true,sort_order:1}],[
+  {id:18,collection_id:7,slug:'cliff-unger',name:'Cliff Unger',caption:'',artwork_path:'https://example.test/cliff.png',mockup_path:'https://example.test/cliff-mockup.webp',mockup_hover_path:'https://example.test/cliff-hover.webp',sample_color:'#202124',active:true},
+ ]);
+ assert.equal(result.designs[0].featuredPhoto,'https://example.test/cliff-mockup.webp');
+ assert.equal(result.designs[0].featuredPhotoHover,'https://example.test/cliff-hover.webp');
+});
+
 test('sample shirt colors accept DS options and fall back safely',()=>{
   assert.equal(normalizeSampleColor('#202124'),'#202124');
   assert.equal(normalizeSampleColor('#FFFFFF'),'#ffffff');

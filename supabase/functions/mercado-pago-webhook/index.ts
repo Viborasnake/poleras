@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
+import { sendAdminOrderNotice, sendOrderEmail } from '../_shared/order-email.ts'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -69,8 +70,18 @@ Deno.serve(async request => {
 
   const { data: paidOrder, error: orderError } = await admin.from('orders')
     .update({ status: 'paid', payment_confirmed_at: confirmedAt })
-    .eq('id', orderId).eq('status', 'submitted').select('id').maybeSingle()
+    .eq('id', orderId).in('status', ['submitted', 'quoted', 'awaiting_deposit']).select('id').maybeSingle()
   if (orderError) return json({ error: 'No se pudo confirmar el pedido.' }, 503)
+  if (paidOrder) {
+    const { data: confirmed } = await admin.from('orders').select('id,request_type,shipping_address,total_clp,subtotal_clp,shipping_clp,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)').eq('id', orderId).single()
+    const customer = confirmed?.shipping_address?.customer || {}
+    if (customer.email) {
+      try { await sendOrderEmail(String(customer.email), String(customer.first_name || ''), String(orderId), 'paid', confirmed?.shipping_address?.fulfillment === 'pickup', { creative: confirmed?.request_type === 'creative', items: confirmed?.order_items, total_clp: confirmed?.total_clp, subtotal_clp: confirmed?.subtotal_clp, shipping_clp: confirmed?.shipping_clp }) }
+      catch (error) { console.error('No pudimos enviar confirmación de pago', error) }
+    }
+    try { await sendAdminOrderNotice(String(orderId), 'Pago confirmado', String(customer.email || 'cliente')) }
+    catch (error) { console.error('No pudimos avisar al administrador del pago', error) }
+  }
   if (!paidOrder && (order as any)?.status !== 'paid') await admin.from('order_status_history').insert({ order_id: orderId, status: (order as any)?.status || 'submitted', note: 'Pago aprobado por Mercado Pago; el pedido ya había avanzado en el panel.' })
   return json({ ok: true })
 })

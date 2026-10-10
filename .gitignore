@@ -7,3 +7,5 @@ dist/
 *.log
 .vercel/
 .vercel
+supabase/.temp/
+.env*

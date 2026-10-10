@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
-import { sendOrderEmail } from '../_shared/order-email.ts'
+import { sendAdminOrderNotice, sendOrderEmail } from '../_shared/order-email.ts'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } })
@@ -86,6 +86,7 @@ Deno.serve(async request => {
     if (paymentMethod === 'transfer') {
       const { error: paymentError } = await admin.from('payments').insert({ order_id: order.id, provider: 'transferencia_bancaria', kind: 'full', status: 'pending', amount_clp: total }); if (paymentError) throw paymentError
       await admin.from('order_status_history').insert({ order_id: order.id, status: 'submitted', note: 'Pedido creado; esperando confirmación de transferencia bancaria.' })
+      try { await sendAdminOrderNotice(String(order.id), 'Pedido por transferencia', address.customer.email) } catch (error) { console.error('Admin notice failed', error) }
       let email: { sent: boolean; reason?: string; id?: string } = { sent: false, reason: 'email_not_configured' }
       try {
         email = await sendOrderEmail(address.customer.email, address.customer.first_name, String(order.id), 'submitted', fulfillment === 'pickup', { items: prepared, subtotal_clp: subtotal, shipping_clp: shipping, total_clp: total, price_snapshot: { provider: 'bank_transfer' }, payment_instructions: { transfer } })
@@ -98,6 +99,7 @@ Deno.serve(async request => {
     const preference = await mpResponse.json(); if (!mpResponse.ok || !preference.id || !preference.init_point) throw new Error(preference.message || 'Mercado Pago rechazó la preferencia')
     const { error: paymentError } = await admin.from('payments').insert({ order_id: order.id, provider: 'mercado_pago', provider_reference: externalReference, provider_preference_id: preference.id, kind: 'full', status: 'pending', amount_clp: total }); if (paymentError) throw paymentError
     await admin.from('order_status_history').insert({ order_id: order.id, status: 'submitted', note: 'Pedido creado; esperando confirmación de Mercado Pago.' })
+    try { await sendAdminOrderNotice(String(order.id), 'Nuevo pedido en Mercado Pago', address.customer.email) } catch (error) { console.error('Admin notice failed', error) }
     return json({ orderId: order.id, totalClp: total, preferenceId: preference.id, initPoint: preference.init_point }, 201)
   } catch (error) { if (draftOrderId) await admin.from('orders').update({ status: 'draft', updated_at: new Date().toISOString() }).eq('id', order.id); else await admin.from('orders').delete().eq('id', order.id); console.error(error); return json({ error: 'No pudimos iniciar el pago con Mercado Pago.' }, 503) }
 })

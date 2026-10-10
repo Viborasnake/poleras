@@ -77,6 +77,8 @@ create table if not exists public.catalog_designs (
   name text not null,
   caption text,
   artwork_path text not null,
+  mockup_path text,
+  mockup_hover_path text,
   sample_color text not null default '#ffffff',
   active boolean not null default true,
   created_at timestamptz not null default now(),

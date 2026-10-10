@@ -78,3 +78,54 @@ export function relaxSleeveOpenings(geometry) {
     }
   }
 }
+
+// UV islands duplicate vertices at seams. Share the lighting normal without
+// welding the UVs, so the fabric does not acquire a hard crease at each island.
+export function smoothGarmentNormals(geometry) {
+  geometry.computeVertexNormals();
+  const position = geometry.attributes.position, normal = geometry.attributes.normal;
+  const groups = new Map();
+  for (let i = 0; i < position.count; i++) {
+    const key = [position.getX(i), position.getY(i), position.getZ(i)].map(v => Math.round(v * 1e5)).join(',');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(i);
+  }
+  const sum = new THREE.Vector3(), value = new THREE.Vector3();
+  for (const ids of groups.values()) {
+    sum.set(0, 0, 0);
+    for (const id of ids) sum.add(value.fromBufferAttribute(normal, id));
+    sum.normalize();
+    for (const id of ids) normal.setXYZ(id, sum.x, sum.y, sum.z);
+  }
+  normal.needsUpdate = true;
+}
+
+// Tint the existing folded band on the cloth itself. An overlapping ribbon
+// can intersect the returned lip and flicker as the garment rotates.
+export function foldedGarmentEdges(geometry) {
+  const position = geometry.attributes.position;
+  const openings = garmentOpenings(geometry);
+  const bounds = geometry.boundingBox, height = bounds.max.y - bounds.min.y;
+  const colors = new Float32Array(position.count * 3).fill(1);
+  const point = new THREE.Vector3();
+  const distanceToEdge = new Float32Array(position.count).fill(Infinity);
+  for (const points of openings) {
+    const relativeY = (points.reduce((sum, p) => sum + p.y, 0) / points.length - bounds.min.y) / height;
+    // The original collar already has its own raised band.
+    if (relativeY > .8) continue;
+    for (let i = 0; i < position.count; i++) {
+      point.fromBufferAttribute(position, i);
+      let distance = Infinity;
+      for (const edge of points) distance = Math.min(distance, point.distanceToSquared(edge));
+      distanceToEdge[i] = Math.min(distanceToEdge[i], Math.sqrt(distance));
+    }
+  }
+  const width = height * .024;
+  for (let i = 0; i < position.count; i++) {
+    const distance = distanceToEdge[i];
+    if (distance > width * 1.3) continue;
+    const band = 1 - THREE.MathUtils.smoothstep(distance, width * .85, width * 1.15);
+    colors.fill(1 - .045 * band, i * 3, i * 3 + 3);
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}

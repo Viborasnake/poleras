@@ -80,6 +80,8 @@ function torsoWidth(geometry, low, high) {
   for (let i = 0; i < positions.count; i++) {
     const t = (positions.getY(i) - bottom) / height;
     if (t < low || t > high) continue;
+    // Long sleeves now reach the waist band; measure only original torso vertices.
+    if (high < .45 && Math.abs(base.attributes.position.getX(i)) > .74) continue;
     left = Math.min(left, positions.getX(i));
     right = Math.max(right, positions.getX(i));
     count++;
@@ -137,17 +139,17 @@ test('Over retains adult length and gains body room without excessive wingspan',
   assert.ok(torsoWidth(cuts.over, .22, .38) > torsoWidth(base, .22, .38) * 1.05, 'Over should add real torso room.');
 });
 
-test('Over hangs straight through the waist instead of narrowing like the fitted source', () => {
+test('Over releases gradually from the waist toward the hem', () => {
   const hem = torsoWidth(cuts.over, .04, .12);
   const waist = torsoWidth(cuts.over, .24, .38);
-  assert.ok(waist / hem > .95 && waist / hem < 1.12, 'The waist should stay close to the lower-body width.');
+  assert.ok(waist / hem > .86 && waist / hem < .98, 'Lower fabric should open toward the hem without a balloon waist.');
 });
 
 test('Over keeps a continuous side profile from the lower torso to the chest', () => {
   const lowerBody = torsoDepth(cuts.over, .22, .38);
   const chest = torsoDepth(cuts.over, .62, .76);
   const ratio = chest / lowerBody;
-  assert.ok(ratio > .75 && ratio < 1.45,
+  assert.ok(ratio > 1 && ratio < 1.85,
     `Chest depth should transition naturally from the lower body (ratio ${ratio.toFixed(2)}).`);
 });
 
@@ -158,4 +160,24 @@ test('Kid has a shorter body and narrower sleeves with its own proportions', () 
   assert.ok(widthRatio > .64 && widthRatio < .97, 'Kid must have a smaller shoulder/sleeve span.');
   const bodyRatio = torsoWidth(cuts.kids, .22, .38) / torsoWidth(base, .22, .38);
   assert.ok(bodyRatio > widthRatio + .02, 'Kid should retain body room while shortening the sleeve span.');
+});
+
+test('Over retains adult proportions with ease at the hem', () => {
+  const over = size(cuts.over);
+  const waist = torsoWidth(cuts.over, .24, .38);
+  assert.ok(waist / over.y > .50 && waist / over.y < .60, `Body width must balance the adult length: ${waist / over.y}`);
+  assert.ok(over.y < size(base).y * 1.03, 'Reference cut should retain an adult body length.');
+});
+
+test('Over preserves the worn chest volume of the basic shirt', () => {
+  const ratio = torsoDepth(cuts.over, .62, .76) / torsoDepth(base, .62, .76);
+  assert.ok(ratio > .86 && ratio < 1.08, 'Chest volume must remain comparable to the underlying adult body.');
+});
+
+test('Over adds lower fabric width without inflating the abdomen', () => {
+  // Loose fabric opens toward the hem in profile as well as from the front.
+  // A fixed reduction from Basic would reintroduce the pinched abdomen.
+  assert.ok(torsoDepth(cuts.over, .22, .38) < torsoDepth(cuts.over, .04, .12) * 1.03);
+  assert.ok(torsoDepth(cuts.over, .22, .38) < torsoDepth(base, .22, .38));
+  assert.ok(torsoWidth(cuts.over, .04, .12) > torsoWidth(base, .04, .12) * 1.06);
 });

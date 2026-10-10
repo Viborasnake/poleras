@@ -14,8 +14,33 @@ export function visibleAlphaBounds(pixels, width, height, threshold = 12) {
   return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
 }
 
-// 100% means the largest visually safe chest placement for the artwork's shape.
-// Tall poster-like pieces retain a narrow safety margin while reading at a useful size.
+// Sample the left and right visible edges across the drawing, including its
+// highest and lowest rows. These points let the viewer fit irregular artwork
+// against the actual garment instead of treating every file as a rectangle.
+export function visibleAlphaEdgeSamples(pixels, width, height, threshold = 8, rowCount = 20) {
+  if (!pixels || width < 1 || height < 1) return [];
+  const rows = [];
+  for (let y = 0; y < height; y += 1) {
+    let left = width, right = -1;
+    for (let x = 0; x < width; x += 1) {
+      if (pixels[(y * width + x) * 4 + 3] <= threshold) continue;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+    if (right >= left) rows.push({ y, left, right });
+  }
+  if (!rows.length) return [];
+  const samples = [];
+  for (let index = 0; index < rowCount; index += 1) {
+    const row = rows[Math.round(index * (rows.length - 1) / Math.max(1, rowCount - 1))];
+    const v = (row.y + .5) / height;
+    samples.push({ u: (row.left + .5) / width, v });
+    if (row.right !== row.left) samples.push({ u: (row.right + .5) / width, v });
+  }
+  return samples;
+}
+
+// Tall poster-like pieces retain a narrow safety margin at the base scale.
 export function automaticPrintScale(aspect) {
   if (!Number.isFinite(aspect) || aspect <= 0) return 1;
   if (aspect < .5) return .82;

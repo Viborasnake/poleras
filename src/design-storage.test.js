@@ -18,3 +18,8 @@ test('private uploads reject unsupported files and invalid folders', () => {
   assert.throws(() => designObjectPath(userId, 'back', { type: 'image/svg+xml', size: 1024 }, uploadId));
   assert.throws(() => designObjectPath(userId, 'back', { type: 'image/png', size: DESIGN_MAX_BYTES + 1 }, uploadId));
 });
+
+test('creative references use a separate private folder owned by the customer', () => {
+  const file = { type: 'image/webp', size: 2048, name: 'idea.webp' };
+  assert.equal(designObjectPath(userId, 'reference', file, uploadId), `${userId}/reference/${uploadId}.webp`);
+});

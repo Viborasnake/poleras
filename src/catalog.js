@@ -50,6 +50,9 @@ const featuredCatalogHoverPhotos={
   'solid-snake-shadow-moses':'/metal-gear-solid-snake-hover.webp',
 };
 
+export const catalogMockupPhoto=(slug,path='')=>path||featuredCatalogPhotos[slug]||'';
+export const catalogMockupHoverPhoto=(slug,path='')=>path||featuredCatalogHoverPhotos[slug]||'';
+
 export function filterCatalog(collection='all',designs=catalogDesigns){
   const visible=designs.filter(design=>design.active!==false);
   return collection==='all'?visible:visible.filter(design=>design.collection===collection);
@@ -80,8 +83,11 @@ export function catalogFromRows(collectionRows=[],designRows=[]){
       name:row.name,
       caption:row.caption||'',
       artworkPath:row.artwork_path,
-      featuredPhoto:featuredCatalogPhotos[row.slug]||'',
-      featuredPhotoHover:featuredCatalogHoverPhotos[row.slug]||'',
+      // Las fotos cargadas desde Administración tienen prioridad. Los mapas
+      // locales preservan las portadas editoriales publicadas antes de que
+      // existieran estos campos en la base de datos.
+      featuredPhoto:catalogMockupPhoto(row.slug,row.mockup_path),
+      featuredPhotoHover:catalogMockupHoverPhoto(row.slug,row.mockup_hover_path),
       active:row.active,
       surface:local.surface||'pink',
       sampleColor:normalizeSampleColor(row.sample_color||local.sampleColor),
@@ -99,7 +105,7 @@ export async function loadCatalog(client){
       client.from('catalog_collections').select('id,slug,name,active,sort_order,catalog_product_types!inner(slug)').eq('active',true).eq('catalog_product_types.slug','poleras').order('sort_order').order('name'),
       // La pieza más reciente abre cada colección: además de respetar el orden
       // editorial, permite que la portada refleje la última polera publicada.
-      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,sample_color,active,created_at').eq('active',true).order('created_at',{ascending:false}),
+      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,mockup_path,mockup_hover_path,sample_color,active,created_at').eq('active',true).order('created_at',{ascending:false}),
     ]);
     if(collectionResult.error)throw collectionResult.error;
     if(designResult.error)throw designResult.error;

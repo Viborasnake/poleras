@@ -7,3 +7,5 @@
 #quote-editor-dialog form{padding:25px}
 #quote-editor-dialog textarea,#quote-editor-dialog input{width:100%;box-sizing:border-box}
 #quote-editor-dialog small{display:block;margin-top:6px;color:#766c81;font-size:10px}
+.admin-creative-references{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.admin-creative-references strong{width:100%}

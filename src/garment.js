@@ -3,8 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { createGarmentCut } from './garment-cuts.js';
-import { garmentOpenings } from './garment-edges.js';
-import { automaticPrintScale, visibleAlphaBounds } from './artwork-fit.js';
+import { garmentOpenings, foldedGarmentEdges } from './garment-edges.js';
+import { automaticPrintScale, visibleAlphaBounds, visibleAlphaEdgeSamples } from './artwork-fit.js';
 
 let modelPromise;
 
@@ -57,6 +57,19 @@ function fittedArtworkImage(image, marginRatio = .08) {
   } catch {
     // A third-party image without CORS cannot be inspected, but it can still be shown.
     return { image, aspect: sourceWidth / sourceHeight };
+  }
+}
+
+function artworkEdgeSamples(image) {
+  try {
+    const sample = document.createElement('canvas');
+    sample.width = 96;
+    sample.height = Math.max(1, Math.min(192, Math.round(96 * image.height / image.width)));
+    const context = sample.getContext('2d', { willReadFrequently: true });
+    context.drawImage(image, 0, 0, sample.width, sample.height);
+    return visibleAlphaEdgeSamples(context.getImageData(0, 0, sample.width, sample.height).data, sample.width, sample.height);
+  } catch {
+    return [];
   }
 }
 
@@ -128,18 +141,21 @@ function addGarmentHems(mesh, kind = 'basic') {
   const geometry = mesh.geometry;
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox, height = bounds.max.y - bounds.min.y;
+  if (kind === 'over') foldedGarmentEdges(geometry);
   for (const points of garmentOpenings(geometry)) {
     const averageY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
     const relativeY = (averageY - bounds.min.y) / height;
     const bottomHem = relativeY < .3;
     const collar = relativeY > .8;
     const curve = new THREE.CatmullRomCurve3(points, true, 'centripetal');
-    const shade = collar && kind === 'over' ? .97 : .94;
+    const shade = kind === 'over' ? (collar ? .98 : .975) : .94;
     const material = new THREE.MeshStandardMaterial({
       color: mesh.material.color.clone().multiplyScalar(shade), roughness: 1, metalness: 0
     });
-    const collarRadius = kind === 'over' ? .0034 : .0032;
-    const hem = new THREE.Mesh(new THREE.TubeGeometry(curve, points.length * 2, height * (collar ? collarRadius : .0018), 8, true), material);
+    const edgeRadius = kind === 'over'
+      ? collar ? .0028 : .0020
+      : collar ? .0032 : .0018;
+    const hem = new THREE.Mesh(new THREE.TubeGeometry(curve, points.length * 2, height * edgeRadius, 8, true), material);
     hem.name = collar ? 'Cuello · ribete' : bottomHem ? 'Basta inferior' : 'Manga · basta';
     hem.userData.garmentHem = true;
     hem.userData.fabricShade = shade;
@@ -223,7 +239,21 @@ export async function createViewer(container, state, { hero = false, viewAngle =
         material.normalMap = null;
         material.normalScale.set(0, 0);
         material.aoMap = null;
-        material.roughness = 1;
+        material.roughness = .96;
+        material.side = THREE.DoubleSide;
+        material.vertexColors = true;
+        // Shade the actual inside of the cloth. The returned lower hem stays
+        // close to the outer shade, preventing dark facets at its folded lip.
+        material.onBeforeCompile = shader => {
+          shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', '#include <common>\n varying float garmentHeight;')
+            .replace('#include <begin_vertex>', '#include <begin_vertex>\n garmentHeight = position.y;');
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\n varying float garmentHeight;')
+            .replace('#include <color_fragment>',
+              '#include <color_fragment>\n diffuseColor.rgb *= gl_FrontFacing ? 1.0 : mix(.98, .72, smoothstep(-1.24, -1.10, garmentHeight));');
+        };
+        material.customProgramCacheKey = () => 'over-cloth-interior-v1';
         material.needsUpdate = true;
       }
       const cut = new THREE.Mesh(kind === 'basic' ? geometry : createGarmentCut(geometry, kind), material);
@@ -256,11 +286,9 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const back = next.printSide === 'back';
     printOnBack = back;
     const requestedScale = next.printScale || 1;
-    const visualMaxScale = hero ? 1.9 : next.catalogDesign ? 2 : 1.6;
-    // La revisión técnica informa calidad; no debe encoger silenciosamente el mockup.
-    const maxScale = next.catalogPreview ? 2 : visualMaxScale;
+    const maxScale = next.catalogPreview ? 2 : next.catalogDesign ? 1.7 : 1.6;
     const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
-    const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : next.catalogDesign ? 'catalog-studio-flat-v1' : 'safe-fit-v3';
+    const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : next.catalogDesign ? 'catalog-studio-decal-v2' : 'safe-fit-v4';
     const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + fitMode : '';
     if (key === currentImage) return;
     currentImage = key;
@@ -280,22 +308,57 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       const aspect = fitted.aspect;
       const safeScale = automaticPrintScale(aspect);
       const printArea = next.kind === 'kids' ? { width: .82, height: 1.15, y: .12 } : next.kind === 'over' ? { width: 1.12, height: 1.40, y: .10 } : { width: .95, height: 1.357, y: .15 };
-      const width = Math.min(printArea.width, printArea.height * aspect) * printScale * safeScale;
-      const height = width / aspect;
-      const placementY = printArea.y + (1 - safeScale) * .35;
-      // Project onto the active cloth mesh so the artwork follows the fabric instead of floating.
+      const baseWidth = Math.min(printArea.width, printArea.height * aspect) * safeScale;
+      let useFlatPreview = next.catalogPreview || hero;
+      const placementY = printArea.y + (1 - safeScale) * .35 - (useFlatPreview ? 0 : .12);
+      const facingThreshold = next.catalogDesign ? .32 : .52;
       group.updateMatrixWorld(true);
-      ray.set(new THREE.Vector3(0, placementY, back ? -3 : 3), new THREE.Vector3(0, 0, back ? 1 : -1));
-      const targetZ = ray.intersectObject(shirt, false)[0]?.point.z ?? (back ? -.4 : .4);
+      const rayDirection = new THREE.Vector3(0, 0, back ? 1 : -1).transformDirection(group.matrixWorld);
+      const castOnShirt = (x, y) => {
+        ray.set(new THREE.Vector3(x, y, back ? -3 : 3).applyMatrix4(group.matrixWorld), rayDirection);
+        return ray.intersectObject(shirt, false)[0];
+      };
+      const centerHit = castOnShirt(0, placementY);
+      const targetZ = centerHit ? group.worldToLocal(centerHit.point.clone()).z : back ? -.4 : .4;
+      let fittedScale = printScale;
+      if (!useFlatPreview) {
+        const edges = artworkEdgeSamples(fitted.image);
+        const fits = scale => {
+          const width = baseWidth * scale, height = width / aspect;
+          return edges.every(({ u, v }) => {
+            const hit = castOnShirt((u - .5) * width, placementY + (.5 - v) * height);
+            return hit && isPrintableFacing(hit.face.normal.z, back, facingThreshold)
+              && Math.abs(group.worldToLocal(hit.point.clone()).z - targetZ) < .48;
+          });
+        };
+        if (edges.length && !fits(fittedScale)) {
+          let lower = .3, upper = fittedScale;
+          if (fits(lower)) {
+            for (let attempt = 0; attempt < 7; attempt += 1) {
+              const middle = (lower + upper) / 2;
+              if (fits(middle)) lower = middle;
+              else upper = middle;
+            }
+            fittedScale = Math.max(.3, lower - .02);
+          } else {
+            // A mesh with no continuous printable surface still needs a complete preview.
+            useFlatPreview = true;
+            fittedScale = Math.min(printScale, 1);
+          }
+        }
+      }
+      const width = baseWidth * fittedScale;
+      const height = width / aspect;
       // Hero y catálogo son vistas frontales editoriales: preservan el PNG completo.
-      // Los motivos de catálogo también usan esta capa en el estudio: los bordes
-      // grandes de una ilustración no deben desaparecer al cruzar una costura o
-      // el lateral curvo de la malla. Los archivos propios siguen proyectándose
-      // sobre la tela para representar su ubicación y permitir el giro.
-      const useFlatPreview = next.catalogPreview || hero || Boolean(next.catalogDesign);
+      // Dentro del estudio todos los motivos, incluidos los de catálogo, se
+      // proyectan sobre la malla para acompañar los pliegues y no despegarse
+      // de los costados al girar la polera.
+      // Los diseños de colección necesitan conservar más de su contorno al
+      // cruzar el pecho. Un umbral menos restrictivo mantiene los bordes sin
+      // convertirlos en una lámina plana: los vértices siguen sobre la tela.
       const decal = useFlatPreview
         ? new THREE.PlaneGeometry(width, height)
-        : settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, .18)), back, .52));
+        : settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, 1)), back, facingThreshold));
       printMaterial.map = texture;
       printMaterial.depthTest = !useFlatPreview;
       printMaterial.needsUpdate = true;

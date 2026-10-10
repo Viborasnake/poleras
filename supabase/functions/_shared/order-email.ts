@@ -1,5 +1,6 @@
 export const orderEmailLabels: Record<string, string> = {
   submitted: 'Pedido ingresado',
+  quoted: 'Cotización disponible',
   paid: 'Pedido ingresado',
   in_production: 'Preparando pedido',
   ready: 'Pedido preparado',
@@ -29,7 +30,7 @@ const htmlEntities: Record<string, string> = {
 export const escapeHtml = (value: unknown) => String(value || '').replace(/[&<>"']/g, char => htmlEntities[char] || char)
 type OrderEmailItem = { name_snapshot?: string; quantity?: number; unit_price_clp?: number; line_total_clp?: number; print_sides?: string }
 type PaymentInstructions = { transfer?: { holder?: string; bank?: string; account_type?: string; account_number?: string; rut?: string; email?: string }; mercado_pago_url?: string }
-type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; total_clp?: number; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean }
+type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; total_clp?: number; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean; creative?: boolean; request_details?: string; quote_message?: string; adminNotice?: boolean; referenceCount?: number }
 const formatClp = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0))
 function orderDetails(details: OrderEmailDetails = {}) {
   const items = Array.isArray(details.items) ? details.items : []
@@ -113,6 +114,13 @@ export function buildOrderEmail(name: string, orderId: string, status: string, s
   const actionUrl = status === 'delivered' ? `${safeSiteUrl}/?encuesta=${encodeURIComponent(orderId)}` : `${safeSiteUrl}/?panel=account`
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hola Droska, necesito ayuda con mi pedido #${orderId}`)}`
   const summary = orderDetails(details)
+  if (details.creative) {
+    const quote = status === 'quoted' || status === 'awaiting_deposit'
+    const subject = `${details.adminNotice ? 'Nueva idea recibida' : quote ? 'Tu cotización está disponible' : status === 'paid' ? 'Confirmamos tu pago' : 'Recibimos tu idea'} · Solicitud #${orderId}`
+    const message = details.adminNotice ? `Nueva solicitud de ${name}. Idea: ${details.request_details || ''}. Referencias adjuntas: ${details.referenceCount || 0}. Revisa los archivos en Administración.` : quote ? `Tu propuesta: ${details.quote_message || ''}. Total: ${formatClp(details.total_clp)}. Crea una cuenta con este correo o ingresa a Mis pedidos para aceptarla y continuar al pago.` : status === 'paid' ? `Confirmamos el pago de tu solicitud por ${formatClp(details.total_clp)}. Nuestro equipo continuará con tu diseño.` : 'Recibimos tu idea y la revisaremos. Crea una cuenta con este correo para seguir la solicitud en Mis pedidos.'
+    const action = details.adminNotice ? `${siteUrl}/admin#pedidos` : `${siteUrl}/?panel=account`
+    return { subject, text: `${message}\n\nSolicitud #${orderId}\n${action}`, html: `<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif;background:#F9F7F2;color:#262920;padding:24px"><main style="max-width:600px;margin:auto;background:#FFFDFA;padding:30px;border-radius:18px"><h1 style="font-size:27px">${escapeHtml(subject)}</h1><p style="line-height:1.6;white-space:pre-wrap">${escapeHtml(message)}</p><a href="${escapeHtml(action)}" style="display:inline-block;background:#262920;color:white;padding:14px 20px;border-radius:99px;text-decoration:none">${details.adminNotice ? 'Abrir pedidos' : 'Ver mi solicitud'}</a></main></body></html>` }
+  }
   const hasPaymentInstructions = Boolean(details.payment_instructions && (details.payment_instructions.transfer || details.payment_instructions.mercado_pago_url))
   const emailBody = hasPaymentInstructions ? 'Te dejamos los datos para pagar tu pedido. Cuando realices la transferencia, envíanos el comprobante por WhatsApp o responde este correo.' : details.orderEdited ? 'Actualizamos tu pedido con los cambios aprobados por nuestro equipo. Revisa el nuevo detalle y total a continuación.' : copy.body
   return {
@@ -132,4 +140,15 @@ export async function sendOrderEmail(to: string, name: string, orderId: string, 
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload?.message || 'No se pudo enviar el correo.')
   return { sent: true, id: payload?.id }
+}
+
+export async function sendAdminOrderNotice(orderId: string, kind: string, customer: string) {
+  const apiKey = Deno.env.get('RESEND_API_KEY'), from = Deno.env.get('RESEND_FROM_EMAIL'), to = Deno.env.get('ADMIN_ORDER_EMAIL')
+  if (!apiKey || !from || !to) return { sent: false, reason: 'admin_email_not_configured' }
+  const siteUrl = String(Deno.env.get('SITE_URL') || '').replace(/\/$/, '')
+  const subject = `${kind} · Pedido #${orderId}`
+  const message = `${kind} de ${customer}. Revisa el pedido #${orderId} en Administración.`
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [to], subject, text: `${message}\n${siteUrl}/admin#pedidos`, html: `<p>${escapeHtml(message)}</p><p><a href="${escapeHtml(siteUrl)}/admin#pedidos">Abrir pedidos</a></p>` }) })
+  if (!response.ok) throw new Error('No se pudo avisar al administrador.')
+  return { sent: true }
 }

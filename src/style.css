@@ -2468,6 +2468,10 @@ body.theme-dark #studio .preview{background:radial-gradient(circle at 50% 35%,co
 body.theme-dark #studio:has(#live-preview:not([hidden])) .preview{background:radial-gradient(circle at 50% 35%,color-mix(in srgb,var(--ds-brand-secondary) 64%,transparent),transparent 60%),color-mix(in srgb,var(--ds-brand-primary) 83%,#000)}
 body.theme-dark #studio .mode-tabs button,body.theme-dark #studio .product-options>button,body.theme-dark #studio .sizes button,body.theme-dark #studio .print-choice,body.theme-dark #studio .small-button,body.theme-dark #studio .form-navigation #back{border-color:color-mix(in srgb,var(--ds-text-inverse) 28%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 6%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
 body.theme-dark #studio .mode-tabs button.selected,body.theme-dark #studio .print-choice.selected,body.theme-dark #studio .product-options .selected,body.theme-dark #studio .sizes .selected,body.theme-dark #studio .mockup-sides button.selected{border-color:var(--ds-brand-accent);background:var(--ds-brand-accent);color:var(--ds-text-primary);box-shadow:0 3px 0 var(--ds-color-pink-shadow)}
+body.theme-dark #studio .model-block .product-options>button:not(.selected):is(:hover,:focus-visible){filter:none;border-color:var(--ds-text-inverse);background:var(--ds-brand-accent);color:var(--ds-text-primary);box-shadow:0 3px 0 var(--ds-color-pink-shadow);transform:translateY(-1px)}
+body.theme-dark #studio .model-block .product-options>button:not(.selected):is(:hover,:focus-visible) .model-price{color:var(--ds-text-primary)}
+body.theme-dark #studio .form-navigation #next,body.theme-dark .catalog-design-card .catalog-choose{border:2px solid color-mix(in srgb,var(--ds-text-inverse) 76%,transparent);background:var(--ds-brand-accent);color:var(--ds-text-primary);box-shadow:0 5px 0 var(--ds-color-pink-shadow),0 10px 24px rgba(0,0,0,.2)}
+body.theme-dark #studio .form-navigation #next:is(:hover,:focus-visible),body.theme-dark .catalog-design-card .catalog-choose:hover{filter:none;border-color:var(--ds-text-inverse);background:var(--ds-color-lime);color:var(--ds-text-primary);box-shadow:0 6px 0 var(--ds-brand-accent),0 16px 30px rgba(0,0,0,.3)}
 body.theme-dark #studio .dropzone,body.theme-dark #studio .reference-dropzone{border-color:color-mix(in srgb,var(--ds-brand-accent) 70%,var(--ds-text-inverse));background:color-mix(in srgb,var(--ds-brand-secondary) 24%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
 body.theme-dark #studio .dropzone small,body.theme-dark #studio .reference-dropzone small{color:color-mix(in srgb,var(--ds-text-inverse) 72%,transparent)}
 body.theme-dark #studio input:not([type="color"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]),body.theme-dark #studio textarea,body.theme-dark #studio select,body.theme-dark .account-form input{border-color:color-mix(in srgb,var(--ds-text-inverse) 30%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
@@ -2488,6 +2492,27 @@ body.theme-dark .cart-drawer .cart-total{background:transparent;color:var(--ds-t
 body.theme-dark .cart-drawer .cart-keep-shopping,body.theme-dark .cart-access-secondary,body.theme-dark .cart-empty-create{border-color:color-mix(in srgb,var(--ds-text-inverse) 34%,transparent);background:transparent;color:var(--ds-text-inverse)}
 body.theme-dark .cart-drawer .cart-keep-shopping:hover,body.theme-dark .cart-access-secondary:hover,body.theme-dark .cart-empty-create:hover{border-color:var(--ds-brand-accent);background:color-mix(in srgb,var(--ds-brand-accent) 16%,var(--ds-brand-primary))}
 body.theme-dark .commerce-modal:not(.cart-drawer) .commerce-wide,body.theme-dark .cart-drawer .commerce-wide{background:var(--ds-brand-accent);color:var(--ds-text-primary);box-shadow:0 4px 0 var(--ds-color-pink-shadow)}
+
+/* Área privada nocturna: reutiliza las mismas capas de controles y tarjetas
+   del estudio y el catálogo; no introduce una variante visual paralela. */
+body.theme-dark .account-sections{padding:0;background:transparent;color:var(--ds-text-inverse)}
+body.theme-dark .account-sections button{border-color:color-mix(in srgb,var(--ds-text-inverse) 28%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 6%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark .account-sections button:hover{border-color:var(--ds-brand-accent);background:color-mix(in srgb,var(--ds-brand-accent) 16%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark .account-sections button.active{border:2px solid var(--ds-brand-accent);background:var(--ds-brand-accent);color:var(--ds-text-primary);box-shadow:0 3px 0 var(--ds-color-pink-shadow)}
+body.theme-dark .account-sections button:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:3px}
+body.theme-dark .account-orders-head{color:color-mix(in srgb,var(--ds-text-inverse) 76%,transparent)}
+body.theme-dark .account-orders-head button{color:color-mix(in srgb,var(--ds-brand-accent) 82%,white)}
+body.theme-dark .account-order,body.theme-dark .account-order.is-archived{border-color:color-mix(in srgb,var(--ds-text-inverse) 20%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary));color:var(--ds-text-inverse);box-shadow:0 7px 0 color-mix(in srgb,var(--ds-brand-secondary) 48%,#000)}
+body.theme-dark .account-order time,body.theme-dark .account-order>p,body.theme-dark .account-order details small,body.theme-dark .account-order-history,body.theme-dark .account-order-history li{color:color-mix(in srgb,var(--ds-text-inverse) 76%,transparent)}
+body.theme-dark .account-order-status{background:var(--ds-lime-500);color:var(--ds-text-primary)}
+body.theme-dark .account-order-archived-note{border-color:color-mix(in srgb,var(--ds-text-inverse) 20%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 8%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark .account-order details{border-top-color:color-mix(in srgb,var(--ds-text-inverse) 18%,transparent)}
+body.theme-dark .account-data-form{color:var(--ds-text-inverse)}
+body.theme-dark .account-data-form fieldset{border-color:color-mix(in srgb,var(--ds-text-inverse) 24%,transparent)}
+body.theme-dark .account-data-form label>span,body.theme-dark .account-data-form label small{color:color-mix(in srgb,var(--ds-text-inverse) 76%,transparent)}
+body.theme-dark .account-data-form input,body.theme-dark .account-data-form textarea,body.theme-dark .account-data-form input[readonly]{border-color:color-mix(in srgb,var(--ds-text-inverse) 30%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark .region-filter-options{border-color:color-mix(in srgb,var(--ds-text-inverse) 30%,transparent);background:var(--ds-brand-primary)}
+body.theme-dark .region-filter-options button{color:var(--ds-text-inverse)}
 
 body.theme-dark .catalog-dialog-grid .catalog-design-card{border-color:color-mix(in srgb,var(--ds-text-inverse) 20%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary));color:var(--ds-text-inverse);box-shadow:0 7px 0 color-mix(in srgb,var(--ds-brand-secondary) 48%,#000)}
 body.theme-dark .catalog-dialog-grid .catalog-design-card .catalog-visual{background:color-mix(in srgb,var(--ds-brand-secondary) 24%,var(--ds-brand-primary))}
@@ -2678,3 +2703,7 @@ body.theme-dark .ready-catalog .catalog-heading,
 body.theme-dark .catalog-section .catalog-heading{position:relative}
 body.theme-dark .ready-catalog .catalog-heading::after,
 body.theme-dark .catalog-section .catalog-heading::after{content:'';position:absolute;right:0;bottom:-18px;left:0;height:1px;background:linear-gradient(90deg,transparent,var(--ds-brand-accent) 24%,color-mix(in srgb,var(--ds-brand-secondary) 64%,transparent) 72%,transparent);opacity:.7}
+.account-creative-quote{display:grid;gap:12px;padding:18px;border:1px solid var(--ds-border-subtle);border-radius:12px;background:var(--ds-surface-subtle)}
+.account-creative-quote p{margin:0;white-space:pre-wrap;color:var(--ds-text-secondary)}
+.account-creative-quote .button{justify-self:start}
+.account-creative-quote small{color:var(--ds-text-secondary)}
