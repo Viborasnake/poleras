@@ -134,7 +134,7 @@ export async function sendOrderEmail(to: string, name: string, orderId: string, 
   const apiKey = Deno.env.get('RESEND_API_KEY')
   const from = Deno.env.get('RESEND_FROM_EMAIL')
   if (!apiKey || !from) return { sent: false, reason: 'email_not_configured' }
-  const siteUrl = (Deno.env.get('SITE_URL') || 'https://poleras-smoky.vercel.app').replace(/\/$/, '')
+  const siteUrl = (Deno.env.get('SITE_URL') || 'https://droska.frontbook.cl').replace(/\/$/, '')
   const email = buildOrderEmail(name, orderId, status, siteUrl, pickup, details)
   const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [to], subject: email.subject, text: email.text, html: email.html }) })
   const payload = await response.json().catch(() => ({}))

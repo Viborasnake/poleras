@@ -50,7 +50,7 @@ Deno.serve(async request => {
     if (paymentEmail && !paymentInstructions?.transfer && !paymentInstructions?.mercado_pago_url) return json({ error: 'Agrega datos de transferencia o un link de Mercado Pago.' }, 422)
     const details = { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, total_clp: order.total_clp, price_snapshot: order.price_snapshot, payment_instructions: paymentEmail ? paymentInstructions : undefined, orderEdited: orderEditEmail, creative: order.request_type === 'creative', request_details: order.request_details, quote_message: order.quote_message }
     if (preview) {
-      const siteUrl = (Deno.env.get('SITE_URL') || 'https://poleras-smoky.vercel.app').replace(/\/$/, '')
+      const siteUrl = (Deno.env.get('SITE_URL') || 'https://droska.frontbook.cl').replace(/\/$/, '')
       const emailPreview = buildOrderEmail(name, order.id, previewStatus, siteUrl, order.shipping_address?.fulfillment === 'pickup', details)
       return json({ orderId: order.id, status: previewStatus, label: orderEmailLabels[previewStatus], preview: true, recipient: email, email: emailPreview, paymentEmail, orderEditEmail })
     }
