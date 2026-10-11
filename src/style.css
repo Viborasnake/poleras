@@ -654,6 +654,8 @@ footer .logo > span {
 }
 .footer-brand p{display:block;max-width:310px;margin:0;color:var(--ds-text-secondary);font-size:15px;line-height:1.55}
 .footer-contact{display:grid;justify-items:start;gap:8px;padding-left:clamp(24px,3vw,44px);border-left:1px solid var(--ds-border-subtle)}
+.store-support-email{color:var(--ds-text-primary);font-size:13px;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+.announcement[hidden],.store-support-email[hidden]{display:none}
 .footer-contact>span,.footer-catalog strong{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
 .footer-contact strong{font:700 26px/1.15 var(--ds-font-display);letter-spacing:-.04em}
 .footer-contact .whatsapp-link {
@@ -2781,3 +2783,4 @@ body.theme-dark #studio.is-checkout-step .fulfillment-choice.selected>b,
 body.theme-dark #studio.is-checkout-step .shipping-quote small{color:var(--ds-text-primary)}
 body.theme-dark #studio.is-checkout-step .fulfillment-choice:not(.selected) .fulfillment-icon{background:var(--ds-brand-primary);color:var(--ds-text-inverse)}
 @media(prefers-reduced-motion:reduce){.payment-spinner{animation:none}}
+@media(max-width:760px){.announcement .announcement-message{display:inline-flex;min-width:0}.announcement .announcement-message [data-store-announcement-text]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.announcement .announcement-origin{display:none}}

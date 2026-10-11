@@ -22,7 +22,19 @@ const pickupSteps = [
   ['ready_for_pickup', 'Listo para retirar'],
   ['delivered', 'Retirado'],
 ] as const
-const whatsappNumber = '56965217926'
+const fallbackWhatsAppNumber = '56965217926'
+
+async function configuredWhatsAppNumber() {
+  const url = Deno.env.get('SUPABASE_URL'), key = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!url || !key) return fallbackWhatsAppNumber
+  try {
+    const response = await fetch(`${url}/rest/v1/storefront_settings?select=whatsapp_number&id=eq.true`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(3000) })
+    if (!response.ok) return fallbackWhatsAppNumber
+    const rows = await response.json()
+    const number = String(rows?.[0]?.whatsapp_number || '')
+    return /^56\d{9}$/.test(number) ? number : fallbackWhatsAppNumber
+  } catch { return fallbackWhatsAppNumber }
+}
 
 const htmlEntities: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -96,7 +108,7 @@ function copyFor(status: string, pickup: boolean) {
   return copies[status] || copies.submitted
 }
 
-export function buildOrderEmail(name: string, orderId: string, status: string, siteUrl: string, pickup = false, details: OrderEmailDetails = {}) {
+export function buildOrderEmail(name: string, orderId: string, status: string, siteUrl: string, pickup = false, details: OrderEmailDetails = {}, whatsappNumber = fallbackWhatsAppNumber) {
   const label = orderEmailLabels[status] || 'Actualización de pedido'
   const copy = copyFor(status, pickup)
   const steps = pickup ? pickupSteps : deliverySteps
@@ -135,7 +147,7 @@ export async function sendOrderEmail(to: string, name: string, orderId: string, 
   const from = Deno.env.get('RESEND_FROM_EMAIL')
   if (!apiKey || !from) return { sent: false, reason: 'email_not_configured' }
   const siteUrl = (Deno.env.get('SITE_URL') || 'https://droska.frontbook.cl').replace(/\/$/, '')
-  const email = buildOrderEmail(name, orderId, status, siteUrl, pickup, details)
+  const email = buildOrderEmail(name, orderId, status, siteUrl, pickup, details, await configuredWhatsAppNumber())
   const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [to], subject: email.subject, text: email.text, html: email.html }) })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload?.message || 'No se pudo enviar el correo.')
