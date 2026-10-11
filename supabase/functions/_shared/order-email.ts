@@ -36,6 +36,18 @@ async function configuredWhatsAppNumber() {
   } catch { return fallbackWhatsAppNumber }
 }
 
+async function adminNotificationSettings() {
+  const url = Deno.env.get('SUPABASE_URL'), key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SECRET_KEY')
+  if (!url || !key) return { enabled: true, recipient_email: '' }
+  try {
+    const response = await fetch(`${url}/rest/v1/admin_notification_settings?select=enabled,recipient_email&id=eq.true`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(3000) })
+    if (!response.ok) return { enabled: true, recipient_email: '' }
+    const rows = await response.json()
+    const row = rows?.[0]
+    return { enabled: row?.enabled !== false, recipient_email: String(row?.recipient_email || '').trim() }
+  } catch { return { enabled: true, recipient_email: '' } }
+}
+
 const htmlEntities: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }
@@ -155,7 +167,9 @@ export async function sendOrderEmail(to: string, name: string, orderId: string, 
 }
 
 export async function sendAdminOrderNotice(orderId: string, kind: string, customer: string) {
-  const apiKey = Deno.env.get('RESEND_API_KEY'), from = Deno.env.get('RESEND_FROM_EMAIL'), to = Deno.env.get('ADMIN_ORDER_EMAIL')
+  const settings = await adminNotificationSettings()
+  if (!settings.enabled) return { sent: false, reason: 'admin_notifications_disabled' }
+  const apiKey = Deno.env.get('RESEND_API_KEY'), from = Deno.env.get('RESEND_FROM_EMAIL'), to = settings.recipient_email || Deno.env.get('ADMIN_ORDER_EMAIL')
   if (!apiKey || !from || !to) return { sent: false, reason: 'admin_email_not_configured' }
   const siteUrl = String(Deno.env.get('SITE_URL') || '').replace(/\/$/, '')
   const subject = `${kind} · Pedido #${orderId}`
