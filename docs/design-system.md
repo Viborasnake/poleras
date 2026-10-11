@@ -113,7 +113,7 @@ Los controles documentan reposo, hover, activo, foco y disabled cuando correspon
 
 ## 6. Implementación y mantenimiento
 
-En la ruta “Tengo una idea”, adjuntar o quitar una referencia conserva todos los campos ya escritos. El éxito muestra un número de solicitud. Las referencias privadas se presentan al administrador como acciones “Abrir”, con error y reintento si falla el enlace. La cotización aparece en “Mis pedidos” con su mensaje, monto y acción de pago; el estado se expresa con texto además del color.
+En la ruta “Tengo una idea”, se pueden adjuntar hasta cinco fotos de referencia JPG, PNG o WEBP de 50 MB cada una. El formulario muestra cuántas se han cargado y permite quitar una para agregar otra al llegar al límite. Adjuntar o quitar una referencia conserva todos los campos ya escritos. El éxito muestra un número de solicitud. Las referencias privadas se presentan al administrador como acciones “Abrir”, con error y reintento si falla el enlace. La cotización aparece en “Mis pedidos” con su mensaje, monto y acción de pago; el estado se expresa con texto además del color.
 
 | Archivo | Responsabilidad |
 | --- | --- |

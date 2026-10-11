@@ -655,9 +655,11 @@ const phoneFieldHtml=(id,value,name='')=>`<div class="phone-input"><span class="
 const searchFilterHtml=(value,id,name,autocomplete,placeholder,required=false)=>`<div class="region-filter"><input id="${id}" class="ds-field" name="${name}"${required?' required':''} autocomplete="${autocomplete}" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-options" placeholder="${placeholder}" value="${escapeText(value)}"><div id="${id}-options" class="region-filter-options" role="listbox" hidden></div></div>`;
 function setupSearchFilter(input,getItems,onChange,emptyLabel){if(!input)return;const options=input.parentElement.querySelector('.region-filter-options');let active=-1;const render=()=>{const query=input.value.trim().toLocaleLowerCase('es-CL'),items=getItems(),matches=items.filter(item=>item.toLocaleLowerCase('es-CL').includes(query));options.innerHTML=matches.length?matches.map((item,index)=>`<button type="button" role="option" aria-selected="${index===active}" data-value="${escapeText(item)}">${escapeText(item)}</button>`).join(''):`<p>${emptyLabel}</p>`;options.hidden=false;input.setAttribute('aria-expanded','true')};const notify=(committed=false)=>onChange?.(input.value,committed);const choose=value=>{input.value=value;options.hidden=true;input.setAttribute('aria-expanded','false');active=-1;notify(true)};input.onfocus=render;input.oninput=()=>{active=-1;notify(false);render()};input.onkeydown=event=>{const items=[...options.querySelectorAll('[role=option]')];if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();active=Math.max(0,Math.min(items.length-1,active+(event.key==='ArrowDown'?1:-1)));render()}else if(event.key==='Enter'&&active>=0&&items[active]){event.preventDefault();choose(items[active].dataset.value)}else if(event.key==='Escape'){options.hidden=true;input.setAttribute('aria-expanded','false')}};options.onmousedown=event=>{const option=event.target.closest('[data-value]');if(option){event.preventDefault();choose(option.dataset.value)}};input.addEventListener('blur',()=>setTimeout(()=>{options.hidden=true;input.setAttribute('aria-expanded','false')},120))}
 const setupRegionFilter=(input,onChange)=>setupSearchFilter(input,()=>chileRegions,onChange,'No encontramos una región.');
+const MAX_IDEA_REFERENCES=5;
 function customReferencesHtml(){
  const items=state.references.map((reference,index)=>`<div class="reference-thumb"><img src="${reference.url}" alt="Referencia ${index+1}"><span title="${escapeText(reference.name)}">${escapeText(reference.name)}</span><button type="button" data-remove-reference="${index}" aria-label="Quitar ${escapeText(reference.name)}">×</button></div>`).join('');
- return `<div class="custom-references"><div class="custom-references-heading"><strong>Fotos de referencia <span>Opcional</span></strong><small>Mascotas, familiares, personas, objetos o estilos que quieras considerar.</small></div><label class="reference-dropzone"><input id="reference-files" type="file" accept="image/png,image/jpeg,image/webp" multiple><span>＋</span><strong>Adjuntar fotos</strong><small>Hasta 6 archivos JPG, PNG o WEBP</small></label>${items?`<div class="reference-thumbs">${items}</div>`:''}</div>`;
+ const full=state.references.length>=MAX_IDEA_REFERENCES;
+ return `<div class="custom-references"><div class="custom-references-heading"><strong>Fotos de referencia <span>Opcional</span></strong><small>Mascotas, familiares, personas, objetos o estilos que quieras considerar.</small></div><label class="reference-dropzone ${full?'is-full':''}"><input id="reference-files" type="file" accept="image/png,image/jpeg,image/webp" multiple ${full?'disabled':''}><span>＋</span><strong>${full?'Límite de fotos alcanzado':'Adjuntar fotos'}</strong><small>${state.references.length} de ${MAX_IDEA_REFERENCES} fotos · JPG, PNG o WEBP · máx. 50 MB cada una${full?' · Quita una para agregar otra':''}</small></label>${items?`<div class="reference-thumbs">${items}</div>`:''}</div>`;
 }
 function fulfillmentDetailsHtml(){
  const date=estimatedDateLabel();
@@ -748,14 +750,18 @@ function renderStep(){
  normalizeTextSymbols(document.querySelector('#step-content')||document);
 }
 async function addReferenceFiles(fileList){
- const available=Math.max(0,6-state.references.length);const incoming=[...(fileList||[])];
- if(!available)return toast('Puedes adjuntar hasta 6 fotos de referencia.');
- const compatible=incoming.filter(file=>['image/png','image/jpeg','image/webp'].includes(file.type)&&file.size<=PRINT_POLICY.maxBytes).slice(0,available);
- for(const file of compatible){const url=URL.createObjectURL(file),image=new Image();image.src=url;try{await image.decode();state.references.push({name:file.name,url,file,path:null})}catch{URL.revokeObjectURL(url)}}
+ const incoming=[...(fileList||[])];if(!incoming.length)return;
+ if(state.references.length>=MAX_IDEA_REFERENCES)return toast(`Puedes adjuntar hasta ${MAX_IDEA_REFERENCES} fotos de referencia.`);
+ let added=0;
+ for(const file of incoming){
+  if(state.references.length>=MAX_IDEA_REFERENCES)break;
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>PRINT_POLICY.maxBytes)continue;
+  const url=URL.createObjectURL(file),image=new Image();image.src=url;
+  try{await image.decode();if(state.references.length>=MAX_IDEA_REFERENCES){URL.revokeObjectURL(url);break}state.references.push({name:file.name,url,file,path:null});added++}catch{URL.revokeObjectURL(url)}
+ }
  renderStep();
- const added=state.references.length-(6-available);
  if(!added)return toast('Elige fotos JPG, PNG o WEBP legibles de hasta 50 MB.');
- if(added<incoming.length)toast(`Adjuntamos ${added} foto${added===1?'':'s'}. Algunas no eran compatibles o no se pudieron leer.`);
+ if(added<incoming.length)toast(`Adjuntamos ${added} foto${added===1?'':'s'}. El máximo es ${MAX_IDEA_REFERENCES}; algunas fotos no eran compatibles o no se pudieron leer.`);
  else toast(`${added} foto${added===1?' adjunta':'s adjuntas'} como referencia opcional.`);
 }
 async function upload(file,side=state.printSide,fromCatalog=false){

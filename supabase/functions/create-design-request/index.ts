@@ -31,11 +31,12 @@ Deno.serve(async request => {
   const firstName = String(customer.firstName || '').trim()
   const email = String(customer.email || '').trim().toLowerCase()
   const phone = String(customer.phone || '').trim()
+  const maxReferences = 5
   const references = Array.isArray(body?.references)
-    ? body.references.slice(0, 6).map((item: any) => ({ name: String(item?.name || '').trim().slice(0, 120), path: String(item?.path || '') })).filter((item: any) => item.name)
+    ? body.references.map((item: any) => ({ name: String(item?.name || '').trim().slice(0, 120), path: String(item?.path || '') })).filter((item: any) => item.name)
     : []
   if (!/^[0-9a-f-]{36}$/i.test(requestId)) return json({ error: 'Identificador de solicitud inválido.' }, 400)
-  if (Array.isArray(body?.references) && body.references.length > 6) return json({ error: 'Puedes adjuntar hasta seis referencias.' }, 400)
+  if (Array.isArray(body?.references) && body.references.length > maxReferences) return json({ error: 'Puedes adjuntar hasta cinco referencias.' }, 400)
   if (idea.length < 10 || idea.length > 4000) return json({ error: 'Cuéntanos un poco más sobre tu idea.' }, 400)
   if (!firstName || !email.includes('@') || !phone) return json({ error: 'Faltan datos de contacto.' }, 400)
   const { data: previous } = await admin.from('orders').select('id').eq('creative_request_id', requestId).eq('user_id', userData.user.id).maybeSingle()
