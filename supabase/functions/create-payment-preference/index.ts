@@ -25,7 +25,7 @@ const shippingFor = (fulfillment: string, region: string, quantity: number) => {
 
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers })
-  if (request.method !== 'POST') return json({ error: 'Método no permitido.' }, 405)
+  if (request.method !== 'POST' && request.method !== 'GET') return json({ error: 'Método no permitido.' }, 405)
   const auth = request.headers.get('Authorization')
   const url = Deno.env.get('SUPABASE_URL'), secret = Deno.env.get('SUPABASE_SECRET_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), token = auth?.replace(/^Bearer\s+/, '')
   const mpToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN'), siteUrl = (Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || '').replace(/\/$/, '')
@@ -33,10 +33,13 @@ Deno.serve(async request => {
   const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data: userData, error: userError } = await admin.auth.getUser(token)
   if (userError || !userData.user) return json({ error: 'La sesión no es válida.' }, 401)
+  const bankTransfer = transferInstructions()
+  const bankTransferAvailable = Boolean(bankTransfer.holder && bankTransfer.bank && bankTransfer.account_number && bankTransfer.rut)
+  if (request.method === 'GET') return json({ bankTransferAvailable })
   const body = await request.json().catch(() => null) as any, paymentMethod = body?.paymentMethod === 'transfer' ? 'transfer' : body?.paymentMethod === 'draft' ? 'draft' : 'mercado_pago'
   if (paymentMethod === 'mercado_pago' && (!mpToken || !siteUrl)) return json({ error: 'La integración de Mercado Pago no está configurada.' }, 500)
-  const transfer = paymentMethod === 'transfer' ? transferInstructions() : null
-  if (paymentMethod === 'transfer' && (!transfer?.holder || !transfer.bank || !transfer.account_number || !transfer.rut)) return json({ error: 'La transferencia bancaria aún no está configurada. Elige Mercado Pago o inténtalo más tarde.' }, 503)
+  const transfer = paymentMethod === 'transfer' ? bankTransfer : null
+  if (paymentMethod === 'transfer' && !bankTransferAvailable) return json({ error: 'La transferencia bancaria aún no está configurada. Elige Mercado Pago o inténtalo más tarde.' }, 503)
   const items = Array.isArray(body?.items) ? body.items : [], customer = body?.customer || {}, fulfillment = body?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
   if (!items.length || items.length > 20 || !customer.firstName || !customer.lastName || !String(customer.email).includes('@') || !customer.phone) return json({ error: 'Faltan datos de contacto o productos.' }, 400)
   if (fulfillment === 'delivery' && (!body.shippingAddress?.region || !body.shippingAddress?.commune || !body.shippingAddress?.address)) return json({ error: 'Falta la dirección de despacho.' }, 400)

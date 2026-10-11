@@ -34,6 +34,7 @@
 .studio-controls .mode-tabs .selected,.studio-controls .product-options .selected,.studio-controls .sizes .selected,.step-one-garment .product-options .selected,.step-one-garment .sizes .selected{background:transparent;color:var(--ds-color-ink);border:2px solid var(--ds-color-ink);padding-top:calc(10px - 1px);padding-bottom:calc(10px - 1px)}.step-one-garment .product-options .selected{padding-top:6px;padding-bottom:6px}.step-one-garment .sizes .selected{padding-top:5px;padding-bottom:5px}
 
 .payment-methods{display:grid;gap:9px;margin:20px 0}.payment-method{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:start;padding:13px 14px;border:1px solid var(--ds-border-control);border-radius:11px;background:var(--ds-surface-raised);cursor:pointer}.payment-method input{margin:3px 0 0;accent-color:var(--ds-action-primary)}.payment-method span{display:grid;gap:3px}.payment-method strong{font-size:13px}.payment-method small{color:var(--ds-text-secondary);font-size:10px;line-height:1.45}.payment-method.is-selected{border-color:var(--ds-action-primary);background:var(--ds-surface-subtle);box-shadow:0 0 0 2px color-mix(in srgb,var(--ds-action-primary) 18%,transparent)}
+.payment-method:has(input:disabled){cursor:default}
 
 /* Mantén los símbolos decorativos como texto en Safari/iOS, evitando su conversión a emoji. */
 body, button, a, summary, .logo, .announcement span, .path-top > span, .text-link span, .button span, .icon-btn, .small-button, .viewer-note, .art-bottom, .floating-chip span, .ticker {
