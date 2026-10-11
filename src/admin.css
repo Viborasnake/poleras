@@ -458,3 +458,11 @@
 .admin-archive-history-row button{flex:0 0 auto}
 .admin-archive-history-message{margin:0;padding:22px 12px;color:var(--ds-text-secondary);font-size:13px;text-align:center}
 @media(max-width:540px){.admin-archive-history-content{padding:0 16px 16px}.admin-archive-history-content>.dialog-title{margin:0 -16px;padding:20px 16px}.admin-archive-history-row{align-items:stretch;flex-direction:column}.admin-archive-history-row button{width:100%}}
+.admin-archive-history-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px;padding:16px;border:1px solid var(--ds-border-subtle);border-radius:12px;background:var(--ds-surface-subtle)}
+.admin-archive-history-filters[hidden]{display:none}
+.admin-archive-history-filters label{min-width:0}
+.admin-archive-history-filters label:first-child{grid-column:1/-1}
+.admin-archive-history-filters input,.admin-archive-history-filters select{width:100%;min-height:42px;padding:9px 11px;border:1px solid var(--ds-border-control);border-radius:var(--ds-radius-control);background:var(--ds-surface-raised);color:var(--ds-text-primary);font:inherit}
+.admin-archive-history-filters input:focus-visible,.admin-archive-history-filters select:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:2px}
+.admin-archive-history-filters button{align-self:end;min-height:42px}
+@media(max-width:540px){.admin-archive-history-filters{grid-template-columns:1fr}.admin-archive-history-filters label:first-child{grid-column:auto}}
