@@ -2477,9 +2477,9 @@ body.theme-dark #studio .form-navigation #next,body.theme-dark .catalog-design-c
 body.theme-dark #studio .form-navigation #next:is(:hover,:focus-visible),body.theme-dark .catalog-design-card .catalog-choose:hover{filter:none;border-color:var(--ds-text-inverse);background:var(--ds-color-lime);color:var(--ds-text-primary);box-shadow:0 6px 0 var(--ds-brand-accent),0 16px 30px rgba(0,0,0,.3)}
 body.theme-dark #studio .dropzone,body.theme-dark #studio .reference-dropzone{border-color:color-mix(in srgb,var(--ds-brand-accent) 70%,var(--ds-text-inverse));background:color-mix(in srgb,var(--ds-brand-secondary) 24%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
 body.theme-dark #studio .dropzone small,body.theme-dark #studio .reference-dropzone small{color:color-mix(in srgb,var(--ds-text-inverse) 72%,transparent)}
-body.theme-dark #studio input:not([type="color"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]),body.theme-dark #studio textarea,body.theme-dark #studio select,body.theme-dark .account-form input{border-color:color-mix(in srgb,var(--ds-text-inverse) 30%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark #studio input:not([type="color"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]),body.theme-dark #studio textarea,body.theme-dark #studio select,body.theme-dark .account-form input{border-color:color-mix(in srgb,var(--ds-text-inverse) 42%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
 body.theme-dark #studio input::placeholder,body.theme-dark #studio textarea::placeholder,body.theme-dark .account-form input::placeholder{color:color-mix(in srgb,var(--ds-text-inverse) 58%,transparent)}
-body.theme-dark #studio .phone-input{border-color:color-mix(in srgb,var(--ds-text-inverse) 30%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary))}
+body.theme-dark #studio .phone-input{border-color:color-mix(in srgb,var(--ds-text-inverse) 42%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary))}
 body.theme-dark #studio .phone-prefix{color:var(--ds-text-inverse)!important}
 body.theme-dark #studio .notice,body.theme-dark #studio .draft-card,body.theme-dark #studio .mockup-save-inline,body.theme-dark #studio .quality-inline-notice{border-color:color-mix(in srgb,var(--ds-text-inverse) 20%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 8%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
 body.theme-dark #studio .order-summary>div,body.theme-dark #studio .selected-print-sides,body.theme-dark #studio .customer-field,body.theme-dark #studio .customer-name{border-color:color-mix(in srgb,var(--ds-text-inverse) 18%,transparent)}
@@ -2729,4 +2729,50 @@ body.theme-dark .mp-payment-modal .payment-method input{accent-color:var(--ds-co
 body.theme-dark .mp-payment-modal .mp-payment-button,body.theme-dark .mp-payment-modal .mp-payment-button:disabled{border:2px solid var(--ds-text-inverse);background:var(--ds-brand-accent);color:var(--ds-text-primary);opacity:1}
 body.theme-dark .mp-payment-modal .mp-payment-button:hover:not(:disabled){background:var(--ds-color-lime);color:var(--ds-text-primary);filter:none}
 body.theme-dark .mp-payment-modal .mp-payment-wait{color:var(--ds-text-inverse)}
+/* Checkout nocturno: cada panel oscuro lleva texto inverso; Lime lleva Ink. */
+body.theme-dark #studio.is-checkout-step .checkout-cart-preview>.eyebrow,
+body.theme-dark #studio.is-checkout-step .checkout-cart-preview-list small,
+body.theme-dark #studio.is-checkout-step .checkout-cart-preview-total .checkout-cart-preview-coupon td,
+body.theme-dark #studio.is-checkout-step .checkout-access small,
+body.theme-dark #studio.is-checkout-step .fulfillment-contact-summary small,
+body.theme-dark #studio.is-checkout-step .fulfillment-contact small,
+body.theme-dark #studio.is-checkout-step .fulfillment-details p,
+body.theme-dark #studio.is-checkout-step .fulfillment-details>small,
+body.theme-dark #studio.is-checkout-step .fulfillment-choice:not(.selected) small,
+body.theme-dark #studio.is-checkout-step .shipping-calculation-note,
+body.theme-dark #studio.is-checkout-step .checkout-coupon small{color:color-mix(in srgb,var(--ds-text-inverse) 82%,transparent)}
+body.theme-dark #studio.is-checkout-step .checkout-cart-preview-list article,
+body.theme-dark #studio.is-checkout-step .checkout-cart-preview-total,
+body.theme-dark #studio.is-checkout-step .checkout-access,
+body.theme-dark #studio.is-checkout-step .checkout-access.signed-in,
+body.theme-dark #studio.is-checkout-step .checkout-access.guest-checkout,
+body.theme-dark #studio.is-checkout-step .fulfillment-details,
+body.theme-dark #studio.is-checkout-step .fulfillment-choice:not(.selected),
+body.theme-dark #studio.is-checkout-step .checkout-coupon,
+body.theme-dark #studio.is-checkout-step .shipping-calculation-note{border-color:color-mix(in srgb,var(--ds-text-inverse) 28%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 8%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .checkout-cart-preview-total .checkout-cart-preview-grand-total{border-color:color-mix(in srgb,var(--ds-text-inverse) 28%,transparent);color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .checkout-cart-preview-total .checkout-cart-preview-coupon strong{color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .fulfillment-choice:not(.selected){border-color:color-mix(in srgb,var(--ds-text-inverse) 42%,transparent)}
+body.theme-dark #studio.is-checkout-step .checkout-access .account-initial{color:var(--ds-text-primary)}
+body.theme-dark #studio.is-checkout-step .delivery-fields .field-label em{color:color-mix(in srgb,var(--ds-text-inverse) 82%,transparent)}
+body.theme-dark #studio.is-checkout-step .region-filter-options{border-color:color-mix(in srgb,var(--ds-text-inverse) 42%,transparent);background:var(--ds-brand-primary)}
+body.theme-dark #studio.is-checkout-step .region-filter-options button,
+body.theme-dark #studio.is-checkout-step .region-filter-options p{color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .region-filter-options button:is(:hover,[aria-selected="true"]){background:var(--ds-brand-accent);color:var(--ds-text-primary)}
+body.theme-dark #studio.is-checkout-step .checkout-edit-order,
+body.theme-dark #studio.is-checkout-step .contact-edit-button{border-color:color-mix(in srgb,var(--ds-text-inverse) 42%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 9%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .checkout-edit-order:hover,
+body.theme-dark #studio.is-checkout-step .contact-edit-button:hover,
+body.theme-dark #studio.is-checkout-step .fulfillment-choice:not(.selected):hover{border-color:var(--ds-brand-accent);background:color-mix(in srgb,var(--ds-brand-accent) 15%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .fulfillment-contact,
+body.theme-dark #studio.is-checkout-step .fulfillment-contact-summary,
+body.theme-dark #studio.is-checkout-step .estimated-date{border-color:color-mix(in srgb,var(--ds-text-inverse) 28%,transparent)}
+body.theme-dark #studio.is-checkout-step .estimated-date b{color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .fulfillment-choice:not(.selected)>b{color:var(--ds-text-inverse)}
+body.theme-dark #studio.is-checkout-step .fulfillment-choice.selected,
+body.theme-dark #studio.is-checkout-step .shipping-quote{border-color:var(--ds-text-primary);background:var(--ds-lime-500);color:var(--ds-text-primary)}
+body.theme-dark #studio.is-checkout-step .fulfillment-choice.selected small,
+body.theme-dark #studio.is-checkout-step .fulfillment-choice.selected>b,
+body.theme-dark #studio.is-checkout-step .shipping-quote small{color:var(--ds-text-primary)}
+body.theme-dark #studio.is-checkout-step .fulfillment-choice:not(.selected) .fulfillment-icon{background:var(--ds-brand-primary);color:var(--ds-text-inverse)}
 @media(prefers-reduced-motion:reduce){.payment-spinner{animation:none}}
