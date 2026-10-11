@@ -30,7 +30,7 @@ Deno.serve(async request => {
   const preview = body.preview === true
   const requestedStatus = String(body.status || '').trim()
   if (!orderId) return json({ error: 'Falta el pedido.' }, 400)
-  const { data: order, error } = await admin.from('orders').select('id,status,source,request_type,request_details,quote_message,user_id,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,edit_pending_approval,order_edit_version,order_edit_email_sent_at,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)').eq('id', orderId).single()
+  const { data: order, error } = await admin.from('orders').select('id,status,source,request_type,request_details,quote_message,user_id,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,order_edit_version,order_edit_email_sent_at,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)').eq('id', orderId).single()
   if (error || !order) return json({ error: 'No encontramos el pedido.' }, 404)
   const supportedStatuses = ['submitted', 'paid', 'in_production', 'ready', 'ready_for_pickup', 'shipped', 'delivered', ...(order.request_type === 'creative' ? ['quoted', 'awaiting_deposit'] : [])]
   const previewStatus = preview && supportedStatuses.includes(requestedStatus) ? requestedStatus : order.status
@@ -40,7 +40,7 @@ Deno.serve(async request => {
   if (orderEditEmail && !order.edit_pending_approval && !approvedEditAwaitingEmail) return json({ error: 'No hay una edición aprobada pendiente de envío.' }, 409)
   if ((order.edit_pending_approval || approvedEditAwaitingEmail) && !orderEditEmail) return json({ error: 'Este pedido tiene cambios pendientes de revisión o envío. Usa la acción correspondiente antes de enviar otro email.' }, 409)
   if (!supportedStatuses.includes(order.status) || (!resend && !paymentEmail && !isStatusTransitionPreview && (order.source !== 'manual' || !['submitted', 'paid'].includes(order.status)))) return json({ error: 'El pedido no tiene una plantilla de email disponible para reenviar.' }, 409)
-  if (isStatusTransitionPreview && previewStatus === 'in_production' && !order.payment_confirmed_at) return json({ error: 'Confirma primero que recibiste el pago antes de preparar el pedido.' }, 409)
+  if (isStatusTransitionPreview && previewStatus === 'in_production' && !(order.payment_confirmed_at && order.payment_confirmed_by)) return json({ error: 'Confirma primero que recibiste el pago antes de preparar el pedido.' }, 409)
   const customer = order.shipping_address?.customer || {}
   const email = String(customer.email || '').trim()
   if (!email) return json({ error: 'El cliente no tiene email.' }, 422)

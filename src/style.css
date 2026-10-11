@@ -2187,6 +2187,10 @@ dialog:focus,dialog:focus-visible{outline:none}
 .account-order>div:first-child strong{font:800 18px 'Space Grotesk',sans-serif}
 .account-order>div:nth-child(2){margin-top:9px}
 .account-order-status{padding:5px 9px;border-radius:999px;background:var(--ds-lime-500);font-size:10px;font-weight:800}
+.account-order-states{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.account-payment-badge{padding:5px 9px;border-radius:999px;background:var(--ds-brand-primary);color:var(--ds-text-inverse);font-size:10px;font-weight:800}
+.account-payment-badge.is-review{background:var(--ds-feedback-warning)}
+.account-payment-badge.is-paid{background:var(--ds-feedback-success)}
 .account-order time{color:var(--ds-text-secondary);font-size:11px}
 .account-order>p{margin:12px 0 0;color:var(--ds-text-secondary);font-size:12px;line-height:1.45}
 .account-order details{margin-top:14px;padding:12px 0 0;border-top:1px solid var(--ds-border-subtle);border-bottom:0}

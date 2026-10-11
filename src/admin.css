@@ -151,6 +151,10 @@
 .admin-payment-toggle input:checked{background:var(--ds-brand-primary)}
 .admin-payment-toggle input:checked::after{transform:translateX(16px)}
 .admin-payment-toggle input:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:3px}
+.admin-payment-badge{display:inline-flex;align-items:center;width:max-content;max-width:100%;min-height:24px;padding:5px 9px;border-radius:999px;background:var(--ds-brand-primary);color:var(--ds-text-inverse);font:800 10px/14px var(--ds-font-body);white-space:normal}
+.admin-payment-badge.is-review{background:var(--ds-feedback-warning)}
+.admin-payment-badge.is-paid{background:var(--ds-feedback-success)}
+.admin-order-detail-grid>section>.admin-payment-badge{display:flex;margin:8px 0 12px}
 .admin-payment-toggle span{display:grid;gap:2px}.admin-payment-toggle strong{font-size:12px}.admin-payment-toggle small{color:var(--ds-text-secondary);font-size:10px}
 .admin-payment-auth-dialog{width:min(460px,calc(100vw - 30px))}.admin-payment-auth-body{display:grid;gap:8px;padding:22px}.admin-payment-auth-body label{display:grid;gap:7px;font-size:12px;font-weight:800}.admin-payment-auth-body input{min-height:44px;padding:10px 12px;border:1px solid var(--ds-border-control);border-radius:9px;background:var(--ds-surface-page);font:inherit}.admin-payment-auth-body .admin-form-status{min-height:18px;margin:0;color:var(--ds-feedback-danger,#b42318);font-size:11px}
 .admin-order-progress-actions>div{align-items:center}

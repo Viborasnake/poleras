@@ -51,20 +51,21 @@ Deno.serve(async request => {
   if (!orderId || (!confirmingPayment && ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any))) return json({ error: 'Estado de pedido inválido.' }, 400)
 
   const { data: order, error: orderError } = await admin.from('orders')
-    .select('id,user_id,status,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,edit_pending_approval,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
+    .select('id,user_id,status,request_type,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
     .eq('id', orderId)
     .single()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)
   if (order.edit_pending_approval) return json({ error: 'Este pedido tiene cambios pendientes de revisión. Compáralos y apruébalos o recházalos antes de avanzar.' }, 409)
   if (confirmingPayment) {
-    if (!['submitted', 'paid'].includes(order.status)) return json({ error: 'Este pedido ya avanzó y no puede confirmar un pago pendiente desde aquí.' }, 409)
+    if (!['submitted', 'quoted', 'awaiting_deposit', 'paid'].includes(order.status)) return json({ error: 'Este pedido ya avanzó y no puede confirmar un pago pendiente desde aquí.' }, 409)
+    if (order.payment_confirmed_at && order.payment_confirmed_by) return json({ error: 'Este pago ya fue confirmado por administración.' }, 409)
     const { data: payments, error: paymentsError } = await admin.from('payments').select('id,provider,status').eq('order_id', order.id).order('created_at', { ascending: false })
     if (paymentsError) return json({ error: 'No pudimos revisar el estado del pago.' }, 503)
-    const mercadoPago = (payments || []).find(payment => payment.provider === 'mercado_pago')
-    if (mercadoPago && mercadoPago.status !== 'approved') return json({ error: 'Mercado Pago todavía no aprobó este cobro. Espera el webhook o pide al cliente que reintente el pago.' }, 409)
+    const mercadoPago = (payments || []).find(payment => payment.provider === 'mercado_pago' && payment.status === 'approved')
     const transferable = (payments || []).find(payment => payment.provider === 'transferencia_bancaria')
+    if (!mercadoPago && !transferable && !order.payment_instructions?.transfer && (payments || []).some(payment => payment.provider === 'mercado_pago')) return json({ error: 'Mercado Pago todavía no aprobó este cobro. Espera el webhook o pide al cliente que reintente el pago.' }, 409)
     const paymentAt = new Date().toISOString()
-    if (transferable) {
+    if (transferable && !mercadoPago) {
       const { error: paymentUpdateError } = await admin.from('payments').update({ status: 'approved', confirmed_at: paymentAt }).eq('id', transferable.id).eq('status', 'pending')
       if (paymentUpdateError) return json({ error: 'No pudimos confirmar la transferencia.' }, 503)
     } else if (!mercadoPago) {
@@ -74,10 +75,26 @@ Deno.serve(async request => {
     }
     const { data: confirmedOrder, error: confirmOrderError } = await admin.from('orders')
       .update({ status: 'paid', payment_confirmed_at: paymentAt, payment_confirmed_by: userData.user.id, updated_at: paymentAt })
-      .eq('id', order.id).in('status', ['submitted', 'paid']).select('id,status').maybeSingle()
+      .eq('id', order.id).in('status', ['submitted', 'quoted', 'awaiting_deposit', 'paid']).select('id,status').maybeSingle()
     if (confirmOrderError || !confirmedOrder) return json({ error: 'No pudimos confirmar el pago del pedido.' }, 503)
     if (order.status === 'paid') await admin.from('order_status_history').insert({ order_id: order.id, status: 'paid', note: 'Pago confirmado manualmente por administración.' })
-    return json({ orderId, status: 'paid', label: orderEmailLabels.paid, paymentConfirmedAt: paymentAt, email: { sent: false, reason: 'payment_confirmation_without_email' } })
+    const customer = order.shipping_address?.customer || {}
+    const authUser = customer.email || !order.user_id ? null : await admin.auth.admin.getUserById(order.user_id)
+    const emailAddress = String(customer.email || authUser?.data?.user?.email || '').trim()
+    const name = String(customer.first_name || authUser?.data?.user?.user_metadata?.full_name || '').trim()
+    let emailResult: Record<string, unknown> = { sent: false, reason: 'missing_customer_email' }
+    if (emailAddress) {
+      try {
+        emailResult = await sendOrderEmail(emailAddress, name, orderId, 'paid', order.shipping_address?.fulfillment === 'pickup', {
+          creative: order.request_type === 'creative', items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp,
+          total_clp: order.total_clp, price_snapshot: order.price_snapshot,
+        })
+      } catch (error) {
+        console.error('No pudimos avisar al cliente de la confirmación del pago', error)
+        emailResult = { sent: false, reason: 'provider_error' }
+      }
+    }
+    return json({ orderId, status: 'paid', label: orderEmailLabels.paid, paymentConfirmedAt: paymentAt, email: emailResult })
   }
   if (body.rollback) {
     if (status !== 'paid' || order.status === 'paid' || order.status === 'delivered') return json({ error: 'Este pedido no puede volver a Pedido ingresado.' }, 409)
@@ -92,7 +109,7 @@ Deno.serve(async request => {
   if (currentIndex === undefined || requestedIndex !== currentIndex + 1) {
     return json({ error: 'El pedido debe avanzar una etapa a la vez.' }, 409)
   }
-  if (status === 'in_production' && !order.payment_confirmed_at) return json({ error: 'Confirma primero que recibiste el pago antes de preparar el pedido.' }, 409)
+  if (status === 'in_production' && !(order.payment_confirmed_at && order.payment_confirmed_by)) return json({ error: 'Confirma primero que recibiste el pago antes de preparar el pedido.' }, 409)
 
   const { data: updatedOrder, error: updateError } = await admin.from('orders')
     .update({ status, updated_at: new Date().toISOString() })

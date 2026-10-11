@@ -137,7 +137,7 @@ Deno.serve(async request => {
 
   const { data: order, error: orderError } = await admin.from('orders').insert({
     user_id: userData.user.id,
-    status: 'paid',
+    status: 'submitted',
     source: 'online',
     coupon_code: coupon?.code || null,
     subtotal_clp: subtotal,
@@ -156,7 +156,7 @@ Deno.serve(async request => {
     if (itemsError) throw itemsError
     const { error: historyError } = await admin.from('order_status_history').insert([
       { order_id: order.id, status: 'submitted', note: 'Pedido creado desde el checkout.' },
-      { order_id: order.id, status: 'paid', note: 'Pago aprobado en la simulación de Mercado Pago.' },
+      { order_id: order.id, status: 'submitted', note: 'Pago simulado aprobado; pendiente de revisión por administración.' },
     ])
     if (historyError) throw historyError
     const { error: paymentError } = await admin.from('payments').insert({
