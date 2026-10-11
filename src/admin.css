@@ -466,3 +466,5 @@
 .admin-archive-history-filters input:focus-visible,.admin-archive-history-filters select:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:2px}
 .admin-archive-history-filters button{align-self:end;min-height:36px;padding:6px 10px;font-size:11px;white-space:nowrap}
 @media(max-width:700px){.admin-archive-history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-archive-history-filters label:first-child,.admin-archive-history-filters button{grid-column:1/-1}.admin-archive-history-filters button{width:100%}}
+.admin-order-heading-actions .admin-secondary{min-height:44px;white-space:nowrap}
+@media(max-width:760px){.admin-order-heading-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.admin-order-heading-actions .admin-secondary,.admin-order-heading-actions .admin-primary{width:100%;justify-content:center}}
