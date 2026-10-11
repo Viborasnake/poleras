@@ -2707,3 +2707,23 @@ body.theme-dark .catalog-section .catalog-heading::after{content:'';position:abs
 .account-creative-quote p{margin:0;white-space:pre-wrap;color:var(--ds-text-secondary)}
 .account-creative-quote .button{justify-self:start}
 .account-creative-quote small{color:var(--ds-text-secondary)}
+
+/* El checkout muestra progreso durante la preparación del pedido y del enlace de pago. */
+.checkout-progress{margin:10px 0 0;color:var(--ds-text-secondary);font-size:12px;line-height:1.4}
+.mp-payment-button,#studio #next.is-loading{display:inline-flex;align-items:center;justify-content:center;gap:10px}
+#studio #next.is-loading{opacity:1}
+.mp-payment-button:disabled{opacity:1;background:var(--ds-action-primary);color:var(--ds-text-inverse)}
+.payment-spinner{display:inline-block;flex:0 0 18px;width:18px;height:18px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:mp-spin .8s linear infinite}
+.mp-payment-wait{margin:10px 0 0;color:var(--ds-text-secondary);font-size:12px;line-height:1.45;text-align:center}
+.mp-payment-modal .payment-method{color:var(--ds-text-primary)}
+.mp-payment-modal .payment-method:focus-within{outline:3px solid var(--ds-focus-ring);outline-offset:3px}
+body.theme-dark #studio .checkout-progress{color:var(--ds-text-inverse)}
+body.theme-dark .mp-payment-head img.mp-payment-logo{box-sizing:content-box;padding:6px;border-radius:10px;background:var(--ds-surface-raised)}
+body.theme-dark .mp-payment-modal .payment-method{border-color:var(--ds-border-subtle);background:var(--ds-brand-primary);color:var(--ds-text-inverse)}
+body.theme-dark .mp-payment-modal .payment-method small{color:var(--ds-text-inverse)}
+body.theme-dark .mp-payment-modal .payment-method.is-selected{border-color:var(--ds-text-inverse);background:var(--ds-brand-secondary);box-shadow:0 0 0 2px var(--ds-brand-secondary)}
+body.theme-dark .mp-payment-modal .payment-method input{accent-color:var(--ds-color-lime)}
+body.theme-dark .mp-payment-modal .mp-payment-button,body.theme-dark .mp-payment-modal .mp-payment-button:disabled{border:2px solid var(--ds-text-inverse);background:var(--ds-brand-accent);color:var(--ds-text-primary);opacity:1}
+body.theme-dark .mp-payment-modal .mp-payment-button:hover:not(:disabled){background:var(--ds-color-lime);color:var(--ds-text-primary);filter:none}
+body.theme-dark .mp-payment-modal .mp-payment-wait{color:var(--ds-text-inverse)}
+@media(prefers-reduced-motion:reduce){.payment-spinner{animation:none}}

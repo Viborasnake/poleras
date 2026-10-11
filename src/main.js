@@ -87,7 +87,7 @@ document.querySelector('#app').innerHTML=`
   <div class="footer-contact"><span>¿TIENES UNA IDEA?</span><strong>Hagámosla polera.</strong><a class="whatsapp-link" href="https://wa.me/56965217926" target="_blank" rel="noreferrer">Escríbeme por WhatsApp <span aria-hidden="true">↗</span></a></div>
   <div class="footer-bottom"><span>Hecho con personalidad en Chile. © ${new Date().getFullYear()}</span><a class="footer-how-link" href="#caminos">Cómo funciona <span aria-hidden="true">↗</span></a></div>
 </footer>
-<dialog id="studio"><div class="dialog-header"><a class="logo" href="#">polerama<span>✳</span></a><span>TU ESTUDIO CREATIVO</span><button class="icon-btn close-button" data-close aria-label="Cerrar estudio"><span aria-hidden="true"></span></button></div><div class="studio-body"><div class="preview"><div id="reference-panel"></div><div id="live-preview" hidden><span class="eyebrow">UNA VISTA A TU PRÓXIMA FAVORITA</span><div id="viewer"><div class="shirt preview-fallback"><div class="shirt-neck"></div><img alt="Tu diseño sobre la polera" hidden/></div></div></div><section id="checkout-cart-preview" class="checkout-cart-preview" hidden></section></div><div class="studio-controls"><div class="steps" aria-label="Progreso del diseño"></div><form id="design-form"><div id="step-content"></div><div class="form-navigation"><button type="button" id="back" class="small-button">Volver</button><button type="submit" class="button dark" id="next">Siguiente</button></div></form></div></div></dialog>
+<dialog id="studio"><div class="dialog-header"><a class="logo" href="#">polerama<span>✳</span></a><span>TU ESTUDIO CREATIVO</span><button class="icon-btn close-button" data-close aria-label="Cerrar estudio"><span aria-hidden="true"></span></button></div><div class="studio-body"><div class="preview"><div id="reference-panel"></div><div id="live-preview" hidden><span class="eyebrow">UNA VISTA A TU PRÓXIMA FAVORITA</span><div id="viewer"><div class="shirt preview-fallback"><div class="shirt-neck"></div><img alt="Tu diseño sobre la polera" hidden/></div></div></div><section id="checkout-cart-preview" class="checkout-cart-preview" hidden></section></div><div class="studio-controls"><div class="steps" aria-label="Progreso del diseño"></div><form id="design-form"><div id="step-content"></div><div class="form-navigation"><button type="button" id="back" class="small-button">Volver</button><button type="submit" class="button dark" id="next">Siguiente</button></div><p class="checkout-progress" id="checkout-progress" role="status" aria-live="polite" hidden></p></form></div></div></dialog>
 <dialog id="size-guide-modal" aria-labelledby="size-guide-title"><div class="size-guide-header"><div><span class="eyebrow">GUÍA DE TALLAS</span><h2 id="size-guide-title">Encuentra tu medida.</h2></div><button type="button" class="icon-btn close-button" data-size-close aria-label="Cerrar guía de tallas"><span aria-hidden="true"></span></button></div><div class="size-guide-body"><div class="measure-visual"><svg viewBox="0 0 420 390" role="img" aria-labelledby="measure-title measure-desc"><title id="measure-title">Medición del ancho de una polera</title><desc id="measure-desc">La polera se mide en línea recta desde una axila hasta la otra.</desc><path class="measure-shirt" d="M133 55 174 34c9 21 63 21 72 0l41 21 75 60-45 63-34-24v195H137V154l-34 24-45-63 75-60Z"/><path class="measure-neck" d="M174 34c5 35 67 35 72 0"/><path class="measure-line" d="M137 158H283"/><path class="measure-arrow" d="m137 158 16-11m-16 11 16 11m130-11-16-11m16 11-16 11"/><circle cx="137" cy="158" r="6"/><circle cx="283" cy="158" r="6"/><text x="210" y="138" text-anchor="middle">AXILA A AXILA</text><text class="measure-a" x="210" y="190" text-anchor="middle">A</text></svg><div class="measure-caption"><strong>Medida A · Ancho</strong><span>Siempre en línea recta, sin estirar la tela.</span></div></div><div class="measure-info"><ol class="measure-steps"><li><b>1</b><span>Busca una polera que te quede como te gusta.</span></li><li><b>2</b><span>Extiéndela plana sobre una mesa.</span></li><li><b>3</b><span>Mide de axila a axila y compara el resultado.</span></li></ol><div class="visual-size-table"><div class="size-table-head"><span>Talla</span><span>Ancho A</span></div>${[['XS','44 cm'],['S','48 cm'],['M','52 cm'],['L','56 cm'],['XL','60 cm'],['XXL','64 cm']].map(([size,width])=>`<button type="button" data-guide-size="${size}"><strong>${size}</strong><span>${width}</span></button>`).join('')}</div><p class="measure-note">Las medidas son aproximadas y pueden variar hasta 1–2 cm. Si quedas entre dos tallas, elige la mayor para un calce más suelto.</p></div></div></dialog>
 <dialog id="space"><div class="dialog-header"><h2>Tu espacio creativo</h2><button data-close class="icon-btn close-button" aria-label="Cerrar"><span aria-hidden="true"></span></button></div><div class="space-content"><span class="eyebrow">TUS IDEAS VIVEN AQUÍ</span><p>Desde aquí puedes seguir tus pedidos, revisar propuestas y volver a tu estudio creativo.</p><div id="saved-request"></div><button class="button dark" id="space-create">Abrir el estudio ↗</button></div></dialog>
 <dialog id="payment-modal" class="mp-payment-modal" aria-labelledby="payment-title"><div id="payment-content"></div></dialog><div id="toast" role="status"></div>`;
@@ -164,6 +164,9 @@ header?.insertBefore(accountButton,header.querySelector('.nav-cta'));header?.ins
 header?.querySelector('.nav-cta')?.remove();
 document.body.insertAdjacentHTML('beforeend',`<dialog id="account-modal" class="commerce-modal"><div class="commerce-head"><div><span class="eyebrow">TU ESPACIO</span><h2 id="account-title">Bienvenida a droska.</h2></div><button type="button" class="commerce-close close-button ds-icon-button" data-commerce-close aria-label="Cerrar"><span aria-hidden="true"></span></button></div><div id="account-content"></div></dialog><dialog id="cart-modal" class="commerce-modal cart-drawer"><div class="commerce-head"><div><span class="eyebrow">TU PEDIDO</span><h2>Carro de compras</h2></div><button type="button" class="commerce-close close-button ds-icon-button" data-commerce-close aria-label="Cerrar"><span aria-hidden="true"></span></button></div><div id="cart-content"></div></dialog>`);
 const accountModal=document.querySelector('#account-modal'),cartModal=document.querySelector('#cart-modal'),paymentModal=document.querySelector('#payment-modal');
+let checkoutOpening=false,paymentSubmitting=false,preparedCheckoutUrl='',preparedCheckoutTotal=0;
+paymentModal.addEventListener('cancel',event=>{if(paymentSubmitting)event.preventDefault()});
+document.querySelector('#studio').addEventListener('cancel',event=>{if(checkoutOpening)event.preventDefault()});
 let accountOrdersChannel=null;
 const safe=value=>String(value||'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 function expiredConfirmationLink(){
@@ -294,14 +297,40 @@ async function createCheckoutDraft(){
  const payload={paymentMethod:'draft',draftOrderId:state.checkoutDraftId,items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
  const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});if(error||!data?.orderId)throw new Error(data?.error||'No pudimos registrar tu pedido en el admin.');state.checkoutDraftId=data.orderId;return data;
 }
+function setCheckoutButtonLoading(button,loading,label){
+ if(!button)return;
+ button.disabled=loading;
+ button.classList.toggle('is-loading',loading);
+ if(loading)button.setAttribute('aria-busy','true');else button.removeAttribute('aria-busy');
+ button.textContent=label;
+ if(loading){const spinner=document.createElement('span');spinner.className='payment-spinner';spinner.setAttribute('aria-hidden','true');button.prepend(spinner)}
+}
+function setPaymentLoading(loading,label,description=''){
+ paymentSubmitting=loading;
+ const target=document.querySelector('#payment-content'),button=target?.querySelector('#continue-to-payment'),status=target?.querySelector('#payment-wait-status');
+ setCheckoutButtonLoading(button,loading,label);
+ target?.querySelectorAll('[name="payment-method"]').forEach(input=>{input.disabled=loading});
+ const close=target?.querySelector('.mp-payment-close');if(close)close.disabled=loading;
+ if(status){status.hidden=!loading;status.textContent=loading?description:''}
+}
 async function openPaymentConfirmation(){
- try{await createCheckoutDraft()}catch(error){toast(error.message||'No pudimos registrar tu pedido.','error');return}
+ if(checkoutOpening)return;
+ checkoutOpening=true;
+ const next=document.querySelector('#next'),originalLabel=next?.textContent||'Ir a pagar';
+ const progress=document.querySelector('#checkout-progress');if(progress){progress.hidden=false;progress.textContent='Estamos preparando tu pedido. Espera un momento.'}
+ const content=document.querySelector('#step-content'),back=document.querySelector('#back'),close=studio.querySelector('.dialog-header [data-close]');
+ if(content)content.inert=true;
+ if(back)back.disabled=true;
+ if(close)close.disabled=true;
+ setCheckoutButtonLoading(next,true,'Preparando tu pedido…');
+ try{await createCheckoutDraft()}catch(error){toast(error.message||'No pudimos registrar tu pedido.','error');return}finally{checkoutOpening=false;setCheckoutButtonLoading(next,false,originalLabel);if(progress){progress.textContent='';progress.hidden=true}if(content)content.inert=false;if(back)back.disabled=false;if(close)close.disabled=false}
  const target=document.querySelector('#payment-content'),shipping=state.shippingQuote?.amount||0,total=cartTotal()+shipping-state.couponDiscount,items=cart.reduce((sum,item)=>sum+item.quantity,0);
  studio.close();
- target.innerHTML=`<div class="mp-payment-head"><img class="mp-payment-logo" src="/mercado-pago-logo.svg" alt="Mercado Pago"><button type="button" class="close-button mp-payment-close ds-icon-button" aria-label="Cerrar confirmación de pago"><span aria-hidden="true"></span></button></div><div class="mp-payment-body"><span class="eyebrow">ELIGE CÓMO PAGAR</span><h2 id="payment-title">Revisa tu pedido.</h2><p class="mp-payment-lead">El despacho ya fue calculado. Confirmaremos el importe con los precios vigentes antes de crear tu pedido.</p><div class="mp-payment-summary"><span>${items} ${items===1?'producto':'productos'}<small>Despacho ${money(shipping)}</small></span><strong>${money(total)}</strong></div><div class="payment-methods" role="radiogroup" aria-label="Medio de pago"><label class="payment-method is-selected"><input type="radio" name="payment-method" value="mercado_pago" checked><span><strong>Mercado Pago</strong><small>Tarjetas, transferencia y otros medios disponibles en Checkout Pro.</small></span></label><label class="payment-method"><input type="radio" name="payment-method" value="transfer"><span><strong>Transferencia bancaria</strong><small>Ingresa el pedido y te enviaremos los datos para transferir. Quedará pendiente de confirmación.</small></span></label></div><p class="mp-payment-error" role="alert" hidden></p><button type="button" class="button mp-payment-button" id="continue-to-payment">Continuar a Mercado Pago</button><small class="mp-payment-legal">El pedido solo pasará a producción cuando confirmemos el pago.</small></div>`;
+ preparedCheckoutUrl='';preparedCheckoutTotal=0;
+ target.innerHTML=`<div class="mp-payment-head"><img class="mp-payment-logo" src="/mercado-pago-logo.svg" alt="Mercado Pago"><button type="button" class="close-button mp-payment-close ds-icon-button" aria-label="Cerrar confirmación de pago"><span aria-hidden="true"></span></button></div><div class="mp-payment-body"><span class="eyebrow">ELIGE CÓMO PAGAR</span><h2 id="payment-title">Revisa tu pedido.</h2><p class="mp-payment-lead">El despacho ya fue calculado. Confirmaremos el importe con los precios vigentes antes de crear tu pedido.</p><div class="mp-payment-summary"><span>${items} ${items===1?'producto':'productos'}<small>Despacho ${money(shipping)}</small></span><strong>${money(total)}</strong></div><div class="payment-methods" role="radiogroup" aria-label="Medio de pago"><label class="payment-method is-selected"><input type="radio" name="payment-method" value="mercado_pago" checked><span><strong>Mercado Pago</strong><small>Tarjetas, transferencia y otros medios disponibles en Checkout Pro.</small></span></label><label class="payment-method"><input type="radio" name="payment-method" value="transfer"><span><strong>Transferencia bancaria</strong><small>Ingresa el pedido y te enviaremos los datos para transferir. Quedará pendiente de confirmación.</small></span></label></div><p class="mp-payment-error" role="alert" hidden></p><button type="button" class="button mp-payment-button" id="continue-to-payment">Continuar a Mercado Pago</button><p class="mp-payment-wait" id="payment-wait-status" role="status" aria-live="polite" hidden></p><small class="mp-payment-legal">El pedido solo pasará a producción cuando confirmemos el pago.</small></div>`;
  openDialog(paymentModal);
  target.querySelector('.mp-payment-close').onclick=()=>paymentModal.close();
- const submit=target.querySelector('#continue-to-payment'),methods=[...target.querySelectorAll('[name="payment-method"]')];const syncMethod=()=>{const selected=target.querySelector('[name="payment-method"]:checked')?.value==='transfer';target.querySelectorAll('.payment-method').forEach(method=>method.classList.toggle('is-selected',method.querySelector('input')?.checked));submit.textContent=selected?'Solicitar pago por transferencia':'Continuar a Mercado Pago'};methods.forEach(method=>method.onchange=syncMethod);submit.onclick=()=>target.querySelector('[name="payment-method"]:checked')?.value==='transfer'?submitTransferOrder():openMercadoPagoCheckout();
+ const submit=target.querySelector('#continue-to-payment'),methods=[...target.querySelectorAll('[name="payment-method"]')];const syncMethod=()=>{if(paymentSubmitting)return;const selected=target.querySelector('[name="payment-method"]:checked')?.value==='transfer';target.querySelectorAll('.payment-method').forEach(method=>method.classList.toggle('is-selected',method.querySelector('input')?.checked));submit.textContent=selected?'Solicitar pago por transferencia':preparedCheckoutUrl?`Confirmar ${money(preparedCheckoutTotal)} e ir a Mercado Pago`:'Continuar a Mercado Pago'};methods.forEach(method=>method.onchange=syncMethod);submit.onclick=()=>{if(paymentSubmitting)return;if(target.querySelector('[name="payment-method"]:checked')?.value==='transfer')return submitTransferOrder();if(preparedCheckoutUrl){setPaymentLoading(true,'Abriendo Mercado Pago…','Te estamos llevando al sitio seguro de pago.');window.location.assign(preparedCheckoutUrl);return}return openMercadoPagoCheckout()};
 }
 accountButton.onclick=()=>{renderAccount();accountModal.showModal()};cartButton.onclick=()=>{renderCart();cartModal.showModal()};document.querySelectorAll('[data-commerce-close]').forEach(button=>button.onclick=()=>button.closest('#cart-modal')?closeCartDrawer():button.closest('dialog').close());accountModal.addEventListener('close',()=>{stopAccountOrdersWatch();if(!account)resumeCheckoutAfterAuth=false});updateCommerceNav();supabase.auth.getUser().then(({data})=>{account=accountFromUser(data.user);updateCommerceNav()});supabase.auth.onAuthStateChange((event,session)=>{const nextAccount=accountFromUser(session?.user);if(account?.id!==nextAccount?.id)state.cloudSaved={front:false,back:false};account=nextAccount;updateCommerceNav();if(event==='PASSWORD_RECOVERY'){renderAccount('update-password');if(!accountModal.open)accountModal.showModal()}});
 const requestedCommercePanel=new URLSearchParams(location.search).get('panel');if(requestedCommercePanel==='account'||requestedCommercePanel==='cart'){const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('panel');history.replaceState(null,'',`${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);queueMicrotask(()=>requestedCommercePanel==='account'?accountButton.click():cartButton.click())}
@@ -759,7 +788,7 @@ async function restoreSavedDesigns(){try{const saved=await savedDesignFiles();fo
 function persistDraft(){syncFullName();try{saveForFifteenDays(DRAFT_KEY,{kind:state.kind,size:state.size,color:state.color,printSides:state.printSides,qualityReview:state.qualityReview,fulfillment:state.fulfillment,date:new Date().toISOString()})}catch{toast('No pudimos guardar el avance en este navegador.')}}
 document.querySelector('#back').onclick=()=>{state.step=Math.max(1,state.step-1);renderStep()};
 document.querySelector('#design-form').onsubmit=e=>{
- e.preventDefault();if(state.checking)return;
+ e.preventDefault();if(state.checking||checkoutOpening)return;
  if(state.step===1){if(!state.catalogDesign&&!state.images.front)return toast('Sube tu diseño para continuar.');if(!hasRequiredFiles()){const missing=includedSides().filter(side=>!state.images[side]).map(side=>sideNames[side].toLowerCase()).join(' y ');return toast(`Carga el archivo de ${missing} para continuar.`)}state.qualityAccepted=true;state.qualityReview=Boolean(failingSides().length);state.step=2;activateSide(includedSides()[0]);return renderStep()}
  if(state.step===2){addCurrentToCart();return}
  const summaryFirstName=document.querySelector('#summary-first-name'),summaryLastName=document.querySelector('#summary-last-name'),summaryEmail=document.querySelector('#summary-email'),summaryPhone=document.querySelector('#summary-phone');
@@ -786,8 +815,9 @@ async function paymentArtworkFor(item,userId){
  return paths;
 }
 async function openMercadoPagoCheckout(){
- const button=document.querySelector('#continue-to-payment'),errorNode=document.querySelector('#payment-content .mp-payment-error');
- if(button){button.disabled=true;button.textContent='Guardando diseños…'}
+ if(paymentSubmitting)return;
+ const errorNode=document.querySelector('#payment-content .mp-payment-error');
+ setPaymentLoading(true,'Guardando diseños…','Estamos guardando tus diseños. Espera aquí mientras preparamos el pago.');
  if(errorNode)errorNode.hidden=true;
  try{
   const {data:{user},error:userError}=await supabase.auth.getUser();
@@ -797,7 +827,7 @@ async function openMercadoPagoCheckout(){
    const artwork=await paymentArtworkFor(item,user.id);
    items.push({modelCode:item.modelCode||Object.entries(products).find(([,product])=>product.name===item.kind)?.[0]||'basic',size:item.size,color:item.color,printSides:item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front'),quantity:item.quantity,qualityReview:Boolean(item.qualityReview),catalogDesignSlug:item.catalogDesignSlug||null,...artwork});
   }
-  if(button)button.textContent='Preparando Mercado Pago…';
+  setPaymentLoading(true,'Preparando Mercado Pago…','Estamos creando el enlace seguro de pago. No necesitas pulsar de nuevo.');
   const payload={draftOrderId:state.checkoutDraftId,items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
   const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});
   if(error||!data?.initPoint)throw new Error(data?.error||'No pudimos iniciar el pago con Mercado Pago. Intenta nuevamente.');
@@ -807,19 +837,23 @@ async function openMercadoPagoCheckout(){
    const amount=document.querySelector('#payment-content .mp-payment-summary strong');
    if(amount)amount.textContent=money(data.totalClp);
    if(errorNode){errorNode.textContent=`El total actualizado es ${money(data.totalClp)}. Confirma este importe para continuar.`;errorNode.hidden=false}
-   if(button){button.disabled=false;button.textContent=`Confirmar ${money(data.totalClp)} e ir a Mercado Pago`;button.onclick=()=>window.location.assign(data.initPoint)}
+   preparedCheckoutUrl=data.initPoint;preparedCheckoutTotal=data.totalClp;
+   setPaymentLoading(false,`Confirmar ${money(data.totalClp)} e ir a Mercado Pago`);
    return;
   }
+  setPaymentLoading(true,'Abriendo Mercado Pago…','Te estamos llevando al sitio seguro de pago.');
   window.location.assign(data.initPoint);
  }catch(error){
   state.checkoutDraftId=null;
-  if(button){button.disabled=false;button.textContent='Continuar a Mercado Pago'}
+  preparedCheckoutUrl='';preparedCheckoutTotal=0;
+  setPaymentLoading(false,'Continuar a Mercado Pago');
   if(errorNode){errorNode.textContent=error.message||'No pudimos guardar los diseños para el pedido.';errorNode.hidden=false}
  }
 }
 async function submitTransferOrder(){
- const button=document.querySelector('#continue-to-payment'),errorNode=document.querySelector('#payment-content .mp-payment-error');
- if(button){button.disabled=true;button.textContent='Guardando pedido…'}
+ if(paymentSubmitting)return;
+ const errorNode=document.querySelector('#payment-content .mp-payment-error');
+ setPaymentLoading(true,'Guardando pedido…','Estamos registrando tu pedido y preparando los datos de transferencia.');
  if(errorNode)errorNode.hidden=true;
  try{
   const {data:{user},error:userError}=await supabase.auth.getUser();
@@ -830,8 +864,8 @@ async function submitTransferOrder(){
   const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});
   if(error||!data?.orderId)throw new Error(data?.error||'No pudimos ingresar el pedido por transferencia. Intenta nuevamente.');
   const submittedCart=[...cart];cart=[];state.cartItemId=null;state.checkoutDraftId=null;saveLocal(CART_KEY,cart);updateCommerceNav();for(const item of submittedCart)removeCartDesignFiles(item.id).catch(()=>{});
-  const transfer=data.paymentInstructions?.transfer||{},account=[transfer.holder&&`<div><span>Titular</span><strong>${safe(transfer.holder)}</strong></div>`,transfer.bank&&`<div><span>Banco</span><strong>${safe(transfer.bank)}</strong></div>`,(transfer.account_type||transfer.account_number)&&`<div><span>Cuenta</span><strong>${safe(`${transfer.account_type||''} ${transfer.account_number||''}`.trim())}</strong></div>`,transfer.rut&&`<div><span>RUT</span><strong>${safe(transfer.rut)}</strong></div>`,transfer.email&&`<div><span>Email</span><strong>${safe(transfer.email)}</strong></div>`].filter(Boolean).join('');const emailNote=data.email?.sent?'También enviamos estos datos a tu correo.':'Guarda estos datos para hacer la transferencia. Podrás verlos nuevamente en Mis pedidos al iniciar sesión.';const target=document.querySelector('#payment-content');target.innerHTML=`<div class="mp-success"><div class="mp-success-icon" aria-hidden="true">✓</div><span class="eyebrow">PEDIDO RECIBIDO</span><h2>Completa tu transferencia.</h2><p>Tu pedido #${data.orderId} quedó ingresado y pendiente de confirmación.</p><dl class="account-order-payment">${account}</dl><p>${emailNote}</p><button type="button" class="button dark" id="transfer-done">Entendido</button><small>El pedido no pasa a producción hasta confirmar el abono.</small></div>`;target.querySelector('#transfer-done').onclick=()=>paymentModal.close();persistDraft();
- }catch(error){if(button){button.disabled=false;button.textContent='Solicitar pago por transferencia'}if(errorNode){errorNode.textContent=error.message||'No pudimos ingresar el pedido por transferencia.';errorNode.hidden=false}}
+  const transfer=data.paymentInstructions?.transfer||{},account=[transfer.holder&&`<div><span>Titular</span><strong>${safe(transfer.holder)}</strong></div>`,transfer.bank&&`<div><span>Banco</span><strong>${safe(transfer.bank)}</strong></div>`,(transfer.account_type||transfer.account_number)&&`<div><span>Cuenta</span><strong>${safe(`${transfer.account_type||''} ${transfer.account_number||''}`.trim())}</strong></div>`,transfer.rut&&`<div><span>RUT</span><strong>${safe(transfer.rut)}</strong></div>`,transfer.email&&`<div><span>Email</span><strong>${safe(transfer.email)}</strong></div>`].filter(Boolean).join('');const emailNote=data.email?.sent?'También enviamos estos datos a tu correo.':'Guarda estos datos para hacer la transferencia. Podrás verlos nuevamente en Mis pedidos al iniciar sesión.';const target=document.querySelector('#payment-content');setPaymentLoading(false,'Solicitar pago por transferencia');target.innerHTML=`<div class="mp-success"><div class="mp-success-icon" aria-hidden="true">✓</div><span class="eyebrow">PEDIDO RECIBIDO</span><h2>Completa tu transferencia.</h2><p>Tu pedido #${data.orderId} quedó ingresado y pendiente de confirmación.</p><dl class="account-order-payment">${account}</dl><p>${emailNote}</p><button type="button" class="button dark" id="transfer-done">Entendido</button><small>El pedido no pasa a producción hasta confirmar el abono.</small></div>`;target.querySelector('#transfer-done').onclick=()=>paymentModal.close();persistDraft();
+ }catch(error){setPaymentLoading(false,'Solicitar pago por transferencia');if(errorNode){errorNode.textContent=error.message||'No pudimos ingresar el pedido por transferencia.';errorNode.hidden=false}}
 }
 async function showMercadoPagoReturn(){
  const params=new URLSearchParams(location.search),status=params.get('mp_status');
