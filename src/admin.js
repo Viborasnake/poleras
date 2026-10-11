@@ -28,6 +28,9 @@ const ARCHIVE_HISTORY_PAGE_SIZE=100;
 const ORDER_EXPORT_PAGE_SIZE=100;
 const ORDER_EXPORT_SELECT='id,source,request_type,request_details,request_references,coupon_code,status,subtotal_clp,shipping_clp,discount_clp,total_clp,created_at,submitted_at,shipping_address,payment_confirmed_at,payment_confirmed_by,payment_transfer_notice_at,archived_at,archived_from_status,order_items(name_snapshot,sku_snapshot,print_sides,quantity,unit_price_clp,line_total_clp,front_design_path,back_design_path),order_status_history(status,note,created_at),payments(provider,status,amount_clp,confirmed_at)';
 const THEME_STORAGE_KEY='droska-theme';
+const SIDEBAR_COLLAPSED_KEY='droska-admin-sidebar-collapsed';
+let sidebarCollapsed=false;
+try{sidebarCollapsed=localStorage.getItem(SIDEBAR_COLLAPSED_KEY)==='true'}catch{}
 let lastOpenedOrderId='';
 try{lastOpenedOrderId=sessionStorage.getItem(LAST_OPENED_ORDER_KEY)||''}catch{}
 const DTF_SEMITONE_URL='https://viborasnake.github.io/semitono-dtf/';
@@ -117,11 +120,22 @@ async function ensureBaseCatalog(){
 
 const routes=[['resumen','home','Resumen'],['productos','box','Productos'],['colecciones','layers','Colecciones'],['disenos','image','Diseños'],['pedidos','receipt','Pedidos'],['insumos','tag','Insumos'],['precios','receipt','Precios'],['servicio-cliente','users','Servicio al cliente'],['cupones','tag','Cupones'],['clientes','users','Clientes'],['analitica','chart','Analítica'],['configuracion','settings','Configuración']];
 function currentRoute(){const route=location.hash.replace('#','');if(route==='proveedores'){history.replaceState(null,'','#insumos');return 'insumos'}return routes.some(([id])=>id===route)?route:'resumen'}
-function navMarkup(active){return routes.map(([id,iconName,label])=>`<a href="#${id}" class="${active===id?'active':''}${['resumen','productos','colecciones','disenos','pedidos','insumos','precios','cupones','clientes','configuracion'].includes(id)?'':' is-planned'}" ${active===id?'aria-current="page"':''}>${icon(iconName)}<span>${label}</span>${id==='pedidos'&&adminData.orders.length?`<b>${adminData.orders.length}</b>`:''}</a>`).join('')}
+function navMarkup(active){return routes.map(([id,iconName,label])=>`<a href="#${id}" class="${active===id?'active':''}${['resumen','productos','colecciones','disenos','pedidos','insumos','precios','cupones','clientes','configuracion'].includes(id)?'':' is-planned'}" aria-label="${label}" title="${label}" ${active===id?'aria-current="page"':''}>${icon(iconName)}<span>${label}</span>${id==='pedidos'&&adminData.orders.length?`<b aria-hidden="true">${adminData.orders.length}</b>`:''}</a>`).join('')}
 function pageHeading(eyebrow,title,copy,action=''){return `<div class="admin-page-heading"><div><span class="admin-eyebrow">${eyebrow}</span><h1>${title}</h1><p>${copy}</p></div>${action}</div>`}
 function shell(content,active){
  const initial=safe((sessionUser.email||'A').slice(0,1).toUpperCase());
- root.innerHTML=`<div class="admin-layout"><aside class="admin-sidebar"><a class="admin-brand" href="/">droska<span>*</span></a><nav aria-label="Administración">${navMarkup(active)}</nav><div class="admin-sidebar-note"><strong>Tu tienda,<br>sin límites.</strong><p>Diseños que se visten de ideas.</p><span aria-hidden="true">✳</span></div></aside><div class="admin-workspace"><header class="admin-topbar"><div class="admin-account"><span class="admin-avatar">${initial}</span><span><strong>Administración</strong><small>${safe(sessionUser.email)}</small></span><button type="button" id="admin-logout" aria-label="Cerrar sesión">${icon('logout')}</button></div></header><main class="admin-main">${content}</main></div></div><div class="admin-toast" role="status" aria-live="polite"></div>`;
+ const sidebarToggleLabel=sidebarCollapsed?'Expandir menú lateral':'Contraer menú lateral';
+ root.innerHTML=`<div class="admin-layout${sidebarCollapsed?' is-sidebar-collapsed':''}"><aside class="admin-sidebar"><div class="admin-sidebar-head"><a class="admin-brand" href="/" aria-label="Droska, ir a la tienda">droska<span>*</span></a><button type="button" id="admin-sidebar-toggle" class="admin-sidebar-toggle" aria-controls="admin-sidebar-nav" aria-expanded="${!sidebarCollapsed}" aria-label="${sidebarToggleLabel}" title="${sidebarToggleLabel}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m7-11-3 3 3 3"/></svg></button></div><nav id="admin-sidebar-nav" aria-label="Administración">${navMarkup(active)}</nav><div class="admin-sidebar-note"><strong>Tu tienda,<br>sin límites.</strong><p>Diseños que se visten de ideas.</p><span aria-hidden="true">✳</span></div></aside><div class="admin-workspace"><header class="admin-topbar"><div class="admin-account"><span class="admin-avatar">${initial}</span><span><strong>Administración</strong><small>${safe(sessionUser.email)}</small></span><button type="button" id="admin-logout" aria-label="Cerrar sesión">${icon('logout')}</button></div></header><main class="admin-main">${content}</main></div></div><div class="admin-toast" role="status" aria-live="polite"></div>`;
+ root.querySelector('#admin-sidebar-toggle').onclick=()=>{
+  sidebarCollapsed=!sidebarCollapsed;
+  try{localStorage.setItem(SIDEBAR_COLLAPSED_KEY,String(sidebarCollapsed))}catch{}
+  root.querySelector('.admin-layout').classList.toggle('is-sidebar-collapsed',sidebarCollapsed);
+  const toggle=root.querySelector('#admin-sidebar-toggle');
+  const label=sidebarCollapsed?'Expandir menú lateral':'Contraer menú lateral';
+  toggle.setAttribute('aria-expanded',String(!sidebarCollapsed));
+  toggle.setAttribute('aria-label',label);
+  toggle.title=label;
+ };
  root.querySelector('#admin-logout').onclick=logout;
 }
 function toast(message){const dialog=root.querySelector('dialog[open]');let node=dialog?.querySelector('.admin-dialog-toast');if(dialog&&!node){node=document.createElement('div');node.className='admin-toast admin-dialog-toast';node.setAttribute('role','status');node.setAttribute('aria-live','polite');dialog.append(node)}node=node||root.querySelector('.admin-toast');if(!node)return;node.textContent=message;node.classList.add('visible');setTimeout(()=>node.classList.remove('visible'),2200)}

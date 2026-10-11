@@ -464,3 +464,22 @@
 @media(max-width:700px){.admin-archive-history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-archive-history-filters label:first-child,.admin-archive-history-filters button{grid-column:1/-1}.admin-archive-history-filters button{width:100%}}
 .admin-order-heading-actions .admin-secondary{min-height:44px;white-space:nowrap}
 @media(max-width:760px){.admin-order-heading-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.admin-order-heading-actions .admin-secondary,.admin-order-heading-actions .admin-primary{width:100%;justify-content:center}}
+
+.admin-sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.admin-sidebar-toggle{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;padding:0;border:1px solid var(--ds-border-control);border-radius:var(--ds-radius-control);background:var(--ds-surface-raised);color:var(--ds-text-primary);cursor:pointer}
+.admin-sidebar-toggle:hover{background:var(--ds-surface-subtle)}
+.admin-sidebar-toggle:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:2px}
+.admin-sidebar-toggle svg{width:19px;height:19px}
+@media(min-width:1051px){
+ .admin-layout.is-sidebar-collapsed{grid-template-columns:82px minmax(0,1fr)}
+ .is-sidebar-collapsed .admin-sidebar{padding-inline:13px}
+ .is-sidebar-collapsed .admin-sidebar-head{flex-direction:column;gap:14px}
+ .is-sidebar-collapsed .admin-brand{font-size:0}
+ .is-sidebar-collapsed .admin-brand::before{content:'d';display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:var(--ds-brand-accent);color:#fff;font:700 25px var(--ds-font-display)}
+ .is-sidebar-collapsed .admin-sidebar-toggle svg{transform:rotate(180deg)}
+ .is-sidebar-collapsed .admin-sidebar nav{margin-top:20px}
+ .is-sidebar-collapsed .admin-sidebar nav a{justify-content:center;padding:10px}
+ .is-sidebar-collapsed .admin-sidebar nav a span,.is-sidebar-collapsed .admin-sidebar nav a b,.is-sidebar-collapsed .admin-sidebar-note{display:none}
+}
+@media(max-width:1050px){.admin-sidebar-toggle{display:none}}
+@media(max-width:760px){.admin-sidebar-head{display:none}}
