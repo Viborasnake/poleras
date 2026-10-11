@@ -7,7 +7,18 @@
     <title>Droska — Administración</title>
   </head>
   <body>
-    <main id="admin-app"></main>
+    <main id="admin-app">
+      <section class="admin-loading" role="status" aria-live="polite">
+        <div class="admin-loading-card">
+          <p class="admin-loading-kicker">DROSKA · ADMINISTRACIÓN</p>
+          <img class="admin-loading-logo" src="/droska-print-logo.png" alt="droska SHIRT" width="2366" height="542" fetchpriority="high" />
+          <h1>Preparando tu panel.</h1>
+          <p>Estamos cargando pedidos, catálogo y herramientas.</p>
+          <div class="admin-loading-track" aria-hidden="true"><i></i></div>
+          <small>Un momento, por favor</small>
+        </div>
+      </section>
+    </main>
     <script type="module" src="/src/admin.js"></script>
   </body>
 </html>

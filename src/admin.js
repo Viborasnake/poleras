@@ -53,7 +53,10 @@ function loginView(message=''){
  root.innerHTML=`<section class="admin-login"><a class="admin-brand" href="/">droska<span>*</span></a><span class="admin-eyebrow">ADMINISTRACIÓN</span><h1>Tu tienda empieza aquí.</h1><p>Ingresa con tu cuenta de administración.</p>${message?`<p class="admin-notice admin-error" role="alert">${safe(message)}</p>`:''}<form id="admin-login-form"><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Contraseña<input name="password" type="password" required autocomplete="current-password"></label><button class="ds-cta" type="submit">Ingresar al panel</button></form></section>`;
  root.querySelector('form').onsubmit=async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;button.textContent='Ingresando…';const form=new FormData(event.currentTarget);const {error}=await supabase.auth.signInWithPassword({email:form.get('email'),password:form.get('password')});if(error)return loginView(error.message);boot()};
 }
-function loadingView(){root.innerHTML='<div class="admin-loading"><span></span>Cargando administración…</div>'}
+function loadingView(){
+ if(root.querySelector('.admin-loading'))return;
+ root.innerHTML='<section class="admin-loading" role="status" aria-live="polite"><div class="admin-loading-card"><p class="admin-loading-kicker">DROSKA · ADMINISTRACIÓN</p><img class="admin-loading-logo" src="/droska-print-logo.png" alt="droska SHIRT" width="2366" height="542"><h1>Preparando tu panel.</h1><p>Estamos cargando pedidos, catálogo y herramientas.</p><div class="admin-loading-track" aria-hidden="true"><i></i></div><small>Un momento, por favor</small></div></section>';
+}
 function deniedView(){root.innerHTML='<section class="admin-login"><a class="admin-brand" href="/">droska<span>*</span></a><h1>Sin acceso</h1><p>Esta cuenta no tiene permisos de administración.</p><button class="admin-secondary" type="button" id="admin-logout">Cerrar sesión</button></section>';root.querySelector('#admin-logout').onclick=logout}
 async function logout(){if(adminOrdersChannel){await supabase.removeChannel(adminOrdersChannel);adminOrdersChannel=null}await supabase.auth.signOut();sessionUser=null;adminData=null;loginView()}
 
