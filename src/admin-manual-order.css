@@ -12,6 +12,8 @@
   font-weight: 800;
 }
 
+.admin-manual-order-type { margin-bottom: 13px; }
+
 .admin-manual-item {
   padding: 14px;
   border: 1px solid var(--ds-border-control);
