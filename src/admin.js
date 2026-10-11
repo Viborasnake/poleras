@@ -64,7 +64,7 @@ function loginView(message=''){
 }
 function loadingView(){
  if(root.querySelector('.admin-loading'))return;
- root.innerHTML='<section class="admin-loading" role="status" aria-live="polite"><div class="admin-loading-card"><p class="admin-loading-kicker">DROSKA · ADMINISTRACIÓN</p><img class="admin-loading-logo" src="/droska-print-logo.png" alt="droska SHIRT" width="2366" height="542"><h1>Preparando tu panel.</h1><p>Estamos cargando pedidos, catálogo y herramientas.</p><div class="admin-loading-track" aria-hidden="true"><i></i></div><small>Un momento, por favor</small></div></section>';
+ root.innerHTML='<section class="admin-loading" role="status" aria-live="polite"><div class="admin-loading-card"><img class="admin-loading-logo" src="/droska-print-logo.png" alt="droska SHIRT" width="2366" height="542"><p class="admin-loading-message">Cargando panel…</p><div class="admin-loading-track" aria-hidden="true"><i></i></div></div></section>';
 }
 function deniedView(){root.innerHTML='<section class="admin-login"><a class="admin-brand" href="/">droska<span>*</span></a><h1>Sin acceso</h1><p>Esta cuenta no tiene permisos de administración.</p><button class="admin-secondary" type="button" id="admin-logout">Cerrar sesión</button></section>';root.querySelector('#admin-logout').onclick=logout}
 async function logout(){if(adminOrdersChannel){await supabase.removeChannel(adminOrdersChannel);adminOrdersChannel=null}await supabase.auth.signOut();sessionUser=null;adminData=null;loginView()}
