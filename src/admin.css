@@ -542,6 +542,8 @@
 .admin-color-option:has(input:checked){border-color:var(--ds-brand-primary);background:var(--ds-lime-500);box-shadow:inset 0 0 0 1px var(--ds-brand-primary)}
 .admin-color-option:has(input:checked)::after{background:var(--ds-brand-primary);color:var(--ds-text-inverse)}
 .admin-payment-toggle input::after{background:var(--ds-surface-raised)}
+.admin-dialog .admin-payment-toggle input:checked{background:var(--ds-feedback-success)}
+.admin-dialog .admin-payment-toggle input:checked::after{transform:translateX(18px)}
 @media(max-width:620px){.admin-dialog .dialog-title h2{font-size:24px;line-height:28px}.admin-dialog .dialog-actions{flex-wrap:wrap}.admin-dialog .dialog-actions>button{flex:1 1 150px}}
 /* Pink siempre lleva Ink; las acciones primarias usan Ink con texto inverso. */
 .admin-sidebar .admin-brand::before,.is-sidebar-collapsed .admin-brand::before,

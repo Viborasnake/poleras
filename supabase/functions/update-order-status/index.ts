@@ -43,12 +43,13 @@ Deno.serve(async request => {
   if (userError || !userData.user) return json({ error: 'La sesión no es válida.' }, 401)
   if (adminError || !isAdmin) return json({ error: 'No tienes permisos de administración.' }, 403)
 
-  let body: { orderId?: string; status?: string; note?: string; rollback?: boolean; confirmPayment?: boolean }
+  let body: { orderId?: string; status?: string; note?: string; rollback?: boolean; confirmPayment?: boolean; revokePayment?: boolean }
   try { body = await request.json() } catch { return json({ error: 'Solicitud inválida.' }, 400) }
   const orderId = String(body.orderId || '').trim()
   const status = String(body.status || '').trim()
   const confirmingPayment = body.confirmPayment === true
-  if (!orderId || (!confirmingPayment && ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any))) return json({ error: 'Estado de pedido inválido.' }, 400)
+  const revokingPayment = body.revokePayment === true
+  if (!orderId || (confirmingPayment && revokingPayment) || (!confirmingPayment && !revokingPayment && ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any))) return json({ error: 'Estado de pedido inválido.' }, 400)
 
   const { data: order, error: orderError } = await admin.from('orders')
     .select('id,user_id,status,request_type,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
@@ -56,13 +57,26 @@ Deno.serve(async request => {
     .single()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)
   if (order.edit_pending_approval) return json({ error: 'Este pedido tiene cambios pendientes de revisión. Compáralos y apruébalos o recházalos antes de avanzar.' }, 409)
+  if (revokingPayment) {
+    if (order.status !== 'paid' || !order.payment_confirmed_at || !order.payment_confirmed_by) return json({ error: 'Solo puedes desmarcar un pago confirmado antes de tomar el pedido.' }, 409)
+    if (order.request_type === 'creative') return json({ error: 'La confirmación de una solicitud creativa requiere revisión de administración.' }, 409)
+    const { data: reverted, error: revertError } = await admin.rpc('revoke_order_payment_confirmation', {
+      p_order_id: order.id,
+      p_actor: userData.user.id,
+    })
+    if (revertError || reverted !== 'submitted') {
+      console.error('No pudimos desmarcar el pago', revertError)
+      return json({ error: 'No pudimos desmarcar el pago. Recarga el pedido e inténtalo nuevamente.' }, 409)
+    }
+    return json({ orderId, status: 'submitted' })
+  }
   if (confirmingPayment) {
     if (!['submitted', 'quoted', 'awaiting_deposit', 'paid'].includes(order.status)) return json({ error: 'Este pedido ya avanzó y no puede confirmar un pago pendiente desde aquí.' }, 409)
     if (order.payment_confirmed_at && order.payment_confirmed_by) return json({ error: 'Este pago ya fue confirmado por administración.' }, 409)
     const { data: payments, error: paymentsError } = await admin.from('payments').select('id,provider,status').eq('order_id', order.id).order('created_at', { ascending: false })
     if (paymentsError) return json({ error: 'No pudimos revisar el estado del pago.' }, 503)
     const mercadoPago = (payments || []).find(payment => payment.provider === 'mercado_pago' && payment.status === 'approved')
-    const transferable = (payments || []).find(payment => payment.provider === 'transferencia_bancaria')
+    const transferable = (payments || []).find(payment => payment.provider === 'transferencia_bancaria') || (payments || []).find(payment => payment.provider === 'manual')
     if (!mercadoPago && !transferable && !order.payment_instructions?.transfer && (payments || []).some(payment => payment.provider === 'mercado_pago')) return json({ error: 'Mercado Pago todavía no aprobó este cobro. Espera el webhook o pide al cliente que reintente el pago.' }, 409)
     const paymentAt = new Date().toISOString()
     if (transferable && !mercadoPago) {
