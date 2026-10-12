@@ -1,9 +1,17 @@
 export const collections = [
-  {id:'papa',label:'Para Papá'},
-  {id:'mama',label:'Para Mamá'},
-  {id:'bebe',label:'Para el bebé'},
-  {id:'juegos',label:'Juegos'},
-  {id:'peliculas',label:'Películas'},
+  {id:'papa',label:'Para Papá',category:'general'},
+  {id:'mama',label:'Para Mamá',category:'general'},
+  {id:'bebe',label:'Para el bebé',category:'general'},
+  {id:'juegos',label:'Juegos',category:'videojuegos'},
+  {id:'peliculas',label:'Películas',category:'general'},
+];
+
+export const categories=[
+  {id:'general',label:'Más ideas'},
+  {id:'videojuegos',label:'Videojuegos'},
+  {id:'anime',label:'Anime'},
+  {id:'paisajes',label:'Paisajes'},
+  {id:'animales',label:'Animales'},
 ];
 
 export const sampleShirtColors = [
@@ -58,22 +66,25 @@ export function filterCatalog(collection='all',designs=catalogDesigns){
   return collection==='all'?visible:visible.filter(design=>design.collection===collection);
 }
 
-export function catalogFromRows(collectionRows=[],designRows=[]){
-  const remoteCollections=collectionRows.map(collection=>({
+export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=null){
+  const categoryIds=new Map((categoryRows||[]).map(category=>[category.id,category.slug]));
+  const remoteCategories=(categoryRows||[]).map(category=>({id:category.slug,label:category.name,sortOrder:category.sort_order})).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)||a.label.localeCompare(b.label,'es'));
+  const remoteCollections=collectionRows.filter(collection=>categoryRows===null||categoryIds.has(collection.category_id)).map(collection=>({
     id:collection.slug,
     databaseId:collection.id,
     label:collection.name,
+    category:categoryIds.get(collection.category_id)||'general',
     active:collection.active,
     sortOrder:collection.sort_order,
   })).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)||a.label.localeCompare(b.label,'es'));
-  const collectionIds=new Map(collectionRows.map(collection=>[collection.id,collection.slug]));
+  const collectionIds=new Map(remoteCollections.map(collection=>[collection.databaseId,collection.id]));
   const localDesigns=new Map(catalogDesigns.map(design=>[design.id,design]));
   const remoteDesigns=[...designRows].sort((a,b)=>{
     const newest=new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();
     return Number.isFinite(newest)?newest:0;
   }).flatMap(row=>{
     const local=localDesigns.get(row.slug)||{};
-    const collection=collectionIds.get(row.collection_id)||local.collection;
+    const collection=collectionIds.get(row.collection_id);
     if(!collection)return [];
     return [{
       ...local,
@@ -94,6 +105,7 @@ export function catalogFromRows(collectionRows=[],designRows=[]){
     }];
   });
   return {
+    categories:remoteCategories,
     collections:remoteCollections,
     designs:remoteDesigns,
   };
@@ -101,17 +113,19 @@ export function catalogFromRows(collectionRows=[],designRows=[]){
 
 export async function loadCatalog(client){
   try{
-    const [collectionResult,designResult]=await Promise.all([
-      client.from('catalog_collections').select('id,slug,name,active,sort_order,catalog_product_types!inner(slug)').eq('active',true).eq('catalog_product_types.slug','poleras').order('sort_order').order('name'),
+    const [categoryResult,collectionResult,designResult]=await Promise.all([
+      client.from('catalog_categories').select('id,slug,name,active,sort_order').eq('active',true).order('sort_order').order('name'),
+      client.from('catalog_collections').select('id,category_id,slug,name,active,sort_order,catalog_product_types!inner(slug)').eq('active',true).eq('catalog_product_types.slug','poleras').order('sort_order').order('name'),
       // La pieza más reciente abre cada colección: además de respetar el orden
       // editorial, permite que la portada refleje la última polera publicada.
       client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,mockup_path,mockup_hover_path,sample_color,active,created_at').eq('active',true).order('created_at',{ascending:false}),
     ]);
+    if(categoryResult.error)throw categoryResult.error;
     if(collectionResult.error)throw collectionResult.error;
     if(designResult.error)throw designResult.error;
-    return {...catalogFromRows(collectionResult.data||[],designResult.data||[]),source:'remote'};
+    return {...catalogFromRows(collectionResult.data||[],designResult.data||[],categoryResult.data||[]),source:'remote'};
   }catch(error){
-    return {collections:[...collections],designs:[...catalogDesigns],source:'fallback',error};
+    return {categories:[...categories],collections:[...collections],designs:[...catalogDesigns],source:'fallback',error};
   }
 }
 

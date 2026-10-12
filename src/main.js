@@ -6,7 +6,7 @@ import { fetchStoreSettings, applyStoreSettings } from './store-settings.js';
 import { authErrorMessage } from './auth-messages.js';
 import { PRINT_POLICY, PRINT_EXTRAS_CLP, QUALITY_ADJUSTMENT_CLP, checkResolution, orderTotal } from './print-check.js';
 import { quoteShipping } from './shipping.js';
-import { collections as fallbackCollections, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, designCountLabel, loadCatalog, normalizeSampleColor } from './catalog.js';
+import { collections as fallbackCollections, categories as fallbackCategories, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, designCountLabel, loadCatalog, normalizeSampleColor } from './catalog.js';
 import { catalogCollectionPath, catalogProductPath } from './catalog-routes.js';
 import { orderSteps, orderProgressIndex, orderStatusLabel } from './order-status.js';
 import { orderPaymentState, paymentStateLabels } from './payment-state.js';
@@ -132,6 +132,8 @@ const supabase=createClient(SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHAB
 // El catálogo publicado sustituye estos datos al iniciar. El respaldo local
 // evita que el home muestre una grilla vacía mientras llega Supabase.
 let collections=[...fallbackCollections];
+let catalogCategories=[...fallbackCategories];
+let selectedCatalogCategory='all';
 let catalogDesigns=[...fallbackCatalogDesigns];
 async function loadProductPrices(){
  try{
@@ -472,11 +474,14 @@ document.body.append(catalogDialog);
 document.querySelector('.closing p').textContent='Parte con un diseño del catálogo o crea el tuyo desde cero. A tu pinta.';
 let catalogAvailable=false;
 function renderCatalog(){
+  const visibleCategories=catalogCategories.filter(category=>collections.some(collection=>collection.category===category.id));
+  if(selectedCatalogCategory!=='all'&&!visibleCategories.some(category=>category.id===selectedCatalogCategory))selectedCatalogCategory='all';
+  const shownCollections=selectedCatalogCategory==='all'?collections:collections.filter(collection=>collection.category===selectedCatalogCategory);
   catalogSection.querySelector('#catalog-title').textContent='Elige una colección.';
-  catalogSection.querySelector('.catalog-count').textContent=catalogAvailable?`${collections.length} colecciones para explorar`:'Mostrando ejemplos. El catálogo publicado no está disponible para comprar en este momento.';
-  catalogSection.querySelector('.catalog-actions').replaceChildren();
+  catalogSection.querySelector('.catalog-count').textContent=catalogAvailable?`${shownCollections.length} ${shownCollections.length===1?'colección':'colecciones'} para explorar`:'Mostrando ejemplos. El catálogo publicado no está disponible para comprar en este momento.';
+  catalogSection.querySelector('.catalog-actions').innerHTML=`<div class="catalog-category-filters" role="group" aria-label="Filtrar colecciones por categoría"><button type="button" data-category="all" aria-pressed="${selectedCatalogCategory==='all'}">Todas</button>${visibleCategories.map(category=>`<button type="button" data-category="${safe(category.id)}" aria-pressed="${selectedCatalogCategory===category.id}">${safe(category.label)}</button>`).join('')}</div>`;
   const grid=catalogSection.querySelector('.catalog-grid');
-  grid.innerHTML=collections.map((item,index)=>{const designs=filterCatalog(item.id,catalogDesigns),cover=designs[0],count=designs.length,countText=designCountLabel(count),preview=cover?` data-preview-id="${cover.id}"`:'';const coverVisual=cover?.featuredPhoto?`<img class="catalog-3d catalog-featured-photo" src="${cover.featuredPhoto}" alt="Portada de la colección ${item.label}">${cover.featuredPhotoHover?`<img class="catalog-3d catalog-featured-photo-hover" src="${cover.featuredPhotoHover}" alt="" aria-hidden="true">`:''}`:cover?`<div class="catalog-viewer-loading" role="status"><i aria-hidden="true"></i><strong>Preparando vista 3D</strong><small>Un momento…</small></div><img class="catalog-3d" alt="Portada de la colección ${item.label}" hidden>`:`<div class="catalog-empty-cover" aria-hidden="true"><span>+</span><small>PRIMER DISEÑO</small></div>`;return `<article class="catalog-card catalog-collection-card"${preview}><div class="catalog-visual catalog-visual--${cover?.surface||'pink'} catalog-theme-${index%4}"${cover&&!cover.featuredPhoto?' aria-busy="true"':''}><span class="catalog-card-collection">COLECCIÓN</span><span class="collection-count-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4 10 2h4l2 2 4 2-2 5-2-1v10H8V10l-2 1-2-5 4-2Z"/></svg>${countText}</span>${coverVisual}<button type="button" class="catalog-round-arrow" data-open-collection="${item.id}" aria-label="Ver colección ${item.label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7h8v8"/></svg></button></div><div class="catalog-card-info"><div><h3>${item.label}</h3><p>${cover?'Diseños listos para llevar.':'Colección lista para recibir diseños.'}</p></div></div><button type="button" class="catalog-choose ds-cta" data-open-collection="${item.id}" aria-label="Ver colección ${item.label}, ${countText}">Ver colección <span aria-hidden="true">→</span></button></article>`}).join('');
+  grid.innerHTML=shownCollections.map((item,index)=>{const designs=filterCatalog(item.id,catalogDesigns),cover=designs[0],count=designs.length,countText=designCountLabel(count),preview=cover?` data-preview-id="${cover.id}"`:'';const coverVisual=cover?.featuredPhoto?`<img class="catalog-3d catalog-featured-photo" src="${cover.featuredPhoto}" alt="Portada de la colección ${item.label}">${cover.featuredPhotoHover?`<img class="catalog-3d catalog-featured-photo-hover" src="${cover.featuredPhotoHover}" alt="" aria-hidden="true">`:''}`:cover?`<div class="catalog-viewer-loading" role="status"><i aria-hidden="true"></i><strong>Preparando vista 3D</strong><small>Un momento…</small></div><img class="catalog-3d" alt="Portada de la colección ${item.label}" hidden>`:`<div class="catalog-empty-cover" aria-hidden="true"><span>+</span><small>PRIMER DISEÑO</small></div>`;return `<article class="catalog-card catalog-collection-card"${preview}><div class="catalog-visual catalog-visual--${cover?.surface||'pink'} catalog-theme-${index%4}"${cover&&!cover.featuredPhoto?' aria-busy="true"':''}><span class="catalog-card-collection">COLECCIÓN</span><span class="collection-count-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4 10 2h4l2 2 4 2-2 5-2-1v10H8V10l-2 1-2-5 4-2Z"/></svg>${countText}</span>${coverVisual}<button type="button" class="catalog-round-arrow" data-open-collection="${item.id}" aria-label="Ver colección ${item.label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7h8v8"/></svg></button></div><div class="catalog-card-info"><div><h3>${item.label}</h3><p>${cover?'Diseños listos para llevar.':'Colección lista para recibir diseños.'}</p></div></div><button type="button" class="catalog-choose ds-cta" data-open-collection="${item.id}" aria-label="Ver colección ${item.label}, ${countText}">Ver colección <span aria-hidden="true">→</span></button></article>`}).join('');
   renderFooterCatalog();
   collections.forEach(item=>{const cover=filterCatalog(item.id,catalogDesigns)[0];if(cover&&!cover.featuredPhoto)showCatalogMockup(cover.id)});
 }
@@ -546,9 +551,9 @@ async function refreshCatalog(){
    return;
   }
   const wasAvailable=catalogAvailable;catalogAvailable=true;
-  const before=JSON.stringify([collections,catalogDesigns]);
-  const after=JSON.stringify([result.collections,result.designs]);
-  collections=result.collections;catalogDesigns=result.designs;
+  const before=JSON.stringify([catalogCategories,collections,catalogDesigns]);
+  const after=JSON.stringify([result.categories,result.collections,result.designs]);
+  catalogCategories=result.categories;collections=result.collections;catalogDesigns=result.designs;
   if(before!==after||!wasAvailable){renderCatalog();renderHeroCatalogSamples();if(catalogRenderStarted)requestCatalogMockups()}
  })().finally(()=>{catalogRefreshPending=null});
  return catalogRefreshPending;
@@ -560,6 +565,7 @@ refreshCatalog().finally(()=>{
   requestCatalogMockups();
 });
 const catalogChannel=supabase.channel('droska-public-catalog')
+ .on('postgres_changes',{event:'*',schema:'public',table:'catalog_categories'},refreshCatalog)
  .on('postgres_changes',{event:'*',schema:'public',table:'catalog_product_types'},refreshCatalog)
  .on('postgres_changes',{event:'*',schema:'public',table:'catalog_collections'},refreshCatalog)
  .on('postgres_changes',{event:'*',schema:'public',table:'catalog_designs'},refreshCatalog)
@@ -581,6 +587,11 @@ function toggleCatalogZoom(event){
 catalogSection.querySelector('.catalog-grid').addEventListener('click',async event=>{
   if(toggleCatalogZoom(event))return;
   const collectionButton=event.target.closest('[data-open-collection]');if(collectionButton)openCatalogCollection(collectionButton.dataset.openCollection);
+});
+catalogSection.querySelector('.catalog-actions').addEventListener('click',event=>{
+  const button=event.target.closest('[data-category]');if(!button)return;
+  selectedCatalogCategory=button.dataset.category;renderCatalog();
+  catalogSection.querySelector(`[data-category="${selectedCatalogCategory}"]`)?.focus();
 });
 async function chooseCatalogDesign(button){
   if(!button||button.disabled)return;

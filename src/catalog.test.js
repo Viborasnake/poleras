@@ -37,6 +37,19 @@ test('the newest published design is first so a collection cover follows the lat
   assert.deepEqual(result.designs.map(item=>item.name),['Reciente','Anterior']);
 });
 
+test('categories group collections and hide collections from inactive categories',()=>{
+  const result=catalogFromRows([
+    {id:1,category_id:10,slug:'juegos',name:'Juegos',sort_order:2},
+    {id:2,category_id:20,slug:'bosques',name:'Bosques',sort_order:1},
+  ],[
+    {id:3,collection_id:1,slug:'juegos-player',name:'Player one',active:true},
+    {id:4,collection_id:2,slug:'bosque',name:'Bosque',active:true},
+  ],[{id:10,slug:'videojuegos',name:'Videojuegos',sort_order:10}]);
+  assert.deepEqual(result.categories.map(item=>item.id),['videojuegos']);
+  assert.deepEqual(result.collections.map(item=>[item.id,item.category]),[['juegos','videojuegos']]);
+  assert.deepEqual(result.designs.map(item=>item.id),['juegos-player']);
+});
+
 test('editorial photos remain attached to the matching uploaded designs',()=>{
   const result=catalogFromRows([{id:7,slug:'death-stranding',name:'Death Stranding',active:true,sort_order:1},{id:9,slug:'metal-gear',name:'Metal Gear',active:true,sort_order:2}],[
     {id:18,collection_id:7,slug:'cliff-unger',name:'Cliff Unger',caption:'',artwork_path:'https://example.test/cliff.png',sample_color:'#202124',active:true,created_at:'2026-10-07T03:35:50Z'},

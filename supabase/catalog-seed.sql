@@ -1,16 +1,17 @@
 -- Catálogo inicial de Droska. Es idempotente y conserva cualquier colección
 -- o diseño que ya haya creado el equipo desde el panel.
 
-insert into public.catalog_collections (product_type_id, slug, name, active, sort_order)
-select product.id, seed.slug, seed.name, true, seed.sort_order
+insert into public.catalog_collections (product_type_id, category_id, slug, name, active, sort_order)
+select product.id, category.id, seed.slug, seed.name, true, seed.sort_order
 from (values
-  ('papa', 'Para Papá', 10),
-  ('mama', 'Para Mamá', 20),
-  ('bebe', 'Para el bebé', 30),
-  ('juegos', 'Juegos', 40),
-  ('peliculas', 'Películas', 50)
-) as seed(slug, name, sort_order)
+  ('papa', 'Para Papá', 'general', 10),
+  ('mama', 'Para Mamá', 'general', 20),
+  ('bebe', 'Para el bebé', 'general', 30),
+  ('juegos', 'Juegos', 'videojuegos', 40),
+  ('peliculas', 'Películas', 'general', 50)
+) as seed(slug, name, category_slug, sort_order)
 join public.catalog_product_types product on product.slug = 'poleras'
+join public.catalog_categories category on category.slug = seed.category_slug
 on conflict (slug) do nothing;
 
 insert into public.catalog_designs (collection_id, slug, name, caption, artwork_path, active)

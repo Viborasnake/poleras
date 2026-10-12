@@ -23,17 +23,19 @@ function fallbackCatalog(){
 
 async function remoteCatalog(){
   const client=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-  const [productsResult,collectionsResult,designsResult,pricesResult]=await Promise.all([
+  const [productsResult,categoriesResult,collectionsResult,designsResult,pricesResult]=await Promise.all([
     client.from('catalog_product_types').select('id,slug,name,sort_order').eq('active',true).order('sort_order'),
-    client.from('catalog_collections').select('id,product_type_id,slug,name,sort_order').eq('active',true).order('sort_order'),
+    client.from('catalog_categories').select('id').eq('active',true),
+    client.from('catalog_collections').select('id,product_type_id,category_id,slug,name,sort_order').eq('active',true).order('sort_order'),
     client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,sample_color').eq('active',true).order('id'),
     client.from('product_variants').select('price_clp,product_models!inner(code)').eq('active',true).eq('product_models.code','basic'),
   ]);
-  for(const result of [productsResult,collectionsResult,designsResult,pricesResult])if(result.error)throw result.error;
+  for(const result of [productsResult,categoriesResult,collectionsResult,designsResult,pricesResult])if(result.error)throw result.error;
   if(!productsResult.data?.length)throw new Error('Supabase no devolvió productos públicos activos.');
   const activePrices=(pricesResult.data||[]).map(item=>item.price_clp).filter(Number.isFinite);
   if(activePrices.length)basePrice=Math.min(...activePrices);
-  return productsResult.data.map(product=>({id:product.id,slug:product.slug,name:product.name,collections:(collectionsResult.data||[]).filter(collection=>collection.product_type_id===product.id).map(collection=>({
+  const activeCategoryIds=new Set((categoriesResult.data||[]).map(category=>category.id));
+  return productsResult.data.map(product=>({id:product.id,slug:product.slug,name:product.name,collections:(collectionsResult.data||[]).filter(collection=>collection.product_type_id===product.id&&activeCategoryIds.has(collection.category_id)).map(collection=>({
     id:collection.id,slug:collection.slug,name:collection.name,sortOrder:collection.sort_order,
     designs:(designsResult.data||[]).filter(design=>design.collection_id===collection.id).map(design=>({id:design.slug,name:design.name,caption:design.caption||'',artworkPath:design.artwork_path||'',sampleColor:normalizeSampleColor(design.sample_color),collection:collection.slug})),
   }))}));
