@@ -2693,6 +2693,18 @@ body.theme-dark .hero.is-creative-slide::before{z-index:0;background:radial-grad
 .hero.is-creative-slide .hero-static-image{inset:42px auto 42px 11%;width:78%;height:calc(100% - 84px);object-fit:contain}
 @media(max-width:760px){.hero.is-catalog-slide::before{background:radial-gradient(circle,rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/22px 22px,linear-gradient(180deg,rgba(0,0,0,.94),rgba(0,0,0,.84) 48%,rgba(0,0,0,.7))}.hero.is-creative-slide .hero-static-image{inset:32px auto 32px 10%;width:80%;height:calc(100% - 64px)}}
 
+/* En claro la señalética acompaña la composición sin formar un bloque gris. */
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail{color:var(--ds-text-primary)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--left{border-color:color-mix(in srgb,var(--ds-text-primary) 14%,transparent);background:repeating-linear-gradient(180deg,transparent 0 75px,color-mix(in srgb,var(--ds-text-primary) 9%,transparent) 75px 76px)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--left::before,body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--left::after{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--ds-text-primary) 22%,transparent),transparent)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--left>span{color:var(--ds-text-primary)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--left>i{background:linear-gradient(transparent,color-mix(in srgb,var(--ds-text-primary) 46%,transparent),transparent)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--left em{color:color-mix(in srgb,var(--ds-text-primary) 38%,transparent)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-top{color:var(--ds-text-primary)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-top::after{background:linear-gradient(90deg,var(--ds-brand-accent) 0 55%,color-mix(in srgb,var(--ds-text-primary) 20%,transparent) 55%)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--right{border-left-color:color-mix(in srgb,var(--ds-text-primary) 20%,transparent);background:repeating-linear-gradient(180deg,transparent 0 86px,color-mix(in srgb,var(--ds-text-primary) 9%,transparent) 86px 87px)}
+body:not(.theme-dark) .hero.is-creative-slide .hero-editorial-rail--right .hero-editorial-star{text-shadow:none}
+
 /* El diálogo nunca desborda el viewport: en móvil se desplaza solo de forma vertical. */
 .catalog-dialog,.catalog-dialog-shell,.catalog-dialog-body{max-width:100%;overflow-x:clip}
 .catalog-dialog-head,.catalog-dialog-grid,.catalog-dialog-grid .catalog-design-card{min-width:0;max-width:100%}
