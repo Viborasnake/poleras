@@ -1,3 +1,5 @@
+import {fallbackCatalogProducts} from './product-navigation.js';
+
 export const collections = [
   {id:'papa',label:'Para Papá',category:'general'},
   {id:'mama',label:'Para Mamá',category:'general'},
@@ -66,7 +68,7 @@ export function filterCatalog(collection='all',designs=catalogDesigns){
   return collection==='all'?visible:visible.filter(design=>design.collection===collection);
 }
 
-export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=null){
+export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=null,productRows=[]){
   const categoryIds=new Map((categoryRows||[]).map(category=>[category.id,category.slug]));
   const remoteCategories=(categoryRows||[]).map(category=>({id:category.slug,label:category.name,sortOrder:category.sort_order})).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)||a.label.localeCompare(b.label,'es'));
   const remoteCollections=collectionRows.filter(collection=>categoryRows===null||categoryIds.has(collection.category_id)).map(collection=>({
@@ -105,6 +107,7 @@ export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=nul
     }];
   });
   return {
+    productTypes:productRows,
     categories:remoteCategories,
     collections:remoteCollections,
     designs:remoteDesigns,
@@ -113,7 +116,8 @@ export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=nul
 
 export async function loadCatalog(client){
   try{
-    const [categoryResult,collectionResult,designResult]=await Promise.all([
+    const [productResult,categoryResult,collectionResult,designResult]=await Promise.all([
+      client.from('catalog_product_types').select('slug,name,menu_description,active,sort_order').eq('active',true).order('sort_order').order('name'),
       client.from('catalog_categories').select('id,slug,name,active,sort_order').eq('active',true).order('sort_order').order('name'),
       client.from('catalog_collections').select('id,category_id,slug,name,active,sort_order,catalog_product_types!inner(slug)').eq('active',true).eq('catalog_product_types.slug','poleras').order('sort_order').order('name'),
       // La pieza más reciente abre cada colección: además de respetar el orden
@@ -123,9 +127,9 @@ export async function loadCatalog(client){
     if(categoryResult.error)throw categoryResult.error;
     if(collectionResult.error)throw collectionResult.error;
     if(designResult.error)throw designResult.error;
-    return {...catalogFromRows(collectionResult.data||[],designResult.data||[],categoryResult.data||[]),source:'remote'};
+    return {...catalogFromRows(collectionResult.data||[],designResult.data||[],categoryResult.data||[],productResult.error?fallbackCatalogProducts:productResult.data||[]),source:'remote'};
   }catch(error){
-    return {categories:[...categories],collections:[...collections],designs:[...catalogDesigns],source:'fallback',error};
+    return {productTypes:[...fallbackCatalogProducts],categories:[...categories],collections:[...collections],designs:[...catalogDesigns],source:'fallback',error};
   }
 }
 

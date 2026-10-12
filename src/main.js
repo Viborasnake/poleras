@@ -8,6 +8,7 @@ import { PRINT_POLICY, PRINT_EXTRAS_CLP, QUALITY_ADJUSTMENT_CLP, checkResolution
 import { quoteShipping } from './shipping.js';
 import { collections as fallbackCollections, categories as fallbackCategories, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, designCountLabel, loadCatalog, normalizeSampleColor } from './catalog.js';
 import { catalogCollectionPath, catalogProductPath } from './catalog-routes.js';
+import {fallbackCatalogProducts,storefrontProductItems} from './product-navigation.js';
 import { orderSteps, orderProgressIndex, orderStatusLabel } from './order-status.js';
 import { orderPaymentState, paymentStateLabels } from './payment-state.js';
 import { communes, provinces } from '@clregions/data/array';
@@ -75,7 +76,7 @@ function normalizeTextSymbols(root=document){
 }
 document.querySelector('#app').innerHTML=`
 <div class="announcement" data-store-announcement><span class="announcement-message"><span data-store-announcement-text>De tu cabeza a tu polera. Así de simple.</span><svg class="announcement-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 14.3 9.7 22 12l-7.7 2.3L12 22l-2.3-7.7L2 12l7.7-2.3L12 2Z"/></svg></span><span class="announcement-origin">Hecho a tu pinta, en <img class="chile-flag" src="/chile-flag.webp" alt=""> Chile.</span></div>
-<header><a class="logo" href="#" aria-label="Polerama inicio">polerama<span>✳</span></a><nav><details class="product-nav"><summary>Productos<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="product-nav-panel"><a href="#catalogo"><span><b>Poleras</b><em>Diseños listos y personalizados</em></span><small>Explorar <i aria-hidden="true">→</i></small></a><span class="product-nav-soon" aria-disabled="true"><span><b>Imanes</b><em>Para pegar tus mejores ideas</em></span><small>Próximamente</small></span><span class="product-nav-soon" aria-disabled="true"><span><b>Afiches</b><em>Arte para tus espacios</em></span><small>Próximamente</small></span><span class="product-nav-soon" aria-disabled="true"><span><b>Totebags</b><em>Tu idea para llevar</em></span><small>Próximamente</small></span><span class="product-nav-soon" aria-disabled="true"><span><b>Vasos térmicos</b><em>Para acompañarte todo el día</em></span><small>Próximamente</small></span></div></details></nav><button class="nav-cta ds-cta ds-cta--sm" data-start="ready">Crear mi polera ↗</button></header>
+<header><a class="logo" href="#" aria-label="Polerama inicio">polerama<span>✳</span></a><nav><details class="product-nav"><summary>Productos<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="product-nav-panel"></div></details></nav><button class="nav-cta ds-cta ds-cta--sm" data-start="ready">Crear mi polera ↗</button></header>
 <main><section class="hero"><div class="hero-copy"><span class="eyebrow"><i></i> PARA IDEAS QUE NO CABEN EN UN CATÁLOGO</span><h1>Tu idea<br>favorita,<br><span>puesta.</span><svg class="hero-star" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 0l9 33 27-20-19 28 33 9-33 9 19 28-27-20-9 33-9-33-28 20 20-28L0 50l33-9-20-28 28 20Z" fill="#dfff6b" stroke="#242720" stroke-width="2"/></svg></h1><p>Tu mascota, ese recuerdo, una idea muy tuya.<br>Lo convertimos en la polera que solo tú tienes.</p><button class="button dark" data-start="ready">Dale forma a tu idea <span>↗</span></button><div class="hero-note"><span class="mini-faces">☺ ☻ ☺</span><span>Diseñada por ti. Creada contigo.</span></div></div>
 <div class="hero-art"><div class="art-grid"></div><span class="art-label">EL LIENZO ERES TÚ</span><div class="bubble">Esta puede ser tu mascota <span aria-hidden="true"><svg viewBox="0 0 70 90" role="img"><path d="M8 8 C50 12, 65 32, 57 55 C52 69, 43 76, 31 78" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M19 64 L30 79 L43 66" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><img class="hero-static-image" src="/hero-customization.webp" width="1280" height="1280" alt="Foto de un perro convertida en un diseño sobre una polera personalizada" fetchpriority="high" decoding="async"><button class="hero-personalize" data-start="ready">＋ Agrega tu diseño</button><div class="floating-chip pink">ÚNICA.<br>COMO TÚ. <span>✷</span></div><div class="floating-chip cream"><span>✧</span> Cero poleras aburridas.</div><div class="art-bottom"><span>FOTO A POLERA · HECHA A TU PINTA</span><span>↙ HECHA A TU PINTA</span></div></div></section>
 <div class="ticker"><span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳ <span>TU POLERA</span> ✳ <span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳</div>
@@ -132,6 +133,7 @@ const supabase=createClient(SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHAB
 // El catálogo publicado sustituye estos datos al iniciar. El respaldo local
 // evita que el home muestre una grilla vacía mientras llega Supabase.
 let collections=[...fallbackCollections];
+let catalogProducts=[...fallbackCatalogProducts];
 let catalogCategories=[...fallbackCategories];
 let selectedCatalogCategory='all';
 let catalogDesigns=[...fallbackCatalogDesigns];
@@ -160,7 +162,7 @@ let account=null,cart=readLocal(CART_KEY,[]),cartExpanded=false,resumeIdeaAfterA
 const saveLocal=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{}};
 const header=document.querySelector('header');
 const productNav=header?.querySelector('.product-nav');
-productNav?.querySelector('a')?.addEventListener('click',()=>productNav.removeAttribute('open'));
+productNav?.addEventListener('click',event=>{if(event.target.closest('a'))productNav.removeAttribute('open')});
 document.addEventListener('pointerdown',event=>{if(productNav?.open&&!productNav.contains(event.target))productNav.removeAttribute('open')});
 const accountButton=document.createElement('button');accountButton.type='button';accountButton.className='account-trigger';accountButton.setAttribute('aria-label','Abrir acceso de cuenta');
 const cartButton=document.createElement('button');cartButton.type='button';cartButton.className='cart-trigger ds-cart-button';cartButton.setAttribute('aria-label','Abrir carro de compras');
@@ -173,6 +175,25 @@ paymentModal.addEventListener('cancel',event=>{if(paymentSubmitting)event.preven
 document.querySelector('#studio').addEventListener('cancel',event=>{if(checkoutOpening)event.preventDefault()});
 let accountOrdersChannel=null;
 const safe=value=>String(value||'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+function renderProductNav(){
+ const panel=productNav?.querySelector('.product-nav-panel');if(!panel)return;
+ const items=storefrontProductItems(catalogProducts);
+ if(!items.length)productNav.removeAttribute('open');
+ productNav.hidden=items.length===0;
+ if(productNav.open&&panel.contains(document.activeElement))productNav.querySelector('summary')?.focus();
+ panel.replaceChildren(...items.map(item=>{
+  const row=document.createElement(item.purchasable?'a':'span');
+  if(item.purchasable)row.href='#catalogo';
+  else{row.className='product-nav-soon';row.setAttribute('aria-disabled','true')}
+  const copy=document.createElement('span'),name=document.createElement('b'),description=document.createElement('em'),action=document.createElement('small');
+  name.textContent=item.name;description.textContent=item.description;copy.append(name,description);
+  if(item.purchasable){action.textContent='Explorar ';const arrow=document.createElement('i');arrow.setAttribute('aria-hidden','true');arrow.textContent='→';action.append(arrow)}
+  else action.textContent='Próximamente';
+  row.append(copy,action);return row;
+ }));
+}
+renderProductNav();
+
 function expiredConfirmationLink(){
  const params=new URLSearchParams(location.search);
  const hash=location.hash.startsWith('#')?location.hash.slice(1):'';
@@ -551,6 +572,8 @@ async function refreshCatalog(){
    return;
   }
   const wasAvailable=catalogAvailable;catalogAvailable=true;
+  const productsChanged=JSON.stringify(catalogProducts)!==JSON.stringify(result.productTypes);
+  catalogProducts=result.productTypes;if(productsChanged)renderProductNav();
   const before=JSON.stringify([catalogCategories,collections,catalogDesigns]);
   const after=JSON.stringify([result.categories,result.collections,result.designs]);
   catalogCategories=result.categories;collections=result.collections;catalogDesigns=result.designs;
