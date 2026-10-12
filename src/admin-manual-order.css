@@ -49,7 +49,7 @@
 .admin-payment-instructions > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .admin-payment-instructions > div > span { display: grid; gap: 3px; min-width: 150px; padding: 9px 11px; border-radius: 9px; background: var(--ds-surface-raised); font-size: 12px; }
 .admin-payment-instructions > div b { color: var(--ds-text-secondary); font-size: 10px; text-transform: uppercase; }
-.admin-payment-instructions a { color: var(--ds-link); font-weight: 700; }
+.admin-payment-instructions a { color: var(--ds-color-link); font-weight: 700; }
 .admin-payment-instructions button { width: max-content; }
 .admin-payment-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .admin-payment-dialog { width: min(620px, calc(100vw - 30px)); }
@@ -67,4 +67,4 @@
 .admin-payment-instructions > p { display: flex; align-items: center; gap: 8px; }
 .admin-payment-instructions > p::before { width: 8px; height: 8px; border-radius: 50%; background: var(--ds-feedback-warning); content: ''; }
 .admin-payment-instructions:has([data-send-payment-email]:disabled) > p::before { background: var(--ds-text-disabled); }
-.admin-payment-actions [data-send-payment-email]:not(:disabled) { border-color: var(--ds-brand-accent); background: var(--ds-brand-accent); color: var(--ds-text-inverse); box-shadow: 0 3px 0 var(--ds-pink-500); }
+.admin-payment-actions [data-send-payment-email]:not(:disabled) { border-color: var(--ds-brand-primary); background: var(--ds-brand-primary); color: var(--ds-text-inverse); box-shadow: 0 3px 0 var(--ds-color-pink-shadow); }

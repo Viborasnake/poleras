@@ -32,12 +32,12 @@
 }
 
 .admin-email-disclosure summary strong {
-  color: var(--ds-text);
+  color: var(--ds-text-primary);
   font-size: 14px;
 }
 
 .admin-email-disclosure summary small {
-  color: var(--ds-text-muted);
+  color: var(--ds-text-secondary);
   font-size: 12px;
 }
 
@@ -45,7 +45,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: var(--ds-brand-accent);
+  color: var(--ds-color-link);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -69,14 +69,14 @@
   width: 100%;
   height: 900px;
   border: 0;
-  background: #f1eee8;
+  background: var(--ds-surface-page);
 }
 
 .admin-email-preview-dialog {
   width: min(860px, calc(100vw - 32px));
   max-width: 860px;
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .admin-email-preview-dialog .dialog-title {
@@ -90,7 +90,7 @@
   gap: 12px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--ds-border-subtle);
-  background: var(--ds-surface-soft, #f4f1eb);
+  background: var(--ds-surface-subtle);
 }
 
 .admin-email-preview-meta div {
@@ -107,7 +107,7 @@
 
 .admin-email-preview-meta span {
   margin-bottom: 4px;
-  color: var(--ds-text-muted, #6b6a62);
+  color: var(--ds-text-secondary);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .08em;
@@ -115,7 +115,7 @@
 }
 
 .admin-email-preview-meta strong {
-  color: var(--ds-text, #262920);
+  color: var(--ds-text-primary);
   font-size: 14px;
 }
 
