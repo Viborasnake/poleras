@@ -1,4 +1,19 @@
 import {fallbackCatalogProducts} from './product-navigation.js';
+import {migratedCatalogR2Paths} from './catalog-r2-paths.js';
+
+const catalogAssetBaseUrl=String(import.meta.env?.VITE_CATALOG_IMAGE_BASE_URL||'').replace(/\/$/,'');
+const supabaseCatalogPathMarker='/storage/v1/object/public/catalog-designs/';
+
+/**
+ * Serves only the verified migrated catalog objects from R2. New uploads keep
+ * their Supabase URL until they are copied, so publishing in Admin never
+ * produces a broken image during the transition.
+ */
+export function catalogAssetUrl(value='',baseUrl=catalogAssetBaseUrl){
+  if(!baseUrl||typeof value!=='string'||!value.includes(supabaseCatalogPathMarker))return value;
+  const path=value.split(supabaseCatalogPathMarker)[1];
+  return migratedCatalogR2Paths.has(path)?`${String(baseUrl).replace(/\/$/,'')}/${path}`:value;
+}
 
 export const collections = [
   {id:'papa',label:'Para Papá',category:'general'},
@@ -95,12 +110,12 @@ export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=nul
       collection,
       name:row.name,
       caption:row.caption||'',
-      artworkPath:row.artwork_path,
+      artworkPath:catalogAssetUrl(row.artwork_path),
       // Las fotos cargadas desde Administración tienen prioridad. Los mapas
       // locales preservan las portadas editoriales publicadas antes de que
       // existieran estos campos en la base de datos.
-      featuredPhoto:catalogMockupPhoto(row.slug,row.mockup_path),
-      featuredPhotoHover:catalogMockupHoverPhoto(row.slug,row.mockup_hover_path),
+      featuredPhoto:catalogAssetUrl(catalogMockupPhoto(row.slug,row.mockup_path)),
+      featuredPhotoHover:catalogAssetUrl(catalogMockupHoverPhoto(row.slug,row.mockup_hover_path)),
       active:row.active,
       surface:local.surface||'pink',
       sampleColor:normalizeSampleColor(row.sample_color||local.sampleColor),
