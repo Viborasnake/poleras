@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collections, catalogDesigns, filterCatalog, artworkSvg, artworkUrl, designCountLabel, catalogFromRows, normalizeSampleColor } from './catalog.js';
+import { collections, catalogDesigns, filterCatalog, artworkSvg, artworkUrl, designCountLabel, catalogFromRows, normalizeSampleColor, catalogAssetUrl } from './catalog.js';
 
 test('every original catalog design belongs to a visible collection',()=>{
   const ids=new Set(collections.map(collection=>collection.id));
@@ -85,4 +85,11 @@ test('each design has a renderable SVG data URL',()=>{
     assert.match(artworkSvg(design),/<\/svg>$/);
     assert.match(artworkUrl(design),/^data:image\/svg\+xml;charset=utf-8,/);
   }
+});
+
+test('verified catalog assets can move to R2 while new uploads stay on Supabase',()=>{
+  const migrated='https://project.supabase.co/storage/v1/object/public/catalog-designs/aves-chilenas/choroy-bosque-sol-artwork-1791861465149.png';
+  const pending='https://project.supabase.co/storage/v1/object/public/catalog-designs/future/new-upload.png';
+  assert.equal(catalogAssetUrl(migrated,'https://images.example.cl'),'https://images.example.cl/aves-chilenas/choroy-bosque-sol-artwork-1791861465149.png');
+  assert.equal(catalogAssetUrl(pending,'https://images.example.cl'),pending);
 });
