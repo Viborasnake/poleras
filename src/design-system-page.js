@@ -1,6 +1,10 @@
+import {catalogFiltersMarkup,catalogProductToggleMarkup} from './catalog-filters.js';
+import {mountFormDisclosure} from './form-disclosure.js';
+import {createDisclosureState,confirmDisclosure,mountDisclosure,focusDisclosure} from './progressive-disclosure.js';
 import './design-system.css';
 import './design-system-page.css';
 import './accessibility.css';
+import './dialog-motion.js';
 
 // Los especímenes explican estados; no deben sumar controles falsos al orden de tabulación.
 document.querySelectorAll(
@@ -44,8 +48,8 @@ const fileInput=document.querySelector('#ds-file-input');
 const fileStatus=document.querySelector('#ds-file-status');
 const showFile=(file)=>{
   if(!file) return;
-  const validType=['image/png','image/jpeg','application/pdf'].includes(file.type);
-  if(!validType||file.size>50*1024*1024){fileStatus.textContent='Usa PNG, JPG o PDF de hasta 50 MB.';return;}
+  const validType=['image/png','image/jpeg','image/webp'].includes(file.type);
+  if(!validType||file.size>12*1024*1024){fileStatus.textContent='Usa PNG, JPG o WebP de hasta 12 MB; se optimiza antes de enviar.';return;}
   fileStatus.textContent=`Archivo listo: ${file.name}`;
 };
 fileInput?.addEventListener('change',()=>showFile(fileInput.files?.[0]));
@@ -161,3 +165,53 @@ const renderContrastMatrix=(attempt=0)=>{
   matrixSummary.innerHTML=`<span><b>${totals.aa}</b> pares AA</span><span><b>${totals.ui}</b> pares solo UI/texto grande</span><span><b>${totals.fail}</b> pares no aprobados</span><small>La matriz se recalcula automáticamente si cambia un token.</small>`;
 };
 renderContrastMatrix();
+
+
+// The same production primitive, with local fixture data and no commercial action.
+const disclosureExample=document.querySelector('#ds-disclosure-example');
+let disclosureState=createDisclosureState();
+const disclosureValues={product:'unisex',size:'M',color:'beige'};
+function renderDisclosureExample(){
+ if(!disclosureExample)return;
+ const descriptors=[
+  {id:'product',title:'Producto',value:disclosureValues.product,summary:disclosureValues.product==='unisex'?'Polera unisex':'Polera mujer',valid:true,options:[['unisex','Polera unisex'],['woman','Polera mujer']]},
+  {id:'size',title:'Talla',value:disclosureValues.size,summary:disclosureValues.size==='M'?'Mediana':'Grande',valid:true,options:[['M','Mediana'],['L','Grande']]},
+  {id:'color',title:'Color',value:'beige',summary:'Beige',single:true,valid:true,options:[['beige','Beige']]},
+ ];
+ disclosureExample.replaceChildren();
+ const steps=descriptors.map(step=>{const node=document.createElement('section');for(const [value,label] of step.options){const button=document.createElement('button');button.type='button';button.className='ds-choice-button';button.textContent=label;button.setAttribute('aria-pressed',String(disclosureState.confirmed[step.id]===value));button.onclick=()=>{disclosureValues[step.id]=value;step.value=value;step.summary=label;confirmDisclosure(disclosureState,descriptors,step.id);renderDisclosureExample()};node.append(button)}disclosureExample.append(node);return {...step,node}});
+ const result=mountDisclosure({container:disclosureExample,state:disclosureState,steps,idPrefix:'ds-example',onEdit:renderDisclosureExample});
+ document.querySelector('#ds-disclosure-result').textContent=result.complete?'✓ Selección lista · Solo una demostración, sin guardar datos.':'';
+ const focus=disclosureState.focus;disclosureState.focus=null;
+ if(focus==='next')focusDisclosure(document.querySelector('#ds-disclosure-reset'));
+ if(focus&&focus!=='next')focusDisclosure(focus.startsWith('edit:')?disclosureExample.querySelector(`[data-disclosure-edit="${focus.slice(5)}"]`):document.querySelector(`#ds-example-${focus}-heading`));
+}
+document.querySelector('#ds-disclosure-reset')?.addEventListener('click',()=>{disclosureState=createDisclosureState();renderDisclosureExample()});
+renderDisclosureExample();
+
+
+let fieldDisclosureDemo;
+function renderFieldDisclosureExample(){
+ const host=document.querySelector('#ds-field-disclosure-example');if(!host)return;
+ fieldDisclosureDemo?.destroy();
+ host.innerHTML='<form><div class="ds-fields-flow"><section data-demo-name><label>Nombre<input class="ds-field" autocomplete="off" required></label></section><section data-demo-contact><label>Email<input class="ds-field" type="email" autocomplete="off" required></label></section></div><section data-demo-review hidden><h4>Revisa tus datos</h4><p></p></section><button type="button" class="ds-cta" data-demo-confirm>Confirmar ejemplo</button></form>';
+ const group=host.querySelector('.ds-fields-flow'),name=host.querySelector('[data-demo-name]'),contact=host.querySelector('[data-demo-contact]'),review=host.querySelector('[data-demo-review]'),button=host.querySelector('[data-demo-confirm]');
+ document.querySelector('#ds-field-disclosure-result').textContent='Ejemplo local. No guarda ni envía datos.';
+ fieldDisclosureDemo=mountFormDisclosure({container:group,state:createDisclosureState(),steps:[{id:'name',title:'Nombre',node:name},{id:'contact',title:'Contacto',node:contact}],finalButton:button,review,prefix:'ds-fields',autoFocus:false,onChange:()=>{review.querySelector('p').textContent=[...host.querySelectorAll('input')].map(input=>input.value).join(' · ')}});
+ button.onclick=event=>{if(fieldDisclosureDemo.guardFinal(event))document.querySelector('#ds-field-disclosure-result').textContent='✓ Ejemplo confirmado. No se enviaron datos.'};
+ host.querySelector('form').onsubmit=event=>{event.preventDefault();if(fieldDisclosureDemo.guardFinal(event))button.click()};
+}
+document.querySelector('#ds-field-disclosure-reset')?.addEventListener('click',renderFieldDisclosureExample);
+renderFieldDisclosureExample();
+
+const catalogFilterDemo=document.querySelector('[data-catalog-filter-demo]');
+if(catalogFilterDemo){
+ const products=[{slug:'poleras',name:'Poleras'},{slug:'bodys',name:'Bodys'},{slug:'totebags',name:'Totebags'}];
+ const selection={view:'collections',mode:'collections',category:'all',product:'poleras'};
+ const drawFilters=()=>{catalogFilterDemo.innerHTML=`${catalogFiltersMarkup({...selection,prefix:'ds-catalog',categories:[{id:'anime',label:'Anime'},{id:'mascotas',label:'Mascotas'},{id:'fauna',label:'Fauna'}]})}<div class="ds-catalog-card-product-demo"><strong>Producto dentro de la card</strong>${catalogProductToggleMarkup({products,selected:selection.product,cardKey:'design:demo'})}</div>`};
+ catalogFilterDemo.addEventListener('click',event=>{
+  const button=event.target.closest('button');if(!button)return;
+  for(const [attribute,key] of [['catalogView','view'],['category','category'],['cardProduct','product']])if(button.dataset[attribute]){selection[key]=button.dataset[attribute];if(key==='view')selection.mode=selection.view;drawFilters();catalogFilterDemo.querySelector(`[data-${attribute.replace(/[A-Z]/g,char=>'-'+char.toLowerCase())}="${button.dataset[attribute]}"]`)?.focus();break}
+ });
+ drawFilters();
+}

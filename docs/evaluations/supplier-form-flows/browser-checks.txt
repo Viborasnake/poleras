@@ -1,0 +1,15 @@
+PASA · Gestión confirma acción y grupo, sin aceptar los valores iniciales
+PASA · Pack exige cantidad válida, conserva costo y calcula el valor por unidad
+PASA · Guardado simulado bloquea duplicados y conserva cantidad/costo del pack
+PASA · Principal conserva medidas, margen e IVA, y exige confirmar producción
+PASA · Cambiar principal por secundario excluye producción y conserva datos compatibles
+PASA · DTF revela y valida pliego y tamaño máximo, sin exigir cantidad de pack
+PASA · Gestión de edición conserva selección visible y exige elegir un resultado
+PASA · Receta existente muestra resúmenes y exige revisión explícita antes de guardar
+PASA · Agregar componente bloquea otra alta y valida cantidad y duplicados
+PASA · Cancelar alta de componente regresa a la receta sin perder cantidades
+PASA · Crear componente restaura el borrador y pide confirmar la nueva línea
+PASA · Error al guardar receta conserva las líneas y permite reintentar
+PASA · Rendimiento DTF cero bloquea confirmar un componente incompatible
+PASA · Categorías abre su gestión pertinente sin pedir seleccionar un insumo
+PASA · Campos DTF inactivos no bloquean guardar un pack ni entran en el payload

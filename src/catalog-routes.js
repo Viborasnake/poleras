@@ -3,6 +3,12 @@ export const catalogProductPath=productSlug=>`/productos/${encodeURIComponent(pr
 export const catalogCollectionPath=(productSlug,collectionSlug)=>
   `${catalogProductPath(productSlug)}${encodeURIComponent(collectionSlug)}/`;
 
+export const catalogCollectionDialogPath=collectionSlug=>
+  `/?collection=${encodeURIComponent(collectionSlug)}#catalogo`;
+
+export const catalogDesignDialogPath=(collectionSlug,designSlug)=>
+  `/?collection=${encodeURIComponent(collectionSlug)}&shared-design=${encodeURIComponent(designSlug)}#catalogo`;
+
 export const catalogDesignPath=(productSlug,collectionSlug,designSlug)=>
   `${catalogCollectionPath(productSlug,collectionSlug)}${encodeURIComponent(designSlug)}/`;
 

@@ -1,0 +1,15 @@
+PASA · Captura del pedido manual bloquea un submit antes de completar
+PASA · Comprador se confirma; retiro omite los campos de despacho
+PASA · Cada producto exige confirmación y bloquea agregar mientras está pendiente
+PASA · Agregar otra línea conserva el resumen anterior y su archivo de campos
+PASA · Pago revela solo los métodos activos y valida el envío de instrucciones
+PASA · Envío por captura mantiene las líneas, bloquea duplicados y recupera la acción
+PASA · Cambiar retiro por despacho conserva el comprador y exige dirección
+PASA · Editar una línea invalida solo productos y recalcula su subtotal
+PASA · Quitar y volver a agregar no cambia el color de otra línea
+PASA · Reabrir conserva los nodos y elimina los paneles de línea anteriores
+PASA · Editar pedido inicia con resúmenes y no permite guardar sin cambios
+PASA · Cambiar solo teléfono conserva entrega/productos y muestra antes/después
+PASA · Edición conserva cantidad y precio al cambiar una línea
+PASA · Guardia final de edición detecta un campo oculto alterado
+PASA · Detalle con espacios no confirma una línea y se recupera al corregir

@@ -52,11 +52,14 @@ Deno.serve(async request => {
   if (!orderId || (confirmingPayment && revokingPayment) || (!confirmingPayment && !revokingPayment && ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any))) return json({ error: 'Estado de pedido inválido.' }, 400)
 
   const { data: order, error: orderError } = await admin.from('orders')
-    .select('id,user_id,status,request_type,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
+    .select('id,user_id,status,source,request_type,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,payments(provider,status),order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
     .eq('id', orderId)
     .single()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)
+  const shippingAddress = { ...(order.shipping_address || {}), delivery_notes: order.shipping_address?.delivery_notes || (order.source === 'online' ? order.shipping_address?.notes : '') }
+  delete shippingAddress.notes
   if (order.edit_pending_approval) return json({ error: 'Este pedido tiene cambios pendientes de revisión. Compáralos y apruébalos o recházalos antes de avanzar.' }, 409)
+  const paymentIssue = (order.payments || []).some((payment: any) => ['refunded', 'partially_refunded', 'charged_back', 'in_mediation'].includes(payment.status))
   if (revokingPayment) {
     if (order.status !== 'paid' || !order.payment_confirmed_at || !order.payment_confirmed_by) return json({ error: 'Solo puedes desmarcar un pago confirmado antes de tomar el pedido.' }, 409)
     if (order.request_type === 'creative') return json({ error: 'La confirmación de una solicitud creativa requiere revisión de administración.' }, 409)
@@ -71,6 +74,7 @@ Deno.serve(async request => {
     return json({ orderId, status: 'submitted' })
   }
   if (confirmingPayment) {
+    if (paymentIssue) return json({ error: 'Este pago tiene una reversa, contracargo o mediación. Resuelve la incidencia en Mercado Pago antes de confirmarlo.' }, 409)
     if (!['submitted', 'quoted', 'awaiting_deposit', 'paid'].includes(order.status)) return json({ error: 'Este pedido ya avanzó y no puede confirmar un pago pendiente desde aquí.' }, 409)
     if (order.payment_confirmed_at && order.payment_confirmed_by) return json({ error: 'Este pago ya fue confirmado por administración.' }, 409)
     const { data: payments, error: paymentsError } = await admin.from('payments').select('id,provider,status').eq('order_id', order.id).order('created_at', { ascending: false })
@@ -101,7 +105,7 @@ Deno.serve(async request => {
       try {
         emailResult = await sendOrderEmail(emailAddress, name, orderId, 'paid', order.shipping_address?.fulfillment === 'pickup', {
           creative: order.request_type === 'creative', items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp,
-          total_clp: order.total_clp, price_snapshot: order.price_snapshot,
+          discount_clp: order.discount_clp, coupon_code: order.coupon_code, total_clp: order.total_clp, shipping_address: shippingAddress, price_snapshot: order.price_snapshot,
         })
       } catch (error) {
         console.error('No pudimos avisar al cliente de la confirmación del pago', error)
@@ -123,6 +127,7 @@ Deno.serve(async request => {
   if (currentIndex === undefined || requestedIndex !== currentIndex + 1) {
     return json({ error: 'El pedido debe avanzar una etapa a la vez.' }, 409)
   }
+  if (status === 'in_production' && paymentIssue) return json({ error: 'El pago tiene una incidencia activa. No puedes iniciar producción hasta resolverla.' }, 409)
   if (status === 'in_production' && !(order.payment_confirmed_at && order.payment_confirmed_by)) return json({ error: 'Confirma primero que recibiste el pago antes de preparar el pedido.' }, 409)
 
   const { data: updatedOrder, error: updateError } = await admin.from('orders')
@@ -140,7 +145,7 @@ Deno.serve(async request => {
   const name = String(customer.first_name || authUser?.data?.user?.user_metadata?.full_name || '').trim()
   let emailResult: Record<string, unknown> = { sent: false, reason: 'missing_customer_email' }
   if (email) {
-    try { emailResult = await sendOrderEmail(email, name, orderId, status, pickup, { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, total_clp: order.total_clp, price_snapshot: order.price_snapshot }) }
+    try { emailResult = await sendOrderEmail(email, name, orderId, status, pickup, { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, discount_clp: order.discount_clp, coupon_code: order.coupon_code, total_clp: order.total_clp, shipping_address: shippingAddress, price_snapshot: order.price_snapshot }) }
     catch (error) {
       console.error(error)
       emailResult = { sent: false, reason: 'provider_error' }

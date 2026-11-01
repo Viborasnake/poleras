@@ -1,8 +1,10 @@
+import {loadOversizeModel,normalizedOversizeGeometry} from './oversize-model.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { createGarmentCut } from './garment-cuts.js';
+import { createBodyGeometry, addBodyDetails } from './body-geometry.js';
 import { garmentOpenings, foldedGarmentEdges } from './garment-edges.js';
 import { automaticPrintScale, visibleAlphaBounds, visibleAlphaEdgeSamples } from './artwork-fit.js';
 
@@ -94,6 +96,14 @@ export function responsiveCameraDistance(distance, aspect, hero = false) {
   return distance * Math.max(1, .96 / safeAspect);
 }
 
+export function garmentPrintArea(kind) {
+  if (kind === 'body') return { width: .62, height: .66, y: .30 };
+  if (kind === 'woman') return { width: .86, height: 1.20, y: .14 };
+  if (kind === 'kids') return { width: .82, height: 1.15, y: .12 };
+  if (kind === 'over') return { width: 1.0, height: 1.18, y: .20 };
+  return { width: .95, height: 1.357, y: .15 };
+}
+
 function keepForwardFacingDecal(geometry, back = false, threshold = .52) {
   const position = geometry.getAttribute('position');
   const normal = geometry.getAttribute('normal');
@@ -170,7 +180,7 @@ function loadGarment() {
   return modelPromise;
 }
 
-export async function createViewer(container, state, { hero = false, viewAngle = 0, cameraDistance = 4.9 } = {}) {
+export async function createViewer(container, state, { hero = false, viewAngle = 0, cameraDistance = 4.9, minDistance } = {}) {
   // Load before replacing the fallback, so a failed download never leaves a blank canvas.
   const asset = await loadGarment();
   const scene = new THREE.Scene();
@@ -183,6 +193,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
+  renderer.domElement.classList.add('viewer-canvas');
   renderer.domElement.setAttribute('aria-label', 'Polera 3D en blanco. Arrastra para ver frente, costados y espalda.');
   container.replaceChildren(renderer.domElement);
 
@@ -204,7 +215,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   controls.enableZoom = !hero;
   controls.enableRotate = !hero;
   // Mantiene la prenda completa dentro del visor incluso después de hacer zoom.
-  controls.minDistance = hero ? 4 : 4.65;
+  controls.minDistance = hero ? 4 : (minDistance ?? 4.65);
   controls.maxDistance = 8;
   controls.minPolarAngle = Math.PI * .25;
   controls.maxPolarAngle = Math.PI * .75;
@@ -229,36 +240,35 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   cloth.normalScale.set(.32, .32);
   cloth.aoMapIntensity = .72;
   const cuts = {};
-  function getCut(kind) {
+  let updateVersion=0,disposed=false;
+  async function getCut(kind) {
+    const oversize = kind === 'over' ? await loadOversizeModel() : null;
+    if(disposed)return null;
     if (!cuts[kind]) {
-      const material = cloth.clone();
-      if (kind === 'over') {
-        // The source normal map belongs to the fitted sample and creates the
-        // dark vertical stripe seen under the Over's arm. Let this cut shade
-        // from its own relaxed geometry instead.
+      const material = (oversize ? oversize.material : cloth).clone();
+      if (kind === 'body') {
+        // The GLB's baked maps belong to an adult shirt UV layout.
         material.normalMap = null;
-        material.normalScale.set(0, 0);
         material.aoMap = null;
-        material.roughness = .96;
         material.side = THREE.DoubleSide;
-        material.vertexColors = true;
-        // Shade the actual inside of the cloth. The returned lower hem stays
-        // close to the outer shade, preventing dark facets at its folded lip.
+        // The body has a hollow neck, sleeves and legs: shade the inside of
+        // the actual fabric so the openings remain readable while rotating.
         material.onBeforeCompile = shader => {
-          shader.vertexShader = shader.vertexShader
-            .replace('#include <common>', '#include <common>\n varying float garmentHeight;')
-            .replace('#include <begin_vertex>', '#include <begin_vertex>\n garmentHeight = position.y;');
-          shader.fragmentShader = shader.fragmentShader
-            .replace('#include <common>', '#include <common>\n varying float garmentHeight;')
-            .replace('#include <color_fragment>',
-              '#include <color_fragment>\n diffuseColor.rgb *= gl_FrontFacing ? 1.0 : mix(.98, .72, smoothstep(-1.24, -1.10, garmentHeight));');
+          shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>',
+            '#include <color_fragment>\n diffuseColor.rgb *= gl_FrontFacing ? 1.0 : .76;');
         };
-        material.customProgramCacheKey = () => 'over-cloth-interior-v1';
-        material.needsUpdate = true;
+        material.customProgramCacheKey = () => 'body-cloth-interior-v1';
       }
-      const cut = new THREE.Mesh(kind === 'basic' ? geometry : createGarmentCut(geometry, kind), material);
-      cut.name = `Polera ${kind}`;
-      addGarmentHems(cut, kind);
+      if (oversize) {
+        material.roughness = .96;
+        material.metalness = 0;
+        material.normalScale.set(.32,.32);
+        material.side = THREE.DoubleSide;
+      }
+      const cut = new THREE.Mesh(oversize ? normalizedOversizeGeometry(oversize) : kind === 'body' ? createBodyGeometry() : kind === 'basic' ? geometry : createGarmentCut(geometry, kind), material);
+      cut.name = kind === 'body' ? 'Body bebé' : `Polera ${kind}`;
+      if (kind === 'body') addBodyDetails(cut);
+      else if (!oversize) addGarmentHems(cut, kind);
       cuts[kind] = cut;
       group.add(cut);
     }
@@ -274,11 +284,14 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   const localCameraPosition = new THREE.Vector3();
 
   async function update(next) {
+    const version=++updateVersion;
+    renderer.domElement.setAttribute('aria-label', `${next.kind === 'body' ? 'Body de bebé' : 'Polera'} 3D. Arrastra para ver frente, costados y espalda.`);
     cloth.color.set(next.color);
     // Less fill allows the loose cotton's curved panels to read on white too.
     ambient.intensity = next.kind === 'over' ? 1.05 : 1.55;
     fill.intensity = next.kind === 'over' ? .5 : .85;
-    const shirt = getCut(next.kind);
+    const shirt = await getCut(next.kind);
+    if(disposed||version!==updateVersion)return;
     shirt.material.color.set(next.color);
     Object.values(cuts).forEach(cut => { cut.visible = cut === shirt; });
     shirt.children.forEach(hem => hem.material.color.set(next.color).multiplyScalar(hem.userData.fabricShade ?? .94));
@@ -291,12 +304,15 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : next.catalogDesign ? 'catalog-studio-decal-v2' : 'safe-fit-v4';
     const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + fitMode : '';
     if (key === currentImage) return;
+    const previousImage = currentImage;
     currentImage = key;
     const token = ++generation;
-    if (print) { group.remove(print); print.geometry.dispose(); print = undefined; }
-    printMaterial.map?.dispose();
-    printMaterial.map = null;
-    if (!url) return;
+    if (!url) {
+      if (print) { group.remove(print); print.geometry.dispose(); print = undefined; }
+      printMaterial.map?.dispose();
+      printMaterial.map = null;
+      return;
+    }
     try {
       const texture = await new THREE.TextureLoader().loadAsync(url);
       if (generation !== token) { texture.dispose(); return; }
@@ -307,11 +323,11 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       const aspect = fitted.aspect;
       const safeScale = automaticPrintScale(aspect);
-      const printArea = next.kind === 'kids' ? { width: .82, height: 1.15, y: .12 } : next.kind === 'over' ? { width: 1.12, height: 1.40, y: .10 } : { width: .95, height: 1.357, y: .15 };
+      const printArea = garmentPrintArea(next.kind);
       const baseWidth = Math.min(printArea.width, printArea.height * aspect) * safeScale;
       let useFlatPreview = next.catalogPreview || hero;
       const placementY = printArea.y + (1 - safeScale) * .35 - (useFlatPreview ? 0 : .12);
-      const facingThreshold = next.catalogDesign ? .32 : .52;
+      const facingThreshold = next.kind === 'over' ? .05 : next.catalogDesign ? .32 : .52;
       group.updateMatrixWorld(true);
       const rayDirection = new THREE.Vector3(0, 0, back ? 1 : -1).transformDirection(group.matrixWorld);
       const castOnShirt = (x, y) => {
@@ -356,9 +372,24 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       // Los diseños de colección necesitan conservar más de su contorno al
       // cruzar el pecho. Un umbral menos restrictivo mantiene los bordes sin
       // convertirlos en una lámina plana: los vértices siguen sobre la tela.
+      const rawDecal = new DecalGeometry(
+        shirt,
+        new THREE.Vector3(0, placementY, targetZ),
+        new THREE.Euler(0, back ? Math.PI : 0, 0),
+        new THREE.Vector3(width, height, 1.45),
+      );
+      // The imported oversize mesh has deep folds whose normals point away from
+      // the camera even though they are still part of the front panel. Filtering
+      // those triangles creates the vertical gaps seen in the artwork. Keep the
+      // complete decal on this model; the depth box and the garment surface keep
+      // it attached to the cloth. Other cuts retain the stricter edge filter.
       const decal = useFlatPreview
         ? new THREE.PlaneGeometry(width, height)
-        : settleDecalOnFabric(keepForwardFacingDecal(new DecalGeometry(shirt, new THREE.Vector3(0, placementY, targetZ), new THREE.Euler(0, back ? Math.PI : 0, 0), new THREE.Vector3(width, height, 1)), back, facingThreshold));
+        : settleDecalOnFabric(next.kind === 'over'
+          ? rawDecal
+          : keepForwardFacingDecal(rawDecal, back, facingThreshold));
+      if (print) { group.remove(print); print.geometry.dispose(); print = undefined; }
+      printMaterial.map?.dispose();
       printMaterial.map = texture;
       printMaterial.depthTest = !useFlatPreview;
       printMaterial.needsUpdate = true;
@@ -369,9 +400,9 @@ export async function createViewer(container, state, { hero = false, viewAngle =
         print.renderOrder = 2;
       }
       group.add(print);
-      renderer.domElement.setAttribute('aria-label', 'Polera 3D con tu diseño aplicado a la tela. Arrastra para girar.');
+      renderer.domElement.setAttribute('aria-label', `${next.kind === 'body' ? 'Body de bebé' : 'Polera'} 3D con tu diseño aplicado a la tela. Arrastra para girar.`);
     } catch (error) {
-      currentImage = '';
+      if (generation === token) currentImage = previousImage;
       container.dispatchEvent(new CustomEvent('preview-error', { detail: error }));
     }
   }
@@ -388,6 +419,8 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   let visible = true;
   const visibilityObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; });
   visibilityObserver.observe(container);
+  let initialSceneReady = false;
+  let firstFrameShown = false;
   renderer.setAnimationLoop(() => {
     if (!visible || document.hidden) return;
     const dialog = container.closest('dialog');
@@ -403,9 +436,15 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       print.visible = opacity > .001;
     }
     renderer.render(scene, camera);
+    if(initialSceneReady&&!firstFrameShown){
+      firstFrameShown=true;
+      renderer.domElement.classList.add('is-ready');
+      container.dispatchEvent(new CustomEvent('viewer-ready',{detail:{canvas:renderer.domElement}}));
+    }
   });
   await update(state);
   resize();
+  initialSceneReady=true;
   return {
     update, resize,
     snapshot() {
@@ -414,6 +453,8 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       return renderer.domElement.toDataURL('image/png');
     },
     dispose() {
+      disposed=true;
+      ++updateVersion;
       ++generation;
       renderer.setAnimationLoop(null);
       resizeObserver.disconnect();
@@ -434,6 +475,16 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     },
     turn(angle = 0) { group.rotation.y = angle; },
     face(side) { camera.position.set(0, .05, side === 'back' ? -initial.z : initial.z); controls.target.set(0, 0, 0); controls.update(); },
-    reset() { camera.position.set(0, .05, initial.z); controls.target.set(0, 0, 0); controls.update(); }
+    reset() { camera.position.set(0, .05, initial.z); controls.target.set(0, 0, 0); controls.update(); },
+    zoomBy(amount = 0) {
+      const offset = camera.position.clone().sub(controls.target);
+      const distance = THREE.MathUtils.clamp(offset.length() + amount, controls.minDistance, controls.maxDistance);
+      camera.position.copy(controls.target).add(offset.normalize().multiplyScalar(distance));
+      controls.update();
+    },
+    zoomPercent() {
+      const span = controls.maxDistance - controls.minDistance;
+      return Math.round(((controls.maxDistance - camera.position.distanceTo(controls.target)) / span) * 100);
+    }
   };
 }

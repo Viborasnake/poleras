@@ -1,6 +1,7 @@
 export const orderEmailLabels: Record<string, string> = {
   submitted: 'Pedido ingresado',
   quoted: 'Cotización disponible',
+  awaiting_deposit: 'Pago pendiente',
   paid: 'Pedido ingresado',
   in_production: 'Preparando pedido',
   ready: 'Pedido preparado',
@@ -54,22 +55,50 @@ const htmlEntities: Record<string, string> = {
 export const escapeHtml = (value: unknown) => String(value || '').replace(/[&<>"']/g, char => htmlEntities[char] || char)
 type OrderEmailItem = { name_snapshot?: string; quantity?: number; unit_price_clp?: number; line_total_clp?: number; print_sides?: string }
 type PaymentInstructions = { transfer?: { holder?: string; bank?: string; account_type?: string; account_number?: string; rut?: string; email?: string }; mercado_pago_url?: string }
-type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; total_clp?: number; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean; creative?: boolean; request_details?: string; quote_message?: string; adminNotice?: boolean; referenceCount?: number }
+type OrderDelivery = { fulfillment?: string; region?: string; commune?: string; address?: string; address_extra?: string; delivery_notes?: string }
+type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; discount_clp?: number; total_clp?: number; coupon_code?: string; shipping_address?: OrderDelivery; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean; creative?: boolean; request_details?: string; quote_message?: string; adminNotice?: boolean; referenceCount?: number }
 const formatClp = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0))
+const printSideLabel = (value: unknown) => value === 'back' ? 'Espalda' : value === 'both' ? 'Frente y espalda' : value === 'front' ? 'Frente' : String(value || '')
+const lineLabel = (item: OrderEmailItem) => {
+  const placement = printSideLabel(item.print_sides)
+  return `${item.quantity || 1} × ${item.name_snapshot || 'Producto'}${placement ? ` · ${placement}` : ''}`
+}
 function orderDetails(details: OrderEmailDetails = {}) {
   const items = Array.isArray(details.items) ? details.items : []
-  const lines = items.map(item => `${item.quantity || 1} × ${item.name_snapshot || 'Producto'}${item.print_sides ? ` · ${item.print_sides}` : ''}`)
+  const lines = items.map(lineLabel)
   const manual = details.price_snapshot || {}
   const notes = [manual.design_details, manual.substrate, manual.size, manual.color].filter(Boolean).map(String)
-  const text = [...lines, ...notes.map(note => `Detalle: ${note}`)]
-  if (details.total_clp !== undefined) text.push(`Total: ${formatClp(details.total_clp)}`)
-  const htmlLines = [...items.map(item => `<tr><td style="padding:7px 0;border-bottom:1px solid #E8E3DA">${escapeHtml(item.quantity || 1)} × ${escapeHtml(item.name_snapshot || 'Producto')}</td><td style="padding:7px 0;border-bottom:1px solid #E8E3DA;text-align:right">${formatClp(item.line_total_clp || 0)}</td></tr>`), ...notes.map(note => `<tr><td colspan="2" style="padding:7px 0;color:#6B6A62;border-bottom:1px solid #E8E3DA">${escapeHtml(note)}</td></tr>`)]
-  if (details.total_clp !== undefined) htmlLines.push(`<tr><td style="padding:10px 0 0;font-weight:700">Total</td><td style="padding:10px 0 0;text-align:right;font-weight:700">${formatClp(details.total_clp)}</td></tr>`)
+  const text = [...lines.map((line,index) => `${line}: ${formatClp(items[index]?.line_total_clp || 0)}`), ...notes.map(note => `Detalle: ${note}`)]
+  const htmlLines = [...items.map(item => `<tr><td style="padding:7px 0;border-bottom:1px solid #E8E3DA">${escapeHtml(lineLabel(item))}</td><td style="padding:7px 0;border-bottom:1px solid #E8E3DA;text-align:right;white-space:nowrap">${formatClp(item.line_total_clp || 0)}</td></tr>`), ...notes.map(note => `<tr><td colspan="2" style="padding:7px 0;color:#6B6A62;border-bottom:1px solid #E8E3DA">${escapeHtml(note)}</td></tr>`)]
+  const hasPriceBreakdown = ['subtotal_clp', 'shipping_clp', 'discount_clp', 'total_clp'].some(key => Object.prototype.hasOwnProperty.call(details, key))
+  if (hasPriceBreakdown) {
+    const fulfillment = details.shipping_address?.fulfillment
+    const shippingLabel = fulfillment === 'pickup' ? 'Retiro coordinado' : 'Despacho'
+    const shippingValue = Number(details.shipping_clp || 0) > 0 ? formatClp(details.shipping_clp) : 'Gratis'
+    text.push(`Subtotal de productos: ${formatClp(details.subtotal_clp)}`)
+    text.push(`${shippingLabel}: ${shippingValue}`)
+    htmlLines.push(`<tr><td style="padding:10px 0 5px">Subtotal de productos</td><td style="padding:10px 0 5px;text-align:right;white-space:nowrap">${formatClp(details.subtotal_clp)}</td></tr>`)
+    htmlLines.push(`<tr><td style="padding:5px 0">${shippingLabel}</td><td style="padding:5px 0;text-align:right;white-space:nowrap">${shippingValue}</td></tr>`)
+    if (Number(details.discount_clp || 0) > 0) {
+      const discountLabel = `Descuento${details.coupon_code ? ` · ${details.coupon_code}` : ''}`
+      text.push(`${discountLabel}: −${formatClp(details.discount_clp)}`)
+      htmlLines.push(`<tr><td style="padding:5px 0;color:#2F6B2F">${escapeHtml(discountLabel)}</td><td style="padding:5px 0;text-align:right;color:#2F6B2F;white-space:nowrap">−${formatClp(details.discount_clp)}</td></tr>`)
+    }
+    text.push(`Total: ${formatClp(details.total_clp)}`)
+    htmlLines.push(`<tr><td style="padding:10px 0 0;border-top:1px solid #E8E3DA;font-weight:700">Total</td><td style="padding:10px 0 0;border-top:1px solid #E8E3DA;text-align:right;font-weight:700;white-space:nowrap">${formatClp(details.total_clp)}</td></tr>`)
+  }
+  const delivery = details.shipping_address || {}
+  const deliveryText = delivery.fulfillment === 'pickup'
+    ? ['Entrega: Retiro coordinado']
+    : delivery.fulfillment === 'delivery'
+      ? ['Entrega: Despacho a domicilio', `Dirección: ${[delivery.address, delivery.address_extra, delivery.commune, delivery.region].filter(Boolean).join(', ') || 'Por confirmar'}`, delivery.delivery_notes && `Indicaciones: ${delivery.delivery_notes}`].filter(Boolean) as string[]
+      : delivery.fulfillment ? ['Entrega: Por coordinar'] : []
+  const deliveryHtml = deliveryText.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;padding:12px 14px;background:#F5F2FF;border-radius:10px;color:#262920;font-size:12px;line-height:1.55"><tr><td><strong style="display:block;margin-bottom:5px;color:#6A529C;font-size:10px;letter-spacing:1.4px;text-transform:uppercase">Entrega</strong>${deliveryText.map((line,index)=>`${index ? '' : '<b>'}${escapeHtml(line.replace(/^Entrega:\s*/,''))}${index ? '' : '</b>'}<br>`).join('')}</td></tr></table>` : ''
   const payment = details.payment_instructions || {}
   const transfer = payment.transfer || {}
   const paymentText = [transfer.holder && `Titular: ${transfer.holder}`, transfer.bank && `Banco: ${transfer.bank}`, transfer.account_type && `Tipo de cuenta: ${transfer.account_type}`, transfer.account_number && `Número de cuenta: ${transfer.account_number}`, transfer.rut && `RUT: ${transfer.rut}`, transfer.email && `Email: ${transfer.email}`, payment.mercado_pago_url && `Link de pago Mercado Pago: ${payment.mercado_pago_url}`].filter(Boolean).join('\n')
   const paymentHtml = paymentText ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;padding:14px 16px;background:#F4F1EB;border-radius:12px;color:#262920;font-size:13px;line-height:1.55"><tr><td><strong style="display:block;margin-bottom:6px;color:#B52D6B;font-size:11px;letter-spacing:1.5px;text-transform:uppercase">Datos para pagar</strong>${paymentText.split('\n').map(line=>`${escapeHtml(line)}<br>`).join('')}</td></tr></table>` : ''
-  return { text: [...text, paymentText].filter(Boolean).join('\n'), html: `${htmlLines.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;color:#262920;font-size:13px;line-height:1.4"><tr><td colspan="2" style="padding-bottom:6px;color:#B52D6B;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Detalle del pedido</td></tr>${htmlLines.join('')}</table>` : ''}${paymentHtml}` }
+  return { text: [...text, ...deliveryText, paymentText].filter(Boolean).join('\n'), html: `${htmlLines.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;color:#262920;font-size:13px;line-height:1.4"><tr><td colspan="2" style="padding-bottom:6px;color:#B52D6B;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Detalle del pedido</td></tr>${htmlLines.join('')}</table>` : ''}${deliveryHtml}${paymentHtml}` }
 }
 
 function copyFor(status: string, pickup: boolean) {
@@ -124,7 +153,8 @@ export function buildOrderEmail(name: string, orderId: string, status: string, s
   const label = orderEmailLabels[status] || 'Actualización de pedido'
   const copy = copyFor(status, pickup)
   const steps = pickup ? pickupSteps : deliverySteps
-  const currentIndex = steps.findIndex(([key]) => key === status)
+  const stepStatus = status === 'paid' ? 'submitted' : status
+  const currentIndex = steps.findIndex(([key]) => key === stepStatus)
   const stepper = steps.map(([, stepLabel], index) => {
     const active = index === currentIndex
     const complete = index < currentIndex
@@ -143,7 +173,7 @@ export function buildOrderEmail(name: string, orderId: string, status: string, s
     const subject = `${details.adminNotice ? 'Nueva idea recibida' : quote ? 'Tu cotización está disponible' : status === 'paid' ? 'Confirmamos tu pago' : 'Recibimos tu idea'} · Solicitud #${orderId}`
     const message = details.adminNotice ? `Nueva solicitud de ${name}. Idea: ${details.request_details || ''}. Referencias adjuntas: ${details.referenceCount || 0}. Revisa los archivos en Administración.` : quote ? `Tu propuesta: ${details.quote_message || ''}. Total: ${formatClp(details.total_clp)}. Crea una cuenta con este correo o ingresa a Mis pedidos para aceptarla y continuar al pago.` : status === 'paid' ? `Confirmamos el pago de tu solicitud por ${formatClp(details.total_clp)}. Nuestro equipo continuará con tu diseño.` : 'Recibimos tu idea y la revisaremos. Crea una cuenta con este correo para seguir la solicitud en Mis pedidos.'
     const action = details.adminNotice ? `${siteUrl}/admin#pedidos` : `${siteUrl}/?panel=account`
-    return { subject, text: `${message}\n\nSolicitud #${orderId}\n${action}`, html: `<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif;background:#F9F7F2;color:#262920;padding:24px"><main style="max-width:600px;margin:auto;background:#FFFDFA;padding:30px;border-radius:18px"><h1 style="font-size:27px">${escapeHtml(subject)}</h1><p style="line-height:1.6;white-space:pre-wrap">${escapeHtml(message)}</p><a href="${escapeHtml(action)}" style="display:inline-block;background:#262920;color:white;padding:14px 20px;border-radius:99px;text-decoration:none">${details.adminNotice ? 'Abrir pedidos' : 'Ver mi solicitud'}</a></main></body></html>` }
+    return { subject, text: `${message}${summary.text ? `\n\n${summary.text}` : ''}\n\nSolicitud #${orderId}\n${action}`, html: `<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif;background:#F9F7F2;color:#262920;padding:24px"><main style="max-width:600px;margin:auto;background:#FFFDFA;padding:30px;border-radius:18px"><h1 style="font-size:27px">${escapeHtml(subject)}</h1><p style="line-height:1.6;white-space:pre-wrap">${escapeHtml(message)}</p>${summary.html}<a href="${escapeHtml(action)}" style="display:inline-block;margin-top:20px;background:#262920;color:white;padding:14px 20px;border-radius:99px;text-decoration:none">${details.adminNotice ? 'Abrir pedidos' : 'Ver mi solicitud'}</a></main></body></html>` }
   }
   const hasPaymentInstructions = Boolean(details.payment_instructions && (details.payment_instructions.transfer || details.payment_instructions.mercado_pago_url))
   const emailBody = hasPaymentInstructions ? 'Te dejamos los datos para pagar tu pedido. Cuando realices la transferencia, envíanos el comprobante por WhatsApp o responde este correo.' : details.orderEdited ? 'Actualizamos tu pedido con los cambios aprobados por nuestro equipo. Revisa el nuevo detalle y total a continuación.' : copy.body
@@ -166,7 +196,7 @@ export async function sendOrderEmail(to: string, name: string, orderId: string, 
   return { sent: true, id: payload?.id }
 }
 
-export async function sendAdminOrderNotice(orderId: string, kind: string, customer: string) {
+export async function sendAdminOrderNotice(orderId: string, kind: string, customer: string, details: OrderEmailDetails = {}) {
   const settings = await adminNotificationSettings()
   if (!settings.enabled) return { sent: false, reason: 'admin_notifications_disabled' }
   const apiKey = Deno.env.get('RESEND_API_KEY'), from = Deno.env.get('RESEND_FROM_EMAIL'), to = settings.recipient_email || Deno.env.get('ADMIN_ORDER_EMAIL')
@@ -174,7 +204,8 @@ export async function sendAdminOrderNotice(orderId: string, kind: string, custom
   const siteUrl = String(Deno.env.get('SITE_URL') || '').replace(/\/$/, '')
   const subject = `${kind} · Pedido #${orderId}`
   const message = `${kind} de ${customer}. Revisa el pedido #${orderId} en Administración.`
-  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [to], subject, text: `${message}\n${siteUrl}/admin#pedidos`, html: `<p>${escapeHtml(message)}</p><p><a href="${escapeHtml(siteUrl)}/admin#pedidos">Abrir pedidos</a></p>` }) })
+  const summary = orderDetails(details)
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [to], subject, text: `${message}${summary.text ? `\n\n${summary.text}` : ''}\n\n${siteUrl}/admin#pedidos`, html: `<!doctype html><html lang="es"><body style="margin:0;background:#F7F4EF;color:#262920;font-family:Arial,Helvetica,sans-serif;padding:24px"><main style="max-width:600px;margin:auto;background:#FFFDFA;border:1px solid #DEDAD1;border-radius:18px;padding:30px"><p style="margin:0 0 8px;color:#B52D6B;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">PEDIDO #${escapeHtml(orderId)}</p><h1 style="margin:0 0 14px;font-size:28px;line-height:1.15">${escapeHtml(kind)}</h1><p style="margin:0;color:#56564F;line-height:1.6">${escapeHtml(message)}</p>${summary.html}<a href="${escapeHtml(siteUrl)}/admin#pedidos" style="display:inline-block;margin-top:22px;padding:13px 18px;border-radius:999px;background:#262920;color:#fff;text-decoration:none;font-weight:700">Abrir pedido</a></main></body></html>` }) })
   if (!response.ok) throw new Error('No se pudo avisar al administrador.')
   return { sent: true }
 }

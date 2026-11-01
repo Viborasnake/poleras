@@ -1,0 +1,15 @@
+/* Seasonal home decoration, independent of the selected storefront layout. */
+.home-snow{position:fixed;inset:0;z-index:30;overflow:hidden;pointer-events:none;contain:strict;color:var(--ds-border-control)}
+.theme-dark .home-snow{color:var(--ds-text-inverse)}
+.home-snow-flake{position:absolute;left:var(--snow-x);top:-20px;width:var(--snow-size);height:var(--snow-size);border-radius:50%;background:currentColor;opacity:var(--snow-opacity);animation:home-snow-fall var(--snow-duration) var(--snow-delay) linear infinite}
+.home-snow-flake--crystal{border-radius:0;background:none}
+.home-snow-flake--crystal::before,.home-snow-flake--crystal::after{content:'';position:absolute;inset:0;background:currentColor;clip-path:polygon(46% 0,54% 0,54% 42%,86% 23%,90% 30%,58% 50%,90% 70%,86% 77%,54% 58%,54% 100%,46% 100%,46% 58%,14% 77%,10% 70%,42% 50%,10% 30%,14% 23%,46% 42%)}
+.home-snow-flake--crystal::after{transform:rotate(60deg)}
+.home-snow[data-paused="true"] .home-snow-flake{animation-play-state:paused}
+.home-snow-toggle.ds-filter-pill{position:fixed;z-index:31;left:20px;bottom:20px;padding-inline:14px;min-height:44px;box-shadow:0 2px 8px color-mix(in srgb,var(--ds-brand-primary) 10%,transparent)}
+body:has(dialog[open]) .home-snow,body:has(dialog[open]) .home-snow-toggle,body.is-preloading .home-snow,body.is-preloading .home-snow-toggle{visibility:hidden}
+@keyframes home-snow-fall{from{transform:translate3d(0,-20px,0) rotate(0)}to{transform:translate3d(var(--snow-drift),calc(100vh + 40px),0) rotate(140deg)}}
+@supports(height:100dvh){@keyframes home-snow-fall{from{transform:translate3d(0,-20px,0) rotate(0)}to{transform:translate3d(var(--snow-drift),calc(100dvh + 40px),0) rotate(140deg)}}}
+@media(max-width:640px){.home-snow-flake:nth-child(n+17){display:none}.home-snow-toggle.ds-filter-pill{left:12px;bottom:12px}}
+@media(prefers-reduced-motion:reduce){.home-snow,.home-snow-toggle.ds-filter-pill{display:none}.home-snow-flake{animation:none}}
+@media print{.home-snow,.home-snow-toggle.ds-filter-pill{display:none}}

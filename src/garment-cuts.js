@@ -101,6 +101,17 @@ export function createGarmentCut(base, kind) {
       nz += Math.sign(z) * fold * foldWindow * panel * smooth(Math.abs(z), .08, .22);
       // Soft, asymmetric hem movement follows the long folds.
       ny += (1 - smooth(t, .02, .18)) * (.017 * Math.cos(nx * 7 + .5) + .008 * Math.sin(z * 9));
+    } else if (kind === 'woman') {
+      // Retain the collar and UV islands while distinguishing waist, shoulder
+      // and sleeve. The upper chest keeps room for the existing print panel.
+      const torso = 1 - smooth(side, .57, .78);
+      const waist = smooth(t, .15, .27) * (1 - smooth(t, .48, .62));
+      const bust = smooth(t, .51, .65) * (1 - smooth(t, .76, .88));
+      nx = x * (1 - .105 * waist * torso + .025 * bust * torso);
+      nx -= Math.sign(x) * .085 * sleeve * (1 - neck);
+      ny -= .025 * smooth(side, .43, .68) * smooth(t, .69, .84) * (1 - neck);
+      ny += .04 * sleeve;
+      nz = z * (1 - .055 * waist * torso + .035 * bust * torso);
     } else if (kind === 'kids') {
       // Shorter body, narrower shoulder span and shorter sleeves; a relatively
       // generous neckline is retained instead of shrinking an adult neck.

@@ -5,6 +5,7 @@ export function orderChannelLabel(order) {
 }
 
 export function orderCardOriginLabel(order) {
+  if (order.source === 'whatsapp') return 'WhatsApp · solicitud';
   if (order.source === 'manual') return `Manual · ${orderChannelLabel(order)}`;
 
   const provider = order.price_snapshot?.provider || (order.payments || []).find(payment => ['mercado_pago', 'transferencia_bancaria'].includes(payment.provider))?.provider;

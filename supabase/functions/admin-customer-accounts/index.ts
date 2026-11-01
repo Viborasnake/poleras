@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
+import { deletePrivateDesigns, listPrivateDesigns } from '../_shared/private-design-r2.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,20 +26,8 @@ async function authorize(request: Request) {
   return { admin, callerId: userData.user.id }
 }
 
-async function listCustomerFiles(admin: any, userId: string) {
-  const paths: string[] = []
-  const { data: folders, error } = await admin.storage.from('customer-designs').list(userId, { limit: 1000 })
-  if (error) throw error
-  for (const folder of folders || []) {
-    const prefix = `${userId}/${folder.name}`
-    if (folder.id) paths.push(prefix)
-    else {
-      const { data: files, error: nestedError } = await admin.storage.from('customer-designs').list(prefix, { limit: 1000 })
-      if (nestedError) throw nestedError
-      for (const file of files || []) if (file.id) paths.push(`${prefix}/${file.name}`)
-    }
-  }
-  return paths
+async function listCustomerFiles(userId: string) {
+  return (await listPrivateDesigns(`${userId}/`)).map(file => file.path)
 }
 
 async function listAccounts(admin: any) {
@@ -67,11 +56,8 @@ async function deleteAccount(admin: any, userId: string) {
   }
   const { error: cartsError } = await admin.from('carts').delete().eq('user_id', userId)
   if (cartsError) throw cartsError
-  const paths = await listCustomerFiles(admin, userId)
-  if (paths.length) {
-    const { error: storageError } = await admin.storage.from('customer-designs').remove(paths)
-    if (storageError) throw storageError
-  }
+  const paths = await listCustomerFiles(userId)
+  if (paths.length) await deletePrivateDesigns(paths)
   const { error: authError } = await admin.auth.admin.deleteUser(userId)
   if (authError) throw authError
   return { orders: orderIds.length, files: paths.length }

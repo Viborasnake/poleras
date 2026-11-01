@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { costPerUnit, dtfYield, principalCalculation, recipeLineCost, sortSupplierProducts } from './admin-supplier-products.js'
+import { costPerUnit, dtfYield, minimumPriceWithVat, principalCalculation, recipeLineCost, sortSupplierProducts } from './admin-supplier-products.js'
 
 test('prorratea un pack por cantidad',()=>{
  assert.equal(costPerUnit({unit_cost_clp:5000,purchase_quantity:100}),50)
@@ -20,6 +20,12 @@ test('suma varios secundarios al costo del principal',()=>{
  const result=principalCalculation(principal,[{component_product_id:1,quantity:1,costing_rule:'dtf_yield'},{component_product_id:2,quantity:2,costing_rule:'per_unit'}],id=>components[id])
  assert.equal(result.base,7620)
  assert.equal(result.suggested,13990)
+})
+
+test('el precio mínimo cubre costo neto e IVA sin sumar margen',()=>{
+ assert.equal(minimumPriceWithVat(7620,19),9068)
+ assert.equal(minimumPriceWithVat(100.25,19),120)
+ assert.equal(minimumPriceWithVat(100,0),100)
 })
 
 test('prioriza el orden manual del insumo y conserva un desempate estable por nombre',()=>{

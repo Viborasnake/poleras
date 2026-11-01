@@ -1,0 +1,15 @@
+PASA · Escribir no avanza ni habilita envío
+PASA · Idea → omitir referencias → contacto → revisión antes del CTA
+PASA · Editar no pierde contacto y vuelve a exigir confirmación
+PASA · El resumen compacto conserva el texto completo en revisión y edición
+PASA · Foto requiere archivo válido y no avanza al terminar de optimizar
+PASA · WhatsApp mantiene foto pendiente de adjuntar en el chat
+PASA · Checkout precargado requiere confirmación y retiro omite dirección
+PASA · Volver a despacho conserva valores y pide región/comuna/dirección
+PASA · Cambiar región invalida comuna y obliga a revisar dirección
+PASA · Acción final del banco de pruebas no llama servicios
+PASA · Contacto de mascota requiere confirmación incluso si los campos son válidos
+PASA · Guardia final bloquea un submit anticipado y un dato oculto inválido
+PASA · Mis datos edita teléfono sin confirmar la dirección y serializa secciones cerradas
+PASA · Mis datos exige región y comuna compatibles, conserva la dirección y bloquea duplicados
+PASA · Mis datos no cambia de sección con cambios sin revisar ni guarda campos ocultos alterados

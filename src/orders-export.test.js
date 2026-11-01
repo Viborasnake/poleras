@@ -27,10 +27,11 @@ test('exporta todos los pedidos y preserva detalle, productos e historial en hoj
   const sheets = ordersExportSheets([order]);
   assert.deepEqual(sheets.map(sheet => sheet.name), ['Pedidos', 'Productos', 'Historial']);
   assert.equal(sheets[0].rows.length, 1);
-  assert.equal(sheets[0].rows[0][9], 'Ana Pérez');
-  assert.equal(sheets[0].rows[0][10], '12.345.678-9');
+  assert.equal(sheets[0].rows[0][9], 'Sin registrar');
+  assert.equal(sheets[0].rows[0][10], 'Ana Pérez');
+  assert.equal(sheets[0].rows[0][11], '12.345.678-9');
   assert.equal(sheets[0].rows[0][5], 'Pagado');
-  assert.equal(sheets[0].rows[0][23].value, 23990);
+  assert.equal(sheets[0].rows[0][24].value, 23990);
   assert.equal(sheets[1].rows[0][7], 'customer-designs/42/front.png');
   assert.equal(sheets[2].rows[0][3], 'Entregado');
 });
@@ -40,7 +41,7 @@ test('genera XLSX con hojas, filtros y texto seguro para Excel', () => {
   const files = zipEntries(bytes);
   assert.equal(new DataView(bytes.buffer).getUint32(0, true), 0x04034B50);
   assert.match(files.get('xl/workbook.xml'), /Pedidos.*Productos.*Historial/);
-  assert.match(files.get('xl/worksheets/sheet1.xml'), /autoFilter ref="A1:AC2"/);
+  assert.match(files.get('xl/worksheets/sheet1.xml'), /autoFilter ref="A1:AH2"/);
   assert.match(files.get('xl/worksheets/sheet1.xml'), /s="3"><v>23990<\/v>/);
   assert.match(files.get('xl/worksheets/sheet2.xml'), /<t xml:space="preserve">=HYPERLINK\(&quot;bad&quot;\)<\/t>|<t xml:space="preserve">=HYPERLINK\("bad"\)<\/t>/);
   assert.doesNotMatch(files.get('xl/worksheets/sheet2.xml'), /<f>/);

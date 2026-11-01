@@ -16,3 +16,8 @@ test('el aviso de transferencia y la aprobación del proveedor quedan por revisa
 test('solo una confirmación atribuida a administración muestra Pagado', () => {
   assert.equal(orderPaymentState({ payment_confirmed_at: '2026-10-10T22:00:00Z', payment_confirmed_by: 'admin-id' }), 'paid');
 });
+
+test('una reversa prevalece sobre la confirmación anterior',()=>{
+  assert.equal(orderPaymentState({payment_confirmed_at:'2026-10-10T22:00:00Z',payment_confirmed_by:'admin-id',payments:[{status:'charged_back'}]}),'issue');
+  assert.equal(orderPaymentState({payments:[{status:'partially_refunded'}]}),'issue');
+});

@@ -184,6 +184,7 @@
       </section>
 
       <section id="patterns" class="ds-section">
+        <article class="ds-catalog-filter-example"><h3>Filtros de catálogo</h3><p>La vista global alterna Colecciones / Diseños y filtra por temática. Cada card cambia su propio mockup con un selector de producto segmentado.</p><div data-catalog-filter-demo></div></article>
         <div class="ds-section-heading"><span class="ds-eyebrow"><i></i> 04 / PATRONES DE CONTENIDO</span><h2>Las piezas que construyen<br>la tienda.</h2></div>
         <div class="ds-patterns-showcase">
           <article class="ds-pattern-specimen ds-pattern-specimen--wide">
@@ -219,7 +220,7 @@
 
           <article class="ds-pattern-specimen ds-pattern-specimen--wide">
             <div class="ds-pattern-caption"><span>PROGRESO · ESTUDIO</span><code>.steps</code></div>
-            <div class="ds-progress-standalone"><ol class="ds-progress" aria-label="Ejemplo de progreso"><li class="is-current" aria-current="step"><b>01</b><span>Detalles</span></li><li><b>02</b><span>Diseño</span></li><li><b>03</b><span>Calidad</span></li><li><b>04</b><span>Resumen</span></li><li><b>05</b><span>Pago</span></li></ol></div>
+            <div class="ds-progress-standalone"><ol class="ds-progress" aria-label="Ejemplo de progreso"><li class="is-current" aria-current="step"><b>01</b><span>Detalles</span></li><li><b>02</b><span>Resumen</span></li><li><b>03</b><span>Datos y pago</span></li></ol></div>
             <div class="ds-pattern-anatomy"><span>Current</span><span>Upcoming</span><span>Conector</span><span>Etiqueta</span></div>
           </article>
 
@@ -319,16 +320,17 @@
             <div class="ds-pattern-caption"><span>FORMULARIO · FLUJO DEL ESTUDIO</span><code>#design-form / .studio-controls</code></div>
             <div class="ds-studio-flow">
               <ol class="ds-progress" aria-label="Progreso de personalización">
-                <li class="is-current" aria-current="step"><b>01</b><span>Detalles</span></li><li><b>02</b><span>Diseño</span></li><li><b>03</b><span>Calidad</span></li><li><b>04</b><span>Resumen</span></li><li><b>05</b><span>Pago</span></li>
+                <li class="is-current" aria-current="step"><b>01</b><span>Detalles</span></li><li><b>02</b><span>Resumen</span></li><li><b>03</b><span>Datos y pago</span></li>
               </ol>
               <div class="ds-studio-heading"><span>PASO 1 · DETALLES</span><h3>Elige tu polera.</h3></div>
-              <form class="ds-studio-form">
-                <fieldset><legend><span>Modelo</span><small>PRECIO BASE</small></legend><div class="ds-model-options"><button class="is-selected" type="button"><strong>Básica</strong><small>$14.990</small></button><button type="button"><strong>Over</strong><small>$21.990</small></button><button type="button"><strong>Kid</strong><small>$8.990</small></button></div></fieldset>
-                <fieldset><legend><span>Color</span><small>ELIGE UNO</small></legend><div class="ds-studio-swatches"><button class="is-selected" type="button" aria-label="Blanco" style="--shirt-color:#fff"></button><button type="button" aria-label="Negro" style="--shirt-color:#202124"></button><button type="button" aria-label="Marfil" style="--shirt-color:#e8e0cf"></button><button type="button" aria-label="Azul" style="--shirt-color:#8daec3"></button></div></fieldset>
-                <fieldset><legend><span>Talla</span><button class="ds-guide-button ds-size-guide" type="button"><span>⌁</span>Guía de tallas <b>→</b></button></legend><div class="ds-size-options"><button type="button">XS</button><button type="button">S</button><button class="is-selected" type="button">M</button><button type="button">L</button><button type="button">XL</button><button type="button">XXL</button></div></fieldset>
-                <label class="ds-studio-email"><strong>Indícanos tu email</strong><small>Para seguir en contacto.</small><input class="ds-field" type="email" placeholder="tu@email.com"></label>
-                <button class="ds-cta ds-studio-next" type="button">Siguiente → Sube tu diseño</button>
-              </form>
+              <div class="ds-disclosure-group">
+                <section class="ds-disclosure is-complete"><div class="ds-disclosure-head"><span class="ds-disclosure-number" role="img" aria-label="Completado">✓</span><div><h3>Producto</h3><p>Polera unisex</p></div><button type="button" class="ds-disclosure-edit" aria-label="Editar producto del espécimen">Editar</button></div></section>
+                <section class="ds-disclosure is-active"><div class="ds-disclosure-head"><span class="ds-disclosure-number" aria-hidden="true">02</span><div><h3>Modelo</h3><p>Elige una opción para continuar</p></div></div><div class="ds-disclosure-panel"><button class="ds-choice-button" type="button">Básica</button> <button class="ds-choice-button" type="button">Oversize</button></div></section>
+                <section class="ds-disclosure"><div class="ds-disclosure-head"><span class="ds-disclosure-number" aria-hidden="true">03</span><div><h3>Talla</h3><p>Pendiente</p></div></div></section>
+                <section class="ds-disclosure"><div class="ds-disclosure-head"><span class="ds-disclosure-number" aria-hidden="true">04</span><div><h3>Color</h3><p>Pendiente</p></div></div></section>
+                <section class="ds-disclosure"><div class="ds-disclosure-head"><span class="ds-disclosure-number" aria-hidden="true">05</span><div><h3>Ubicación</h3><p>Pendiente</p></div></div></section>
+              </div>
+              <p>Espécimen de composición. <a href="#ds-disclosure-example">Probar el ejemplo interactivo</a>.</p>
             </div>
             <div class="ds-pattern-anatomy"><span>Stepper</span><span>Encabezado</span><span>Selector de modelo</span><span>Swatches</span><span>Selector de talla</span><span>Input</span><span>CTA</span></div>
           </article>
@@ -346,6 +348,20 @@
           </form>
           <aside class="ds-form-states"><strong>Estados del mismo campo</strong><div class="ds-form-state-grid"><label><span>Reposo</span><input class="ds-field" placeholder="tu@email.com" tabindex="-1"></label><label><span>Foco</span><input class="ds-field" data-state="focus" value="tu@email.com" tabindex="-1"></label><label><span>Completo</span><input class="ds-field" value="hola@droska.cl" tabindex="-1"></label><label><span>Error</span><input class="ds-field" aria-invalid="true" value="correo inválido" tabindex="-1"><small class="ds-field-message is-error">Revisa el formato del correo.</small></label><label><span>Éxito</span><input class="ds-field" data-state="success" value="hola@droska.cl" tabindex="-1"><small class="ds-field-message is-success">Correo validado.</small></label><label><span>Disabled</span><input class="ds-field" value="No editable" disabled tabindex="-1"></label><label><span>Solo lectura</span><input class="ds-field" value="Pedido #1042" readonly tabindex="-1"></label><label><span>Ayuda</span><input class="ds-field" placeholder="Mínimo 6 caracteres" aria-describedby="password-help" tabindex="-1"><small id="password-help" class="ds-field-message">Usa letras y números.</small></label></div></aside>
         </div>
+        <article class="ds-disclosure-demo">
+          <h3>Una decisión a la vez</h3>
+          <p>Elegir abre el siguiente bloque. Las respuestas quedan visibles y se pueden editar.</p>
+          <div id="ds-disclosure-example"></div>
+          <p id="ds-disclosure-result" role="status"></p>
+          <button type="button" class="ds-secondary-button" id="ds-disclosure-reset">Reiniciar ejemplo</button>
+        </article>
+        <article class="ds-disclosure-demo">
+          <h3>Completar, revisar y continuar</h3>
+          <p>Los campos permanecen abiertos mientras escribes. Continuar valida el bloque y muestra un resumen editable.</p>
+          <div id="ds-field-disclosure-example"></div>
+          <p id="ds-field-disclosure-result" role="status"></p>
+          <button type="button" class="ds-secondary-button" id="ds-field-disclosure-reset">Reiniciar formulario de ejemplo</button>
+        </article>
         <div class="ds-form-controls">
           <div class="ds-form-controls-head"><div><span class="ds-eyebrow"><i></i> CONTROLES DE ELECCIÓN Y ENTRADA</span><h3>Más que campos de texto.</h3></div><p>Controles nativos con etiqueta visible, área táctil suficiente, selección explícita y respuesta inmediata.</p></div>
           <div class="ds-form-controls-grid">

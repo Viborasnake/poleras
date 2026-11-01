@@ -1,0 +1,1646 @@
+[
+  {
+    "name": "aves-chilenas-ukiyo-e/carpintero-negro-espiritu-del-bosque-artwork-bodys-1792068104083.png",
+    "metadata": {
+      "eTag": "\"4c99f3c587afd5c75cff4675b160e6d1\"",
+      "size": 3408495,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:41:45.000Z",
+      "contentLength": 3408495,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/chincol-alma-del-barrio-artwork-bodys-1792068062767.png",
+    "metadata": {
+      "eTag": "\"ee39a09ed89e4c4103d558ce30485851\"",
+      "size": 3430947,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:41:04.000Z",
+      "contentLength": 3430947,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/choroy-voz-del-bosque-artwork-bodys-1792068133461.png",
+    "metadata": {
+      "eTag": "\"2c3abd0add2100498b39d980fb4c278c\"",
+      "size": 3933872,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:42:15.000Z",
+      "contentLength": 3933872,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/golondrina-chilena-libertad-en-vuelo-artwork-bodys-1792067998332.png",
+    "metadata": {
+      "eTag": "\"8db769af488398a7da57c491a01c204b\"",
+      "size": 3650713,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:39:59.000Z",
+      "contentLength": 3650713,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/hued-hued-el-guardian-del-bosque-artwork-bodys-1792002318546.png",
+    "metadata": {
+      "eTag": "\"8fbbcb069cfaf6eaacff47039fec2eee\"",
+      "size": 4038221,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-14T18:25:20.000Z",
+      "contentLength": 4038221,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/hued-hued-el-guardian-del-bosque-artwork-poleras-1792002317579.png",
+    "metadata": {
+      "eTag": "\"8fbbcb069cfaf6eaacff47039fec2eee\"",
+      "size": 4038221,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-14T18:25:19.000Z",
+      "contentLength": 4038221,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/loica-corazon-escarlata-artwork-bodys-1792068046545.png",
+    "metadata": {
+      "eTag": "\"e7a334843db7a861ac2c52776ec3c5b1\"",
+      "size": 3519704,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:40:48.000Z",
+      "contentLength": 3519704,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/mirlo-negro-sombra-urbana-artwork-bodys-1792068014333.png",
+    "metadata": {
+      "eTag": "\"2f30baed0a46512d4a3700403f209615\"",
+      "size": 3387499,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:40:16.000Z",
+      "contentLength": 3387499,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/paloma-habitante-de-la-ciudad-artwork-bodys-1792067980388.png",
+    "metadata": {
+      "eTag": "\"dff2bd1b01031d53ac624dc7656cc132\"",
+      "size": 3278846,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:39:41.000Z",
+      "contentLength": 3278846,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/queltehue-guardian-del-paisaje-artwork-bodys-1792068117594.png",
+    "metadata": {
+      "eTag": "\"f7af231afe2b1a0acc5578a5f39cd852\"",
+      "size": 3176504,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:41:58.000Z",
+      "contentLength": 3176504,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/siete-colores-el-ave-que-inspiro-a-fiu-artwork-bodys-1792067878579.png",
+    "metadata": {
+      "eTag": "\"ebeee3a32128b7a77c91a1cc7d37f970\"",
+      "size": 3295597,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:38:00.000Z",
+      "contentLength": 3295597,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/torcaza-espiritu-del-sur-artwork-bodys-1792067944432.png",
+    "metadata": {
+      "eTag": "\"3e8813af4d098ec44f14142a5304cdf6\"",
+      "size": 3336969,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:39:06.000Z",
+      "contentLength": 3336969,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/turca-espiritu-de-la-cordillera-artwork-bodys-1792068082277.png",
+    "metadata": {
+      "eTag": "\"c7ff0f139b8a77d3e8ddb7c9bc023199\"",
+      "size": 4157107,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:41:23.000Z",
+      "contentLength": 4157107,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas-ukiyo-e/zorzal-melodia-del-jardin-polera-artwork-bodys-1792068032769.png",
+    "metadata": {
+      "eTag": "\"f860caf4f0f2b4e6b7cfbec3467d31ab\"",
+      "size": 2978048,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:40:34.000Z",
+      "contentLength": 2978048,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/carpintero-negro-espiritu-del-bosque-artwork-poleras-1791932209487.png",
+    "metadata": {
+      "eTag": "\"4c99f3c587afd5c75cff4675b160e6d1\"",
+      "size": 3408495,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:56:51.000Z",
+      "contentLength": 3408495,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/carpintero-negro-espiritu-del-bosque-artwork-totebags-1791932210321.png",
+    "metadata": {
+      "eTag": "\"ff4008f6002562cb83906874fb034707\"",
+      "size": 3173936,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:56:52.000Z",
+      "contentLength": 3173936,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/carpintero-negro-espiritu-del-bosque-mockup-1791932211116.png",
+    "metadata": {
+      "eTag": "\"1bebe14a38d6dae6361c52a891da3dea\"",
+      "size": 2385204,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:56:52.000Z",
+      "contentLength": 2385204,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/carpintero-negro-espiritu-del-bosque-mockup-hover-1791932211834.png",
+    "metadata": {
+      "eTag": "\"a60f407200e21890f2212505d88e4c54\"",
+      "size": 2368732,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:56:53.000Z",
+      "contentLength": 2368732,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/chincol-alma-del-barrio-artwork-poleras-1791900322128.png",
+    "metadata": {
+      "eTag": "\"ee39a09ed89e4c4103d558ce30485851\"",
+      "size": 3430947,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:05:24.000Z",
+      "contentLength": 3430947,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/chincol-alma-del-barrio-artwork-totebags-1791900324077.png",
+    "metadata": {
+      "eTag": "\"ee39a09ed89e4c4103d558ce30485851\"",
+      "size": 3430947,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:05:26.000Z",
+      "contentLength": 3430947,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/chincol-alma-del-barrio-mockup-1791900325297.png",
+    "metadata": {
+      "eTag": "\"09e22efaf310228d1342696d04ffb28a\"",
+      "size": 2400274,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:05:27.000Z",
+      "contentLength": 2400274,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/chincol-alma-del-barrio-mockup-1791901154368.png",
+    "metadata": {
+      "eTag": "\"e3437e8890087c4ee8d59ad15564606b\"",
+      "size": 2528521,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:19:16.000Z",
+      "contentLength": 2528521,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/chincol-alma-del-barrio-mockup-hover-1791900326277.png",
+    "metadata": {
+      "eTag": "\"e3437e8890087c4ee8d59ad15564606b\"",
+      "size": 2528521,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:05:28.000Z",
+      "contentLength": 2528521,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/chincol-alma-del-barrio-mockup-hover-1791901155198.png",
+    "metadata": {
+      "eTag": "\"09e22efaf310228d1342696d04ffb28a\"",
+      "size": 2400274,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:19:16.000Z",
+      "contentLength": 2400274,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/choroy-bosque-sol-artwork-1791861465149.png",
+    "metadata": {
+      "eTag": "\"2c3abd0add2100498b39d980fb4c278c\"",
+      "size": 3933872,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:17:46.000Z",
+      "contentLength": 3933872,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/choroy-bosque-sol-mockup-1791861465921.png",
+    "metadata": {
+      "eTag": "\"5bd53d6c2537e6d5d0b1c1d214825aae\"",
+      "size": 2412175,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:17:47.000Z",
+      "contentLength": 2412175,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/choroy-bosque-sol-mockup-hover-1791861466535.png",
+    "metadata": {
+      "eTag": "\"4cf4e9dbfae5d64a547b789009755544\"",
+      "size": 2479879,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:17:47.000Z",
+      "contentLength": 2479879,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/choroy-voz-del-bosque-artwork-poleras-1791931740414.png",
+    "metadata": {
+      "eTag": "\"2c3abd0add2100498b39d980fb4c278c\"",
+      "size": 3933872,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:49:02.000Z",
+      "contentLength": 3933872,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/choroy-voz-del-bosque-artwork-totebags-1791931741225.png",
+    "metadata": {
+      "eTag": "\"28628931cc6f4bfcd24760d4611a1671\"",
+      "size": 3380760,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:49:02.000Z",
+      "contentLength": 3380760,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/choroy-voz-del-bosque-mockup-1791931741866.png",
+    "metadata": {
+      "eTag": "\"07530cdf215ae90d498cfcc232d8c67b\"",
+      "size": 2552665,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:49:03.000Z",
+      "contentLength": 2552665,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/choroy-voz-del-bosque-mockup-hover-1791931742415.png",
+    "metadata": {
+      "eTag": "\"0ad63398f0b29e429874628f0c4e2150\"",
+      "size": 2527436,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T22:49:03.000Z",
+      "contentLength": 2527436,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/golondrina-chilena-libertad-en-vuelo-artwork-poleras-1791903214561.png",
+    "metadata": {
+      "eTag": "\"8db769af488398a7da57c491a01c204b\"",
+      "size": 3650713,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:53:36.000Z",
+      "contentLength": 3650713,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/golondrina-chilena-libertad-en-vuelo-artwork-totebags-1791903215670.png",
+    "metadata": {
+      "eTag": "\"11e107ce6f62f290379900ffe07e03f5\"",
+      "size": 3797029,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:53:37.000Z",
+      "contentLength": 3797029,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/golondrina-chilena-libertad-en-vuelo-mockup-1791903216642.png",
+    "metadata": {
+      "eTag": "\"b7942e505d1f52311d4adad56f51fee4\"",
+      "size": 2374686,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:53:38.000Z",
+      "contentLength": 2374686,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/golondrina-chilena-libertad-en-vuelo-mockup-hover-1791903217233.png",
+    "metadata": {
+      "eTag": "\"4b88c3689a9a77fec094b6da52ee6244\"",
+      "size": 2573924,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:53:39.000Z",
+      "contentLength": 2573924,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/hued-hued-el-guardian-del-bosque-artwork-poleras-1791906394551.png",
+    "metadata": {
+      "eTag": "\"8fbbcb069cfaf6eaacff47039fec2eee\"",
+      "size": 4038221,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:46:36.000Z",
+      "contentLength": 4038221,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/hued-hued-el-guardian-del-bosque-artwork-totebags-1791906395907.png",
+    "metadata": {
+      "eTag": "\"008baf0942e4e43bec27f65a13435deb\"",
+      "size": 3935675,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:46:37.000Z",
+      "contentLength": 3935675,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/hued-hued-el-guardian-del-bosque-mockup-1791906396687.png",
+    "metadata": {
+      "eTag": "\"09984053834dea1ecf07521ef5535db0\"",
+      "size": 2636915,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:46:38.000Z",
+      "contentLength": 2636915,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/hued-hued-el-guardian-del-bosque-mockup-hover-1791906397429.png",
+    "metadata": {
+      "eTag": "\"8a5047b887210b0ee9b461a4081aba5b\"",
+      "size": 2654620,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:46:39.000Z",
+      "contentLength": 2654620,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/loica-corazon-escarlata-artwork-poleras-1791901099868.png",
+    "metadata": {
+      "eTag": "\"e7a334843db7a861ac2c52776ec3c5b1\"",
+      "size": 3519704,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:18:21.000Z",
+      "contentLength": 3519704,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/loica-corazon-escarlata-artwork-totebags-1791901100942.png",
+    "metadata": {
+      "eTag": "\"dca07d40f80cd580c344826a4cf13ac0\"",
+      "size": 3221613,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:18:22.000Z",
+      "contentLength": 3221613,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/loica-corazon-escarlata-mockup-1791901101681.png",
+    "metadata": {
+      "eTag": "\"dd1552400026478117709d91e6c8edb9\"",
+      "size": 2565489,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:18:23.000Z",
+      "contentLength": 2565489,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/loica-corazon-escarlata-mockup-hover-1791901102453.png",
+    "metadata": {
+      "eTag": "\"e579d627c6fbbf1be62be025438cddbf\"",
+      "size": 2559102,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:18:24.000Z",
+      "contentLength": 2559102,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/mirlo-negro-sombra-urbana-artwork-poleras-1791902495057.png",
+    "metadata": {
+      "eTag": "\"2f30baed0a46512d4a3700403f209615\"",
+      "size": 3387499,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:41:36.000Z",
+      "contentLength": 3387499,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/mirlo-negro-sombra-urbana-artwork-totebags-1791902495777.png",
+    "metadata": {
+      "eTag": "\"e44eb1cbd9f731802cc6f752ad2073fc\"",
+      "size": 3291503,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:41:37.000Z",
+      "contentLength": 3291503,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/mirlo-negro-sombra-urbana-mockup-1791902496612.png",
+    "metadata": {
+      "eTag": "\"d7d12e29843af122209b20ecbb7054aa\"",
+      "size": 2463627,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:41:38.000Z",
+      "contentLength": 2463627,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/mirlo-negro-sombra-urbana-mockup-hover-1791902497185.png",
+    "metadata": {
+      "eTag": "\"6dd01dcef070802be906612d6d8bef26\"",
+      "size": 2536894,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:41:38.000Z",
+      "contentLength": 2536894,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/pajaro-carpintero-artwork-1791861841038.png",
+    "metadata": {
+      "eTag": "\"4c99f3c587afd5c75cff4675b160e6d1\"",
+      "size": 3408495,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:24:03.000Z",
+      "contentLength": 3408495,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/pajaro-carpintero-mockup-1791861842659.png",
+    "metadata": {
+      "eTag": "\"a77a44d18c330a5ca9547894bc050371\"",
+      "size": 2552596,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:24:04.000Z",
+      "contentLength": 2552596,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/pajaro-carpintero-mockup-hover-1791861843948.png",
+    "metadata": {
+      "eTag": "\"4126fe873e81330d773ec17ba6183b24\"",
+      "size": 2384210,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:24:05.000Z",
+      "contentLength": 2384210,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/paloma-habitante-de-la-ciudad-artwork-poleras-1791904135636.png",
+    "metadata": {
+      "eTag": "\"dff2bd1b01031d53ac624dc7656cc132\"",
+      "size": 3278846,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:08:58.000Z",
+      "contentLength": 3278846,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/paloma-habitante-de-la-ciudad-artwork-totebags-1791904137256.png",
+    "metadata": {
+      "eTag": "\"32cd2141e9183e176e4b817678dabe80\"",
+      "size": 3096979,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:08:59.000Z",
+      "contentLength": 3096979,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/paloma-habitante-de-la-ciudad-mockup-1791904138304.png",
+    "metadata": {
+      "eTag": "\"a8df6c56a3f14aedda98398d109ded4c\"",
+      "size": 2401353,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:09:00.000Z",
+      "contentLength": 2401353,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/paloma-habitante-de-la-ciudad-mockup-hover-1791904139446.png",
+    "metadata": {
+      "eTag": "\"6ad0de343fac8238cab7b318d156b680\"",
+      "size": 2494097,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:09:01.000Z",
+      "contentLength": 2494097,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/queltehue-guardian-del-paisaje-artwork-poleras-1791932472481.png",
+    "metadata": {
+      "eTag": "\"f7af231afe2b1a0acc5578a5f39cd852\"",
+      "size": 3176504,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:01:13.000Z",
+      "contentLength": 3176504,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/queltehue-guardian-del-paisaje-artwork-totebags-1791932472945.png",
+    "metadata": {
+      "eTag": "\"3c92fcd856dd3132ff59bc2a54cfbf05\"",
+      "size": 2869885,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:01:14.000Z",
+      "contentLength": 2869885,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/queltehue-guardian-del-paisaje-mockup-1791932473677.png",
+    "metadata": {
+      "eTag": "\"d5311d4a10aea1e5c40bf01a62bf3ac3\"",
+      "size": 2387451,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:01:15.000Z",
+      "contentLength": 2387451,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/queltehue-guardian-del-paisaje-mockup-hover-1791932474895.png",
+    "metadata": {
+      "eTag": "\"4deef0f36c16091f0170eb989e9772a5\"",
+      "size": 2365510,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:01:16.000Z",
+      "contentLength": 2365510,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/queltehue-humedal-artwork-1791861328269.png",
+    "metadata": {
+      "eTag": "\"f7af231afe2b1a0acc5578a5f39cd852\"",
+      "size": 3176504,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:15:29.000Z",
+      "contentLength": 3176504,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/queltehue-humedal-mockup-1791861328931.png",
+    "metadata": {
+      "eTag": "\"d52163ed323814a1c8756317892de3e9\"",
+      "size": 2734544,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:15:30.000Z",
+      "contentLength": 2734544,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/queltehue-humedal-mockup-hover-1791861329636.png",
+    "metadata": {
+      "eTag": "\"1ae0dbd5d204cf51f8fd0a1740ec86a6\"",
+      "size": 2667719,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:15:31.000Z",
+      "contentLength": 2667719,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/siete-colores-el-ave-que-inspiro-a-fiu-artwork-poleras-1791905629002.png",
+    "metadata": {
+      "eTag": "\"ebeee3a32128b7a77c91a1cc7d37f970\"",
+      "size": 3295597,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:33:51.000Z",
+      "contentLength": 3295597,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/siete-colores-el-ave-que-inspiro-a-fiu-artwork-totebags-1791905630583.png",
+    "metadata": {
+      "eTag": "\"bc5d5695097038a1b68587ba8c9d2461\"",
+      "size": 3045345,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:33:52.000Z",
+      "contentLength": 3045345,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/siete-colores-el-ave-que-inspiro-a-fiu-mockup-1791905632041.png",
+    "metadata": {
+      "eTag": "\"03085c03401b1186caf82e5fca6b77c5\"",
+      "size": 2620279,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:33:53.000Z",
+      "contentLength": 2620279,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/siete-colores-el-ave-que-inspiro-a-fiu-mockup-hover-1791905633003.png",
+    "metadata": {
+      "eTag": "\"d7d48b1c3ebfd258adb680d566403776\"",
+      "size": 2558849,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:33:55.000Z",
+      "contentLength": 2558849,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/tenca-ave-espinas-artwork-1791862502456.png",
+    "metadata": {
+      "eTag": "\"acdf47fa05ada04b2bc479d9be9b5918\"",
+      "size": 3855099,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:35:04.000Z",
+      "contentLength": 3855099,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/tenca-ave-espinas-mockup-1791862503170.png",
+    "metadata": {
+      "eTag": "\"1fdc78cfe646fb56e75c5335a7582045\"",
+      "size": 2414861,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:35:04.000Z",
+      "contentLength": 2414861,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/tenca-ave-espinas-mockup-hover-1791862503706.png",
+    "metadata": {
+      "eTag": "\"319ba142111fa00f8cb20c44b3c9ed16\"",
+      "size": 2407103,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:35:05.000Z",
+      "contentLength": 2407103,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/tenca-canto-de-la-zona-central-artwork-poleras-1791932733124.png",
+    "metadata": {
+      "eTag": "\"acdf47fa05ada04b2bc479d9be9b5918\"",
+      "size": 3855099,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:05:35.000Z",
+      "contentLength": 3855099,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/tenca-canto-de-la-zona-central-artwork-totebags-1791932734169.png",
+    "metadata": {
+      "eTag": "\"fccb6049e582b6fb6f3043a5c8deeda1\"",
+      "size": 3362588,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:05:35.000Z",
+      "contentLength": 3362588,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/tenca-canto-de-la-zona-central-mockup-1791932734860.png",
+    "metadata": {
+      "eTag": "\"96bfc6f38246b268f3366b84d8544c16\"",
+      "size": 2200861,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:05:36.000Z",
+      "contentLength": 2200861,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/tenca-canto-de-la-zona-central-mockup-hover-1791932735478.png",
+    "metadata": {
+      "eTag": "\"1a9c54c7665fd7298de6149ecb8c1934\"",
+      "size": 2285918,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:05:37.000Z",
+      "contentLength": 2285918,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/torcaza-espiritu-del-sur-artwork-poleras-1791905043151.png",
+    "metadata": {
+      "eTag": "\"3e8813af4d098ec44f14142a5304cdf6\"",
+      "size": 3336969,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:24:04.000Z",
+      "contentLength": 3336969,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/torcaza-espiritu-del-sur-artwork-totebags-1791905043954.png",
+    "metadata": {
+      "eTag": "\"618bb0defc91a8ceb80c88f0b67dcc6f\"",
+      "size": 3299160,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:24:05.000Z",
+      "contentLength": 3299160,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/torcaza-espiritu-del-sur-mockup-1791905044871.png",
+    "metadata": {
+      "eTag": "\"741eabf16623a3851415bf7b75b7ee93\"",
+      "size": 2484400,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:24:06.000Z",
+      "contentLength": 2484400,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/torcaza-espiritu-del-sur-mockup-hover-1791905045479.png",
+    "metadata": {
+      "eTag": "\"c4c1cd8344b707f28b14dc8d28ec1949\"",
+      "size": 2434999,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T15:24:07.000Z",
+      "contentLength": 2434999,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/turca-chilena-andino-artwork-1791862827971.png",
+    "metadata": {
+      "eTag": "\"c7ff0f139b8a77d3e8ddb7c9bc023199\"",
+      "size": 4157107,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:40:29.000Z",
+      "contentLength": 4157107,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/turca-chilena-andino-mockup-1791862828959.png",
+    "metadata": {
+      "eTag": "\"6d919cba031ef4bbaff17c28cc9d0ce7\"",
+      "size": 2565904,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:40:30.000Z",
+      "contentLength": 2565904,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/turca-chilena-andino-mockup-hover-1791862829761.png",
+    "metadata": {
+      "eTag": "\"aa887e1a9c76e5b2fe9c631561902b31\"",
+      "size": 2762672,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T03:40:31.000Z",
+      "contentLength": 2762672,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/turca-espiritu-de-la-cordillera-artwork-poleras-1791932623569.png",
+    "metadata": {
+      "eTag": "\"c7ff0f139b8a77d3e8ddb7c9bc023199\"",
+      "size": 4157107,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:03:45.000Z",
+      "contentLength": 4157107,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/turca-espiritu-de-la-cordillera-artwork-totebags-1791932624237.png",
+    "metadata": {
+      "eTag": "\"73a9f8bb99395e059b91e12cca1959e5\"",
+      "size": 3851889,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:03:46.000Z",
+      "contentLength": 3851889,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/turca-espiritu-de-la-cordillera-mockup-1791932625174.png",
+    "metadata": {
+      "eTag": "\"f0e04b1278ebb1fccf3ccc83f8336089\"",
+      "size": 2249141,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:03:46.000Z",
+      "contentLength": 2249141,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/turca-espiritu-de-la-cordillera-mockup-hover-1791932625853.png",
+    "metadata": {
+      "eTag": "\"f96b388e90fb9c8471a354cb97673cac\"",
+      "size": 2347207,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T23:03:47.000Z",
+      "contentLength": 2347207,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/zorzal-melodia-del-jardin-polera-artwork-poleras-1791901943200.png",
+    "metadata": {
+      "eTag": "\"f860caf4f0f2b4e6b7cfbec3467d31ab\"",
+      "size": 2978048,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:32:25.000Z",
+      "contentLength": 2978048,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/zorzal-melodia-del-jardin-polera-artwork-totebags-1791901944138.png",
+    "metadata": {
+      "eTag": "\"bfbde0b034f213fc21aee8510d9aee70\"",
+      "size": 3165152,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:32:26.000Z",
+      "contentLength": 3165152,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/zorzal-melodia-del-jardin-polera-mockup-1791901945332.png",
+    "metadata": {
+      "eTag": "\"022359f7eef695c8cf8a41ec1fe1e611\"",
+      "size": 2496922,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:32:26.000Z",
+      "contentLength": 2496922,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "aves-chilenas/zorzal-melodia-del-jardin-polera-mockup-hover-1791901946081.png",
+    "metadata": {
+      "eTag": "\"d9f591ac43a4bafd3d0a8e5913ea06cb\"",
+      "size": 2476085,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T14:32:27.000Z",
+      "contentLength": 2476085,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "death-stranding/bebe-en-espiral-psicodelica-1790213275319.png",
+    "metadata": {
+      "eTag": "\"3049e73d3634a07098ba457973c2efe5\"",
+      "size": 3471313,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-09-24T01:27:57.000Z",
+      "contentLength": 3471313,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "death-stranding/bebe-en-espiral-psicodelica-mockup-1791518700967.png",
+    "metadata": {
+      "eTag": "\"9ac2efef5b66bb3d97da633d8b6b8baf\"",
+      "size": 2426880,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-09T04:05:02.000Z",
+      "contentLength": 2426880,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "death-stranding/bebe-en-espiral-psicodelica-mockup-hover-1791518701979.png",
+    "metadata": {
+      "eTag": "\"c12b5751bc9ec377fff623c001cad699\"",
+      "size": 2404976,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-09T04:05:03.000Z",
+      "contentLength": 2404976,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "death-stranding/cliff-unger-1791344143865.png",
+    "metadata": {
+      "eTag": "\"f406f1549fd92da734250d8153d8472e\"",
+      "size": 3149431,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-07T03:35:50.000Z",
+      "contentLength": 3149431,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "kaiju/laika-kauiju-artwork-1791850249267.png",
+    "metadata": {
+      "eTag": "\"7873bf983f3317ebedee896c85913933\"",
+      "size": 3486725,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T00:10:51.000Z",
+      "contentLength": 3486725,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "kaiju/laika-kauiju-mockup-1791850250493.png",
+    "metadata": {
+      "eTag": "\"52eb7e019b89f1d077b3162e75517060\"",
+      "size": 2359879,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T00:10:52.000Z",
+      "contentLength": 2359879,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "kaiju/laika-kauiju-mockup-hover-1791850251694.png",
+    "metadata": {
+      "eTag": "\"a84a041dceeffe11b9e0b5f466a6acc4\"",
+      "size": 2581531,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-13T00:10:53.000Z",
+      "contentLength": 2581531,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "metal-gear/meryl-cyberpunk-1791344424528.png",
+    "metadata": {
+      "eTag": "\"02bfa5286dfc1c5a3198882c6b7023e2\"",
+      "size": 3314064,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-07T03:40:27.000Z",
+      "contentLength": 3314064,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "metal-gear/solid-snake-shadow-moses-1790255827732.png",
+    "metadata": {
+      "eTag": "\"749d33903c50895973610ffc545ea557\"",
+      "size": 522612,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-09-24T13:17:09.000Z",
+      "contentLength": 522612,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "resident-evil/claire-redfield-racoon-city-comisaria-1790255514493.png",
+    "metadata": {
+      "eTag": "\"0a7a83b6ae729a16e588f601c17a22e2\"",
+      "size": 1156913,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-09-24T13:11:55.000Z",
+      "contentLength": 1156913,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "resident-evil/claire-redfield-racoon-city-comisaria-mockup-1791518681226.png",
+    "metadata": {
+      "eTag": "\"55f841af7fdccecf81cacfb180f77b25\"",
+      "size": 2339721,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-09T04:04:43.000Z",
+      "contentLength": 2339721,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "resident-evil/claire-redfield-racoon-city-comisaria-mockup-hover-1791518682846.png",
+    "metadata": {
+      "eTag": "\"561aff2d74b8a182912156b6c6cd31a0\"",
+      "size": 2387040,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-09T04:04:44.000Z",
+      "contentLength": 2387040,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "resident-evil/jill-valentine-comisaria-racoon-city-1790255668800.png",
+    "metadata": {
+      "eTag": "\"955025427ab8634e74beda6151eb0f20\"",
+      "size": 1179069,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-09-24T13:14:30.000Z",
+      "contentLength": 1179069,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guardiana-celestial-artwork-bodys-1792200132267.png",
+    "metadata": {
+      "eTag": "\"5d42d36752f81b13a217623dd858f2aa\"",
+      "size": 3034577,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:22:13.000Z",
+      "contentLength": 3034577,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guardiana-celestial-artwork-poleras-1792200131427.png",
+    "metadata": {
+      "eTag": "\"5d42d36752f81b13a217623dd858f2aa\"",
+      "size": 3034577,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:22:13.000Z",
+      "contentLength": 3034577,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guardiana-celestial-artwork-totebags-1792200132726.png",
+    "metadata": {
+      "eTag": "\"3501f68d08664ebe93faac55f8a0ff30\"",
+      "size": 2579755,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:22:14.000Z",
+      "contentLength": 2579755,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guardiana-celestial-mockup-1792200133236.png",
+    "metadata": {
+      "eTag": "\"d56d1fee570e90a536fe0c270e54b8c6\"",
+      "size": 2495587,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:22:14.000Z",
+      "contentLength": 2495587,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guardiana-celestial-mockup-hover-1792200133762.png",
+    "metadata": {
+      "eTag": "\"18db58fed04f899d8f31971bfe0e3b9b\"",
+      "size": 2519694,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:22:15.000Z",
+      "contentLength": 2519694,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guerrera-del-fuego-artwork-bodys-1792200753282.png",
+    "metadata": {
+      "eTag": "\"eeefff989efd4efda3118cc598b9c06f\"",
+      "size": 3097497,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:32:35.000Z",
+      "contentLength": 3097497,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guerrera-del-fuego-artwork-poleras-1792200752132.png",
+    "metadata": {
+      "eTag": "\"eeefff989efd4efda3118cc598b9c06f\"",
+      "size": 3097497,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:32:33.000Z",
+      "contentLength": 3097497,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guerrera-del-fuego-artwork-totebags-1792200755213.png",
+    "metadata": {
+      "eTag": "\"0eb5c981bf6c2d05dfe97e297b9d5329\"",
+      "size": 2980095,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:32:37.000Z",
+      "contentLength": 2980095,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guerrera-del-fuego-mockup-1792200757320.png",
+    "metadata": {
+      "eTag": "\"065f05b9110f938c0fb3398b798d52ca\"",
+      "size": 2599778,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:32:39.000Z",
+      "contentLength": 2599778,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-anime/guerrera-del-fuego-mockup-hover-1792200758732.png",
+    "metadata": {
+      "eTag": "\"4f581e9687b88cd4eb7703ead5ca1f6b\"",
+      "size": 2731048,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-17T01:32:40.000Z",
+      "contentLength": 2731048,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/bebe-en-espiral-psicodelica-artwork-poleras-1792161652831.png",
+    "metadata": {
+      "eTag": "\"db6af2140e9656aceab397579d6aa961\"",
+      "size": 3278805,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:40:54.000Z",
+      "contentLength": 3278805,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/bebe-en-espiral-psicodelica-artwork-totebags-1792160414465.png",
+    "metadata": {
+      "eTag": "\"07269686020db653053236f21b264b10\"",
+      "size": 3259072,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:20:16.000Z",
+      "contentLength": 3259072,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/bebe-en-espiral-psicodelica-artwork-totebags-1792161653649.png",
+    "metadata": {
+      "eTag": "\"b18d16196a7575c79b7505fce33ba693\"",
+      "size": 2996452,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:40:55.000Z",
+      "contentLength": 2996452,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/bebe-en-espiral-psicodelica-mockup-1792161654429.png",
+    "metadata": {
+      "eTag": "\"90102de0999282c075660fcd5c62cff7\"",
+      "size": 2507718,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:40:55.000Z",
+      "contentLength": 2507718,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/bebe-en-espiral-psicodelica-mockup-hover-1792161655026.png",
+    "metadata": {
+      "eTag": "\"6182a0d4f98a113a3f50608e31cefbd8\"",
+      "size": 2658495,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:40:57.000Z",
+      "contentLength": 2658495,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/cliff-unger-artwork-bodys-1792068226643.png",
+    "metadata": {
+      "eTag": "\"f406f1549fd92da734250d8153d8472e\"",
+      "size": 3149431,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:43:48.000Z",
+      "contentLength": 3149431,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/cliff-unger-artwork-totebags-1792068227309.png",
+    "metadata": {
+      "eTag": "\"f406f1549fd92da734250d8153d8472e\"",
+      "size": 3149431,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:43:48.000Z",
+      "contentLength": 3149431,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/meryl-cyberpunk-artwork-bodys-1792068195213.png",
+    "metadata": {
+      "eTag": "\"02bfa5286dfc1c5a3198882c6b7023e2\"",
+      "size": 3314064,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:43:17.000Z",
+      "contentLength": 3314064,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/meryl-cyberpunk-artwork-bodys-1792163391404.png",
+    "metadata": {
+      "eTag": "\"02bfa5286dfc1c5a3198882c6b7023e2\"",
+      "size": 3314064,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T15:09:53.000Z",
+      "contentLength": 3314064,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/meryl-cyberpunk-artwork-poleras-1792163390418.png",
+    "metadata": {
+      "eTag": "\"02bfa5286dfc1c5a3198882c6b7023e2\"",
+      "size": 3314064,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T15:09:52.000Z",
+      "contentLength": 3314064,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/meryl-cyberpunk-artwork-totebags-1792163392506.png",
+    "metadata": {
+      "eTag": "\"e6527f6f859a2c9ece98d1f637e54231\"",
+      "size": 3073613,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T15:09:54.000Z",
+      "contentLength": 3073613,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/meryl-cyberpunk-mockup-1792163393306.png",
+    "metadata": {
+      "eTag": "\"a213ef8c07a57b4945f3bd948a18b1d9\"",
+      "size": 2627616,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T15:09:54.000Z",
+      "contentLength": 2627616,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/meryl-cyberpunk-mockup-hover-1792163393945.png",
+    "metadata": {
+      "eTag": "\"4dc04e1c3bf937ae2cab0b1e5671259e\"",
+      "size": 2602071,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T15:09:55.000Z",
+      "contentLength": 2602071,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/sam-bajo-la-luna-magenta-artwork-poleras-1792160335702.png",
+    "metadata": {
+      "eTag": "\"eca0084d832811367a32cc5ec035e44e\"",
+      "size": 3024174,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:18:57.000Z",
+      "contentLength": 3024174,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/sam-bajo-la-luna-magenta-artwork-totebags-1792160336757.png",
+    "metadata": {
+      "eTag": "\"ec74bd783e3a589a9292a2f74b07d8d4\"",
+      "size": 2934758,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:18:58.000Z",
+      "contentLength": 2934758,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/sam-bajo-la-luna-magenta-mockup-1792160338048.png",
+    "metadata": {
+      "eTag": "\"94e21080f2fe8460c845bce472410a83\"",
+      "size": 2627005,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:18:59.000Z",
+      "contentLength": 2627005,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/sam-bajo-la-luna-magenta-mockup-hover-1792160338753.png",
+    "metadata": {
+      "eTag": "\"87d7c6268a4353e143228be782fb062d\"",
+      "size": 2647913,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T14:19:00.000Z",
+      "contentLength": 2647913,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/solid-snake-shadow-moses-artwork-bodys-1792172202987.png",
+    "metadata": {
+      "eTag": "\"a3b9bfc4f36d81c52bdfe5b841e2d9d8\"",
+      "size": 1500389,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T17:36:44.000Z",
+      "contentLength": 1500389,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/solid-snake-shadow-moses-artwork-poleras-1792172202313.png",
+    "metadata": {
+      "eTag": "\"a3b9bfc4f36d81c52bdfe5b841e2d9d8\"",
+      "size": 1500389,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T17:36:43.000Z",
+      "contentLength": 1500389,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/solid-snake-shadow-moses-artwork-totebags-1792172203646.png",
+    "metadata": {
+      "eTag": "\"7db5fb7aba62af2365823d557212a480\"",
+      "size": 798941,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T17:36:44.000Z",
+      "contentLength": 798941,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/solid-snake-shadow-moses-artwork-totebags-1792172309183.png",
+    "metadata": {
+      "eTag": "\"2d26ef16aae75440c6a4cac77d751091\"",
+      "size": 659081,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T17:38:30.000Z",
+      "contentLength": 659081,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/solid-snake-shadow-moses-mockup-1792172204055.png",
+    "metadata": {
+      "eTag": "\"aa33f7274fee9ea06843a0a648d7efe2\"",
+      "size": 2623681,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T17:36:45.000Z",
+      "contentLength": 2623681,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "retro-games/solid-snake-shadow-moses-mockup-hover-1792172204622.png",
+    "metadata": {
+      "eTag": "\"cb21a6293887c025b69a180589c37936\"",
+      "size": 2756297,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=259200",
+      "lastModified": "2026-10-16T17:36:46.000Z",
+      "contentLength": 2756297,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "sailor-moon-reto-japan/guardiana-celestial-magenta-estelar-1790210744479.png",
+    "metadata": {
+      "eTag": "\"5cb8849def93f387adf0f786ca822843\"",
+      "size": 3123920,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-09-24T00:45:46.000Z",
+      "contentLength": 3123920,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "sailor-moon/guerrera-del-fuego-1790213573763.png",
+    "metadata": {
+      "eTag": "\"9d605641ad608e26605864c0c9b5a7ac\"",
+      "size": 3317095,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-09-24T01:32:55.000Z",
+      "contentLength": 3317095,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "tu-mascota-kaiju/laika-kauiju-artwork-bodys-1792002475263.png",
+    "metadata": {
+      "eTag": "\"7873bf983f3317ebedee896c85913933\"",
+      "size": 3486725,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-14T18:27:56.000Z",
+      "contentLength": 3486725,
+      "httpStatusCode": 200
+    }
+  },
+  {
+    "name": "tu-mascota-kaiju/laika-kauiju-artwork-poleras-1792068169099.png",
+    "metadata": {
+      "eTag": "\"7873bf983f3317ebedee896c85913933\"",
+      "size": 3486725,
+      "mimetype": "image/png",
+      "cacheControl": "max-age=3600",
+      "lastModified": "2026-10-15T12:42:50.000Z",
+      "contentLength": 3486725,
+      "httpStatusCode": 200
+    }
+  }
+]

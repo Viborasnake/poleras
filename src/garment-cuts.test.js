@@ -110,7 +110,7 @@ const base = loadBaseGeometry();
 const originalPositions = base.attributes.position.array.slice();
 const originalUVs = base.attributes.uv.array.slice();
 const originalIndices = base.index.array.slice();
-const cuts = Object.fromEntries(['over', 'kids'].map(kind => [kind, createGarmentCut(base, kind)]));
+const cuts = Object.fromEntries(['over', 'kids', 'woman'].map(kind => [kind, createGarmentCut(base, kind)]));
 
 test('creating both cuts leaves the original shirt and its texture coordinates untouched', () => {
   assert.deepEqual(base.attributes.position.array, originalPositions);
@@ -118,6 +118,7 @@ test('creating both cuts leaves the original shirt and its texture coordinates u
   assert.deepEqual(base.index.array, originalIndices);
   assert.notEqual(cuts.over.attributes.position.array.buffer, base.attributes.position.array.buffer);
   assert.notEqual(cuts.kids.attributes.position.array.buffer, base.attributes.position.array.buffer);
+  assert.notEqual(cuts.woman.attributes.position.array.buffer, base.attributes.position.array.buffer);
 });
 
 for (const [kind, cut] of Object.entries(cuts)) {
@@ -160,6 +161,18 @@ test('Kid has a shorter body and narrower sleeves with its own proportions', () 
   assert.ok(widthRatio > .64 && widthRatio < .97, 'Kid must have a smaller shoulder/sleeve span.');
   const bodyRatio = torsoWidth(cuts.kids, .22, .38) / torsoWidth(base, .22, .38);
   assert.ok(bodyRatio > widthRatio + .02, 'Kid should retain body room while shortening the sleeve span.');
+});
+
+test('Woman has a shaped waist and shorter sleeves while preserving neckline', () => {
+  const adult=size(base), woman=size(cuts.woman);
+  assert.ok(woman.x<adult.x*.99, 'Sleeve span should be shorter than basic.');
+  assert.ok(woman.y>adult.y*.94, 'Torso should retain adult length.');
+  assert.ok(torsoWidth(cuts.woman,.25,.38)<torsoWidth(base,.25,.38)*.98, 'Waist should be visibly shaped.');
+  assert.ok(torsoWidth(cuts.woman,.62,.73)>torsoWidth(cuts.woman,.25,.38), 'Chest should remain wider than waist.');
+  const source=base.attributes.position, fitted=cuts.woman.attributes.position;
+  let neckDelta=0, neckCount=0;
+  for(let i=0;i<source.count;i++)if(Math.abs(source.getX(i))<.3&&source.getY(i)>.85){neckDelta+=Math.abs(fitted.getX(i)-source.getX(i));neckCount++}
+  assert.ok(neckCount>0&&neckDelta/neckCount<.01,'Neckline must stay close to source.');
 });
 
 test('Over retains adult proportions with ease at the hem', () => {

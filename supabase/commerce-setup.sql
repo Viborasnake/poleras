@@ -47,6 +47,7 @@ create table if not exists public.catalog_product_types (
   slug text not null unique,
   name text not null,
   active boolean not null default true,
+  is_featured boolean not null default false,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -65,6 +66,7 @@ create table if not exists public.catalog_collections (
   slug text not null unique,
   name text not null,
   active boolean not null default true,
+  is_new_collection boolean not null default false,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   constraint catalog_collections_slug_format check (slug ~ '^[a-z0-9-]+$')
@@ -78,13 +80,38 @@ create table if not exists public.catalog_designs (
   caption text,
   artwork_path text not null,
   mockup_path text,
+  mockup_focus_x numeric not null default 50 check (mockup_focus_x between 0 and 100),
+  mockup_focus_y numeric not null default 50 check (mockup_focus_y between 0 and 100),
   mockup_hover_path text,
+  mockup_hover_focus_x numeric not null default 50 check (mockup_hover_focus_x between 0 and 100),
+  mockup_hover_focus_y numeric not null default 50 check (mockup_hover_focus_y between 0 and 100),
+  personalization_arrow_x numeric not null default 50 check (personalization_arrow_x between 0 and 100),
+  personalization_arrow_y numeric not null default 50 check (personalization_arrow_y between 0 and 100),
   sample_color text not null default '#ffffff',
+  allowed_colors text[],
+  allowed_product_colors jsonb not null default '{}',
+  accepts_customer_image boolean not null default false,
+  is_featured boolean not null default false,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint catalog_designs_slug_format check (slug ~ '^[a-z0-9-]+$'),
-  constraint catalog_designs_sample_color_format check (sample_color ~ '^#[0-9a-fA-F]{6}$')
+  constraint catalog_designs_sample_color_format check (sample_color ~ '^#[0-9a-fA-F]{6}$'),
+  constraint catalog_designs_allowed_colors_format check (
+    allowed_colors is null
+    or (
+      cardinality(allowed_colors) > 0
+      and array_position(allowed_colors, null) is null
+      and array_to_string(allowed_colors, ',') ~ '^#[0-9a-f]{6}(,#[0-9a-f]{6})*$'
+    )
+  ),
+  constraint catalog_designs_allowed_product_colors_format check (
+    jsonb_typeof(allowed_product_colors)='object'
+    and allowed_product_colors-'poleras'-'bodys'-'totebags'='{}'::jsonb
+    and (not (allowed_product_colors?'poleras') or (jsonb_typeof(allowed_product_colors->'poleras')='array' and jsonb_array_length(allowed_product_colors->'poleras')>0))
+    and (not (allowed_product_colors?'bodys') or (jsonb_typeof(allowed_product_colors->'bodys')='array' and jsonb_array_length(allowed_product_colors->'bodys')>0))
+    and (not (allowed_product_colors?'totebags') or (jsonb_typeof(allowed_product_colors->'totebags')='array' and jsonb_array_length(allowed_product_colors->'totebags')>0))
+  )
 );
 
 create table if not exists public.carts (
@@ -288,6 +315,7 @@ $$;
 -- Initial product prices. Changes are made here/server-side, never in the browser.
 insert into public.product_models (code, name, description) values
   ('basic', 'Básica', 'Tu favorita para todos los días.'),
+  ('woman', 'Mujer', 'Calce femenino para todos los días.'),
   ('over', 'Over', 'Calce amplio, estilo sin esfuerzo.'),
   ('kid', 'Kid', 'Grandes ideas en tallas pequeñas.')
 on conflict (code) do nothing;
@@ -297,8 +325,9 @@ select pm.id, s.sku, s.size, 'Blanco', '#FFFFFF', s.price_clp
 from public.product_models pm
 join (values
   ('basic', 'XS', 'DR-BSC-XS-WHT', 14990), ('basic', 'S', 'DR-BSC-S-WHT', 14990), ('basic', 'M', 'DR-BSC-M-WHT', 14990), ('basic', 'L', 'DR-BSC-L-WHT', 14990), ('basic', 'XL', 'DR-BSC-XL-WHT', 14990), ('basic', 'XXL', 'DR-BSC-XXL-WHT', 14990),
+  ('woman', 'S', 'DR-WMN-S-WHT', 14990), ('woman', 'M', 'DR-WMN-M-WHT', 14990), ('woman', 'L', 'DR-WMN-L-WHT', 14990),
   ('over', 'XS', 'DR-OVR-XS-WHT', 21990), ('over', 'S', 'DR-OVR-S-WHT', 21990), ('over', 'M', 'DR-OVR-M-WHT', 21990), ('over', 'L', 'DR-OVR-L-WHT', 21990), ('over', 'XL', 'DR-OVR-XL-WHT', 21990), ('over', 'XXL', 'DR-OVR-XXL-WHT', 21990),
-  ('kid', 'XS', 'DR-KID-XS-WHT', 8990), ('kid', 'S', 'DR-KID-S-WHT', 8990), ('kid', 'M', 'DR-KID-M-WHT', 8990), ('kid', 'L', 'DR-KID-L-WHT', 8990), ('kid', 'XL', 'DR-KID-XL-WHT', 8990), ('kid', 'XXL', 'DR-KID-XXL-WHT', 8990)
+  ('kid', '2 años', 'DR-KID-2-WHT', 8990), ('kid', '3 años', 'DR-KID-3-WHT', 8990), ('kid', '4 años', 'DR-KID-4-WHT', 8990), ('kid', '6 años', 'DR-KID-6-WHT', 8990), ('kid', '8 años', 'DR-KID-8-WHT', 8990), ('kid', '10 años', 'DR-KID-10-WHT', 8990)
 ) as s(model_code, size, sku, price_clp) on s.model_code = pm.code
 on conflict (sku) do nothing;
 

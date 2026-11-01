@@ -9,3 +9,12 @@ verify_jwt = false
 
 [functions.update-order-status]
 verify_jwt = true
+
+[functions.sync-catalog-design]
+verify_jwt = true
+
+[functions.private-design-storage]
+verify_jwt = true
+
+[functions.create-whatsapp-order]
+verify_jwt = true

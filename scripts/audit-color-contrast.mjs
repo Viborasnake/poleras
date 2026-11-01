@@ -1,8 +1,9 @@
 const colors={
   ink:'#262920',page:'#f9f7f2',surface:'#fffdfa',white:'#ffffff',pink:'#f957a4',
-  lime:'#dfff78',lilac:'#6652c5',success:'#2f6b2f',warning:'#9a4d00',
+  lime:'#dfff78',lilac:'#6652c5',lilacSoft:'#ded6f5',success:'#2f6b2f',warning:'#9a4d00',
   danger:'#b42318',info:'#275dab',secondary:'#52554d',border:'#6f726a',
-  disabled:'#e5e3df',
+  disabled:'#e5e3df',adminDarkSurface:'#171717',adminDarkControl:'#919191',adminDarkPink:'#311523',
+  accountCreativeDark:'#35334e',accountCreativeMuted:'#d3d2d8',accountCreativeBorder:'#9486d7',
 };
 
 const channel=(value)=>{
@@ -23,6 +24,7 @@ const checks=[
   ['white','ink',4.5,'Texto blanco / Ink'],
   ['ink','pink',4.5,'Texto Ink / Pink'],
   ['white','lilac',4.5,'Texto blanco / Lilac'],
+  ['ink','lilacSoft',4.5,'Texto Ink / Lilac suave'],
   ['ink','lime',4.5,'Texto Ink / Lime'],
   ['white','success',4.5,'Texto blanco / Success'],
   ['white','warning',4.5,'Texto blanco / Warning'],
@@ -32,6 +34,11 @@ const checks=[
   ['secondary','disabled',4.5,'Texto / Disabled'],
   ['lilac','page',3,'Focus ring / Page'],
   ['border','surface',3,'Borde de input / Surface'],
+  ['adminDarkSurface','adminDarkControl',3,'Perilla apagada / Riel oscuro'],
+  ['white','adminDarkPink',4.5,'Texto / Contenedor de pago oscuro'],
+  ['white','accountCreativeDark',4.5,'Texto / Solicitud creativa oscura'],
+  ['accountCreativeMuted','accountCreativeDark',4.5,'Texto secundario / Solicitud creativa oscura'],
+  ['accountCreativeBorder','accountCreativeDark',3,'Borde / Solicitud creativa oscura'],
 ];
 
 let failed=false;

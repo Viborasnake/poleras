@@ -1,0 +1,17 @@
+# Oversized t-shirt
+
+- Autor declarado en los metadatos del GLB: kylelhb — https://sketchfab.com/kylelhb
+- Fuente original declarada: https://sketchfab.com/3d-models/oversized-t-shirt-3b6e78d6a1a74370a6e5af6f312d38f7
+- Licencia declarada: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+- Archivo obtenido de: https://donpolera.pro/configurador/models/oversized_tshirt.glb?v=1
+- Fecha de descarga: 2026-10-24.
+- Cambios por Droska: ninguno; copia de los bytes descargados.
+- El archivo indica procesamiento previo con glTF-Transform v4.4.0. No se verificaron las modificaciones anteriores respecto al original de Sketchfab.
+
+La autoría, fuente y licencia anteriores están incrustadas en asset.extras del GLB. Sketchfab devolvió HTTP 403 durante la verificación, por lo que no se confirmó independientemente la ficha original.
+
+Al publicar el modelo, conservar crédito al autor, enlace a la fuente y a la licencia e indicar cualquier modificación. La atribución no implica respaldo del autor ni de Don Polera.
+
+## Integración pendiente
+
+GLB 2.0, 130.360 bytes, una malla y un material. Requiere EXT_meshopt_compression, EXT_texture_webp y KHR_mesh_quantization. El cargador debe configurar MeshoptDecoder; comprobar orientación, escala, UV y proyección del estampado antes de reemplazar el oversize actual. Este archivo no está integrado ni publicado.

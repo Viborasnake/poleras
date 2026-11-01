@@ -30,7 +30,7 @@ Deno.serve(async request => {
   const preview = body.preview === true
   const requestedStatus = String(body.status || '').trim()
   if (!orderId) return json({ error: 'Falta el pedido.' }, 400)
-  const { data: order, error } = await admin.from('orders').select('id,status,source,request_type,request_details,quote_message,user_id,shipping_address,subtotal_clp,shipping_clp,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,order_edit_version,order_edit_email_sent_at,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)').eq('id', orderId).single()
+  const { data: order, error } = await admin.from('orders').select('id,status,source,request_type,request_details,quote_message,user_id,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,order_edit_version,order_edit_email_sent_at,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)').eq('id', orderId).single()
   if (error || !order) return json({ error: 'No encontramos el pedido.' }, 404)
   const supportedStatuses = ['submitted', 'paid', 'in_production', 'ready', 'ready_for_pickup', 'shipped', 'delivered', ...(order.request_type === 'creative' ? ['quoted', 'awaiting_deposit'] : [])]
   const previewStatus = preview && supportedStatuses.includes(requestedStatus) ? requestedStatus : order.status
@@ -48,7 +48,9 @@ Deno.serve(async request => {
   try {
     const paymentInstructions = body.paymentInstructions || order.payment_instructions || null
     if (paymentEmail && !paymentInstructions?.transfer && !paymentInstructions?.mercado_pago_url) return json({ error: 'Agrega datos de transferencia o un link de Mercado Pago.' }, 422)
-    const details = { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, total_clp: order.total_clp, price_snapshot: order.price_snapshot, payment_instructions: paymentEmail ? paymentInstructions : undefined, orderEdited: orderEditEmail, creative: order.request_type === 'creative', request_details: order.request_details, quote_message: order.quote_message }
+    const shippingAddress = { ...(order.shipping_address || {}), delivery_notes: order.shipping_address?.delivery_notes || (order.source === 'online' ? order.shipping_address?.notes : '') }
+    delete shippingAddress.notes
+    const details = { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, discount_clp: order.discount_clp, coupon_code: order.coupon_code, total_clp: order.total_clp, shipping_address: shippingAddress, price_snapshot: order.price_snapshot, payment_instructions: paymentEmail ? paymentInstructions : undefined, orderEdited: orderEditEmail, creative: order.request_type === 'creative', request_details: order.request_details, quote_message: order.quote_message }
     if (preview) {
       const siteUrl = (Deno.env.get('SITE_URL') || 'https://droska.frontbook.cl').replace(/\/$/, '')
       const emailPreview = buildOrderEmail(name, order.id, previewStatus, siteUrl, order.shipping_address?.fulfillment === 'pickup', details)

@@ -13,4 +13,5 @@ test('distingue los medios de pago web usando el pedido actual', () => {
   assert.equal(orderCardOriginLabel({ source: 'online', price_snapshot: { provider: 'checkout_draft' } }), 'Web · Sin medio de pago');
   assert.equal(orderCardOriginLabel({ source: 'online', payments: [{ provider: 'transferencia_bancaria' }] }), 'Web · Transferencia');
   assert.equal(orderCardOriginLabel({ source: 'idea_request', request_type: 'creative' }), 'Web · Idea');
+  assert.equal(orderCardOriginLabel({ source: 'whatsapp' }), 'WhatsApp · solicitud');
 });

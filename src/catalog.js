@@ -1,19 +1,7 @@
+import {designProductMockups} from './catalog-product-mockups.js';
+import {designForProduct,designProductArtworks} from './catalog-product-artworks.js';
 import {fallbackCatalogProducts} from './product-navigation.js';
-import {migratedCatalogR2Paths} from './catalog-r2-paths.js';
-
-const catalogAssetBaseUrl=String(import.meta.env?.VITE_CATALOG_IMAGE_BASE_URL||'').replace(/\/$/,'');
-const supabaseCatalogPathMarker='/storage/v1/object/public/catalog-designs/';
-
-/**
- * Serves only the verified migrated catalog objects from R2. New uploads keep
- * their Supabase URL until they are copied, so publishing in Admin never
- * produces a broken image during the transition.
- */
-export function catalogAssetUrl(value='',baseUrl=catalogAssetBaseUrl){
-  if(!baseUrl||typeof value!=='string'||!value.includes(supabaseCatalogPathMarker))return value;
-  const path=value.split(supabaseCatalogPathMarker)[1];
-  return migratedCatalogR2Paths.has(path)?`${String(baseUrl).replace(/\/$/,'')}/${path}`:value;
-}
+import {designProductColorMap} from '../supabase/functions/_shared/catalog-product-colors.js';
 
 export const collections = [
   {id:'papa',label:'Para Papá',category:'general'},
@@ -31,16 +19,42 @@ export const categories=[
   {id:'animales',label:'Animales'},
 ];
 
-export const sampleShirtColors = [
-  {value:'#ffffff',label:'Blanco'},
-  {value:'#202124',label:'Negro'},
-  {value:'#e8e0cf',label:'Blanco vintage'},
-  {value:'#8daec3',label:'Azul zen'},
-];
-
-export const normalizeSampleColor=value=>sampleShirtColors.some(color=>color.value===String(value).toLowerCase())
+const catalogColorPattern=/^#[0-9a-f]{6}$/i;
+// El catálogo ya no sirve archivos desde Supabase Storage. Conservamos la
+// variable para previews/entornos especiales, pero producción nunca debe
+// volver a depender de ella: los enlaces históricos se resuelven siempre al
+// dominio público de R2.
+const catalogAssetBaseUrl=String(import.meta.env?.VITE_CATALOG_IMAGE_BASE_URL||'https://images.frontbook.cl').replace(/\/$/,'');
+const supabaseCatalogPathMarker='/storage/v1/object/public/catalog-designs/';
+export function catalogAssetUrl(value='',baseUrl=catalogAssetBaseUrl){
+  if(!baseUrl||typeof value!=='string'||!value.includes(supabaseCatalogPathMarker))return value;
+  return `${String(baseUrl).replace(/\/$/,'')}/${value.split(supabaseCatalogPathMarker)[1]}`;
+}
+export const normalizeSampleColor=value=>catalogColorPattern.test(String(value))
   ?String(value).toLowerCase()
   :'#ffffff';
+export function normalizeMockupFocus(x=50,y=50){
+ const normalize=value=>{
+  const number=Number(value);
+  return Number.isFinite(number)?Math.min(100,Math.max(0,number)):50;
+ };
+ return {x:normalize(x),y:normalize(y)};
+}
+export function normalizeAllowedColors(value){
+  if(value==null)return null;
+  if(!Array.isArray(value))return [];
+  return [...new Set(value.map(color=>String(color).toLowerCase()).filter(color=>catalogColorPattern.test(color)))];
+}
+
+export function compareCatalogPriority(a={},b={}){
+  const featured=Number(Boolean(b.featured??b.is_featured))-Number(Boolean(a.featured??a.is_featured));
+  if(featured)return featured;
+  const dateA=new Date(a.createdAt||a.created_at||0).getTime(),dateB=new Date(b.createdAt||b.created_at||0).getTime();
+  if(dateA||dateB)return (Number.isFinite(dateB)?dateB:0)-(Number.isFinite(dateA)?dateA:0);
+  return (a.sortOrder??999)-(b.sortOrder??999)
+    || String(a.label||a.name||'').localeCompare(String(b.label||b.name||''),'es')
+    || String(a.id||'').localeCompare(String(b.id||''),'es');
+}
 
 export const catalogDesigns = [
   {id:'papa-leyenda',collection:'papa',name:'Modo leyenda',caption:'Para el papá que siempre está.',lines:['PAPÁ','MODO LEYENDA'],motif:'rays',accent:'#f957a4',surface:'pink'},
@@ -83,40 +97,62 @@ export function filterCatalog(collection='all',designs=catalogDesigns){
   return collection==='all'?visible:visible.filter(design=>design.collection===collection);
 }
 
+export function collectionsWithDesigns(collectionRows=[],designRows=[]){
+  const visibleDesigns=designRows.filter(design=>design.active!==false);
+  return collectionRows.filter(collection=>visibleDesigns.some(design=>
+    design.collection===collection.id
+    && (!collection.productSlug||designForProduct(design,collection.productSlug))
+  ));
+}
+
 export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=null,productRows=[]){
+  const productIds=new Map(productRows.map(product=>[product.id,product.slug]));
   const categoryIds=new Map((categoryRows||[]).map(category=>[category.id,category.slug]));
   const remoteCategories=(categoryRows||[]).map(category=>({id:category.slug,label:category.name,sortOrder:category.sort_order})).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)||a.label.localeCompare(b.label,'es'));
   const remoteCollections=collectionRows.filter(collection=>categoryRows===null||categoryIds.has(collection.category_id)).map(collection=>({
     id:collection.slug,
     databaseId:collection.id,
+    productSlug:productIds.get(collection.product_type_id)||collection.catalog_product_types?.slug||'poleras',
     label:collection.name,
     category:categoryIds.get(collection.category_id)||'general',
     active:collection.active,
+    featured:Boolean(collection.is_featured),
+    isNewCollection:Boolean(collection.is_new_collection),
+    homeDesignLimit:Math.max(1,Math.min(12,Number(collection.home_design_limit)||4)),
     sortOrder:collection.sort_order,
-  })).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)||a.label.localeCompare(b.label,'es'));
+  })).sort(compareCatalogPriority);
   const collectionIds=new Map(remoteCollections.map(collection=>[collection.databaseId,collection.id]));
   const localDesigns=new Map(catalogDesigns.map(design=>[design.id,design]));
-  const remoteDesigns=[...designRows].sort((a,b)=>{
-    const newest=new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();
-    return Number.isFinite(newest)?newest:0;
-  }).flatMap(row=>{
+  const remoteDesigns=[...designRows].sort(compareCatalogPriority).flatMap(row=>{
     const local=localDesigns.get(row.slug)||{};
     const collection=collectionIds.get(row.collection_id);
     if(!collection)return [];
+    const productArtworks=Object.fromEntries(Object.entries(designProductArtworks(row,remoteCollections.find(item=>item.id===collection)?.productSlug)).map(([product,path])=>[product,catalogAssetUrl(path)]));
     return [{
       ...local,
       id:row.slug,
       databaseId:row.id,
+      createdAt:row.created_at,
       collection,
       name:row.name,
       caption:row.caption||'',
       artworkPath:catalogAssetUrl(row.artwork_path),
+      productArtworks,
       // Las fotos cargadas desde Administración tienen prioridad. Los mapas
       // locales preservan las portadas editoriales publicadas antes de que
       // existieran estos campos en la base de datos.
+      productMockups:Object.fromEntries(Object.entries(designProductMockups(row)).map(([slug,photo])=>[slug,{...photo,path:catalogAssetUrl(photo.path),hoverPath:catalogAssetUrl(photo.hoverPath)}])),
       featuredPhoto:catalogAssetUrl(catalogMockupPhoto(row.slug,row.mockup_path)),
       featuredPhotoHover:catalogAssetUrl(catalogMockupHoverPhoto(row.slug,row.mockup_hover_path)),
+      mockupFocus:normalizeMockupFocus(row.mockup_focus_x,row.mockup_focus_y),
+      mockupHoverFocus:normalizeMockupFocus(row.mockup_hover_focus_x,row.mockup_hover_focus_y),
+      personalizationArrow:normalizeMockupFocus(row.personalization_arrow_x,row.personalization_arrow_y),
       active:row.active,
+      featured:Boolean(row.is_featured),
+      acceptsCustomerImage:Boolean(row.accepts_customer_image),
+      customerPhotoSubject:row.customer_photo_subject==='people'?'people':'pets',
+      allowedColors:normalizeAllowedColors(row.allowed_colors),
+      allowedProductColors:designProductColorMap(row,Object.keys(productArtworks)),
       surface:local.surface||'pink',
       sampleColor:normalizeSampleColor(row.sample_color||local.sampleColor),
     }];
@@ -132,12 +168,12 @@ export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=nul
 export async function loadCatalog(client){
   try{
     const [productResult,categoryResult,collectionResult,designResult]=await Promise.all([
-      client.from('catalog_product_types').select('slug,name,menu_description,active,sort_order').eq('active',true).order('sort_order').order('name'),
+      client.from('catalog_product_types').select('id,slug,name,menu_description,purchase_method,active,sort_order').eq('active',true).order('sort_order').order('name'),
       client.from('catalog_categories').select('id,slug,name,active,sort_order').eq('active',true).order('sort_order').order('name'),
-      client.from('catalog_collections').select('id,category_id,slug,name,active,sort_order,catalog_product_types!inner(slug)').eq('active',true).eq('catalog_product_types.slug','poleras').order('sort_order').order('name'),
+      client.from('catalog_collections').select('id,product_type_id,category_id,slug,name,active,is_featured,is_new_collection,home_design_limit,sort_order,catalog_product_types(slug)').eq('active',true).order('sort_order').order('name'),
       // La pieza más reciente abre cada colección: además de respetar el orden
       // editorial, permite que la portada refleje la última polera publicada.
-      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,mockup_path,mockup_hover_path,sample_color,active,created_at').eq('active',true).order('created_at',{ascending:false}),
+      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,product_artworks,product_mockups,mockup_path,mockup_focus_x,mockup_focus_y,mockup_hover_path,mockup_hover_focus_x,mockup_hover_focus_y,personalization_arrow_x,personalization_arrow_y,sample_color,allowed_colors,allowed_product_colors,accepts_customer_image,customer_photo_subject,is_featured,active,created_at').eq('active',true).order('created_at',{ascending:false}),
     ]);
     if(categoryResult.error)throw categoryResult.error;
     if(collectionResult.error)throw collectionResult.error;
@@ -169,6 +205,14 @@ export function artworkSvg(design){
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 720" role="img" aria-label="Diseño ${design.name}"><g color="${design.accent}">${motifs[design.motif]}</g><text x="300" y="506" text-anchor="middle" fill="#262920" font-family="Arial,sans-serif" font-weight="900" font-size="72" letter-spacing="-3">${first}</text><text x="300" y="572" text-anchor="middle" fill="#262920" font-family="Arial,sans-serif" font-weight="900" font-size="${secondSize}" letter-spacing="-2">${second}</text><path d="M173 601h254" stroke="${design.accent}" stroke-width="12" stroke-linecap="round"/></svg>`;
 }
 
-export const artworkUrl=design=>design.artworkPath&&!design.artworkPath.startsWith('local:')
-  ?design.artworkPath
-  :`data:image/svg+xml;charset=utf-8,${encodeURIComponent(artworkSvg(design))}`;
+export const artworkUrl=design=>{
+  if(design.artworkPath&&!design.artworkPath.startsWith('local:')){
+    const source=design.artworkPath;
+    // El visor 3D necesita una textura same-origin. Producción y Vite sirven el
+    // mismo proxy para no perder el estampado por CORS al cambiar de producto.
+    return source.startsWith(catalogAssetBaseUrl+'/')
+      ?`/api/catalog-image?url=${encodeURIComponent(source)}`
+      :source;
+  }
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(artworkSvg(design))}`;
+};

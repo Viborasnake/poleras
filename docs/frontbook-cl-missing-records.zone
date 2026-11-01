@@ -1,0 +1,77 @@
+$ORIGIN frontbook.cl.
+$TTL 14400
+; Generated from the cPanel zone inventory. Import only while the 29 existing Cloudflare records remain unchanged.
+_acme-challenge.cpcontacts 1 IN TXT "cBs2nZrdBc0YkU6nDdEmQEYedCuV1eWnuxCfwG9keWg"
+_acme-challenge.webdisk 1 IN TXT "rQRFEyH8kBJcOp1gXK8woKDUgkckH84sW2uPGVKxJZY"
+_acme-challenge.webmail 1 IN TXT "PFwb7bfA_auOP0yoSwUwzDbwjJNvqLK-pn5VtTqjfHQ"
+_acme-challenge.cpcalendars 1 IN TXT "5rtVhEsKxFvgoL0RO-HQ2yObnA37ALaGhsS6Uvtqj4o"
+_acme-challenge.cpanel 1 IN TXT "L61wqxuvl1vBtqPulPQQuIKExdBLALavy7Vez8cmU4Q"
+_acme-challenge.mail 1 IN TXT "mgClglowcGHSi6xPeRXyQrHl2n1SPVQOs1q1xaI2a64"
+tienda 14400 IN A 131.72.236.98
+www.tienda 14400 IN A 131.72.236.98
+default._domainkey.tienda 14400 IN TXT "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy/dtjArIjslDGnd0o8L7grHzGIqJnV+efbGiIGYu3jG95C1UVPgoL4ypL68aswSnRokxSjgXJwgmFN88J4rdse8SndmsYmR0rXoP0TwsO1YFwoCuYb2u0ZGJ9KsZF5TI95z22af0TcE35Ozs1eVubT18YiwPyvVeVOZ9CzqpT6d5bAmAO3m52qneunT2bWTk0" "FNPx1ii/0ftaVnY7IFoHsW6Q949L/VfCHmWeumXyU3xwIKlyc+X2A3OIY3DSbmxLt6nzn8IHLb9e5NlR95bbdUta48nwc2oO942+vTK5q4cpvi3eUbuOWzJR95r4jxdOUqM7PXqQkBqkTRKfwpiYQIDAQAB;"
+tienda 14400 IN TXT "v=spf1 +a +mx +ip4:131.72.236.98 +ip4:131.72.236.99 ~all"
+cpanel.tienda 14400 IN A 131.72.236.98
+whm.tienda 14400 IN A 131.72.236.98
+webmail.tienda 14400 IN A 131.72.236.98
+cpcalendars.tienda 14400 IN A 131.72.236.98
+cpcontacts.tienda 14400 IN A 131.72.236.98
+webdisk.tienda 14400 IN A 131.72.236.98
+_acme-challenge.tienda 14400 IN TXT "SZxzyRBkipsK_UlfmtetalrZkL8UmIed3rrP3VFue7U"
+_acme-challenge.www.tienda 14400 IN TXT "Yiw2ZzqBDP8cBeta3NAfaGOg49kvMYwUkr2VtOOxK-A"
+_carddavs._tcp 14400 IN SRV 0 0 2080 frontbook.cl.
+autodiscover.tienda 14400 IN A 131.72.236.98
+_autodiscover._tcp.tienda 14400 IN SRV 0 0 443 cpanelemaildiscovery.cpanel.net.
+_caldav._tcp.tienda 14400 IN SRV 0 0 2079 tienda.frontbook.cl.
+_caldav._tcp.tienda 14400 IN TXT "path=/"
+_caldavs._tcp.tienda 14400 IN SRV 0 0 2080 tienda.frontbook.cl.
+_caldavs._tcp.tienda 14400 IN TXT "path=/"
+_autodiscover._tcp 14400 IN SRV 0 0 443 cpanelemaildiscovery.cpanel.net.
+_carddav._tcp.tienda 14400 IN SRV 0 0 2079 tienda.frontbook.cl.
+_carddav._tcp.tienda 14400 IN TXT "path=/"
+_carddavs._tcp.tienda 14400 IN SRV 0 0 2080 tienda.frontbook.cl.
+_carddavs._tcp.tienda 14400 IN TXT "path=/"
+autoconfig.tienda 14400 IN A 131.72.236.98
+_caldavs._tcp 14400 IN SRV 0 0 2080 frontbook.cl.
+greenfoods 14400 IN A 131.72.236.98
+www.greenfoods 14400 IN A 131.72.236.98
+default._domainkey.greenfoods 14400 IN TXT "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1c2mS40vWLGe6Fto7bHXqE88Hv3sIcBsTT0C6UPK01xPHIOKVZkdcq1yMKZtCGWMWNqNtlXKgzLC6EWxmvFCv64csvxTAEIG+blv0cZFTi9DTW7FmFjro7G6c1hI+Xpxne+mg7GJBj8s0WcuzjuPn0Gbjl4jq4f235Bw6vFtrzGC3WvQuB1CGQ7lm+UwMKULP" "CzVZuBDa84zXrvm4Anabu70uyG8AIijACfanNqQLrbFh0lYn00Vqd1zX6krEdiWW+pF+kPyB+DaCccQb5wQi7kSVKypZwmuHLYVzuuyS7Eihl+a34nsmKSwXkCPLGEe0G3cQ2X8H9VaPM78fe0BBwIDAQAB;"
+greenfoods 14400 IN TXT "v=spf1 +a +mx +ip4:131.72.236.98 +ip4:131.72.236.99 ~all"
+webmail.greenfoods 14400 IN A 131.72.236.98
+cpcontacts.greenfoods 14400 IN A 131.72.236.98
+cpcalendars.greenfoods 14400 IN A 131.72.236.98
+_carddav._tcp.greenfoods 14400 IN SRV 0 0 2079 greenfoods.frontbook.cl.
+_carddav._tcp.greenfoods 14400 IN TXT "path=/"
+webdisk.greenfoods 14400 IN A 131.72.236.98
+_caldavs._tcp.greenfoods 14400 IN SRV 0 0 2080 greenfoods.frontbook.cl.
+_caldavs._tcp.greenfoods 14400 IN TXT "path=/"
+_autodiscover._tcp.greenfoods 14400 IN SRV 0 0 443 cpanelemaildiscovery.cpanel.net.
+_caldav._tcp.greenfoods 14400 IN SRV 0 0 2079 greenfoods.frontbook.cl.
+_caldav._tcp.greenfoods 14400 IN TXT "path=/"
+cpanel.greenfoods 14400 IN A 131.72.236.98
+autoconfig.greenfoods 14400 IN A 131.72.236.98
+whm.greenfoods 14400 IN A 131.72.236.98
+autodiscover.greenfoods 14400 IN A 131.72.236.98
+_carddavs._tcp.greenfoods 14400 IN SRV 0 0 2080 greenfoods.frontbook.cl.
+_carddavs._tcp.greenfoods 14400 IN TXT "path=/"
+_acme-challenge.www.greenfoods 14400 IN TXT "MdL3PezPuXKVJJc_b-LE0Az5OCWM-lVp8mj3o6b5zUk"
+_acme-challenge.greenfoods 14400 IN TXT "drzc-_BHfftNqIM63EBuhS3oR0vPSZ-S5uKw6JPZ0F0"
+_acme-challenge.autodiscover 14400 IN TXT "XKBW22OJ33mqCdrQp_uHuA1RaPenJwqH5lchuFIM5jo"
+_acme-challenge.storyline 14400 IN TXT "aNbRj322t88-HyxW1ZBTDtWHyq_jvpViUHQvZNOk_E4"
+_openai-site-verification.www.storyline 14400 IN TXT "openai-site-verification=oyYl5CGmUSEoE5Fp3wJCMaPvVtMthkrOjl-OnCJkrB4"
+_cf-custom-hostname.www.storyline 14400 IN TXT "7e6f1a0f-41e0-4b77-b0d3-796c0608dab8"
+benjamin 14400 IN CNAME cname.vercel-dns.com.
+_acme-challenge.benjamin 14400 IN TXT "MaV9BUmRt8dqOl9M1ZACxj4-8LoyQaERItrfmYwDIp8"
+default._domainkey.benjamin 14400 IN TXT "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAptrnSvo2GLNZcaEn60aa5GxCq2z0hZmhOhs7ntrHSK3q6aFGu5JP0W6/3PDwFzxQB4RwMarylp/5kdRPINPZqdkUoqF5Z8ylX8OeF9SHf8PqC+gI0AiF20U/fBBfJMyOZx+W0WSbQnTzJZUtVRHkx549FWmuC7biE1DRLQO3hn3C7posXmCF8eOgF8Gh04WuL" "0U5qGtcFrMtA7WhYv8dDZxFBWae1KaufW7ByQYm91zNYMLZlipVaSdpQnO0b2UvDaju9/W9YI9AXRayhbVgrzXy3InlmR3AJa2iuMcCdz0KRvdsFkTLOkG9AhMt+YfPXF7KhSBeB5DZ77rNzE/FkQIDAQAB;"
+finanzas 14400 IN CNAME ab08fbfdf930ed75.vercel-dns-017.com.
+_acme-challenge.finanzas 14400 IN TXT "difLqmEQVZdZsNHyGXW9Hplbd5Gi8kxl453mUqvKApA"
+resend._domainkey.finanzas 14400 IN TXT "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDIPlilm0Fcxrd1PoOFM1jkJe6+oI7uALKlcEO3L1DMxM91pQqSia9d02N3JHmwjrg0KCD9OdpGS0+RSaTW+uVd1wRQDbZZhHCvjpIneKDerb0R5Gz6Edk+W5sI+D3UwOhTxdkQN+wX0SIOa7JlZlUBoxo5g1AFCtJfy1gtq6kswIDAQAB"
+send.finanzas 14400 IN MX 10 feedback-smtp.sa-east-1.amazonses.com.
+send.finanzas 14400 IN TXT "v=spf1 include:amazonses.com ~all"
+pawner 14400 IN CNAME 5ebe0c215936dffc.vercel-dns-017.com.
+resend._domainkey.pawner 14400 IN TXT "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCZ/KmGqNi6Ka4kT9+KtivnIRVHfyXT4d+QroSLdDe49wGqz0DvEK90Qg5EUwWl9SWTrjWBI8WxZdiPaSV3tnOtBNN1bqUAOPlRmTT5jodijIPgj9PNClbjC7H1PoMfVKbQejI1vkabBHRRkUX/SYlNoG8t/dP1O6RgQbLHSe7c/QIDAQAB"
+rsend.pawner 14400 IN CNAME rsend-sae1.forge.rmta.net.
+send.pawner 14400 IN CNAME send.forge.rmta.net.
+_acme-challenge.autoconfig 14400 IN TXT "KWT_U9QStP6C2RYY_0nDF22IoUVP7AOQT7MsvIUVnXI"
+_acme-challenge.www.benjamin 14400 IN TXT "xx7GoDGscFhIxY_nHud5ZHVISynUGZWAalNkBRHzGt8"
+_acme-challenge.www.finanzas 14400 IN TXT "gdvfLCztLgCSYEhv6TjJu0LD3iKjoQ9PNlpbXNYcDsM"

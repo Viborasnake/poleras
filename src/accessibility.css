@@ -36,6 +36,28 @@ select:disabled,
 .ds-icon-button,.commerce-close,.account-icon,.cart-trigger svg{color:var(--ds-icon-default)}
 .commerce-copy,.commerce-note,.cart-item-copy small{color:var(--ds-text-secondary)}
 
+/* La apertura confirma el cambio de contexto sin retrasar el foco del diálogo. */
+@keyframes ds-dialog-enter{
+  from{opacity:0;transform:translateY(8px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes ds-dialog-backdrop-enter{
+  from{opacity:0}
+  to{opacity:1}
+}
+@keyframes ds-dialog-exit{
+  from{opacity:1;transform:translateY(0) scale(1)}
+  to{opacity:0;transform:translateY(8px) scale(.985)}
+}
+@keyframes ds-dialog-backdrop-exit{
+  from{opacity:1}
+  to{opacity:0}
+}
+dialog[open]:not(.ds-dialog-closing){animation:ds-dialog-enter var(--ds-duration-context) var(--ds-ease-standard) both}
+dialog[open]:not(.ds-dialog-closing)::backdrop{animation:ds-dialog-backdrop-enter var(--ds-duration-context) var(--ds-ease-standard) both}
+dialog[open].ds-dialog-closing{animation:ds-dialog-exit var(--ds-duration-context) var(--ds-ease-standard) both}
+dialog[open].ds-dialog-closing::backdrop{animation:ds-dialog-backdrop-exit var(--ds-duration-context) var(--ds-ease-standard) both}
+
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }

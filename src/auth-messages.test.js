@@ -23,6 +23,20 @@ test('mantiene el mensaje específico para correo ya registrado', () => {
   );
 });
 
+test('traduce la configuración que impide iniciar una solicitud como invitado', () => {
+  assert.equal(
+    authErrorMessage({ message: 'Anonymous sign-ins are disabled' }),
+    'El envío de ideas no está disponible en este momento. Escríbenos por WhatsApp para continuar.'
+  );
+});
+
+test('orienta al visitante cuando no puede comenzar el checkout como invitado', () => {
+  assert.equal(
+    authErrorMessage('No pudimos iniciar la compra como invitado. Intenta nuevamente.'),
+    'La compra como invitado no está disponible ahora. Crea una cuenta o inicia sesión para continuar.'
+  );
+});
+
 test('explica cómo recuperar un enlace de confirmación vencido', () => {
   assert.equal(
     authErrorMessage({ message: 'Email link is invalid or has expired (otp_expired)' }),

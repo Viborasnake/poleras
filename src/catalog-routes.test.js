@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { catalogCollectionPath, catalogDesignPath, catalogProductPath, parseCatalogPath } from './catalog-routes.js';
+import { catalogCollectionDialogPath, catalogCollectionPath, catalogDesignDialogPath, catalogDesignPath, catalogProductPath, parseCatalogPath } from './catalog-routes.js';
 
 test('catalog routes are stable, nested and human-readable',()=>{
   assert.equal(catalogProductPath('poleras'),'/productos/poleras/');
   assert.equal(catalogCollectionPath('poleras','sailor-moon'),'/productos/poleras/sailor-moon/');
+  assert.equal(catalogCollectionDialogPath('sailor-moon'),'/?collection=sailor-moon#catalogo');
+  assert.equal(catalogDesignDialogPath('sailor-moon','guardiana-celestial'),'/?collection=sailor-moon&shared-design=guardiana-celestial#catalogo');
   assert.equal(catalogDesignPath('poleras','sailor-moon','guardiana-celestial'),'/productos/poleras/sailor-moon/guardiana-celestial/');
 });
 

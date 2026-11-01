@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es-CL" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Droska · Muestra de selección progresiva</title>
+  <link rel="stylesheet" href="/src/design-system.css">
+  <link rel="stylesheet" href="./progressive-disclosure.css">
+</head>
+<body>
+  <header class="page-head"><a href="/" class="brand">droska<span aria-hidden="true">✳</span></a><span class="badge">Laboratorio de experiencia · 01</span></header>
+  <main>
+    <section class="intro"><span class="eyebrow">UNA DECISIÓN A LA VEZ</span><h1>Elige. Mira cómo<br>toma forma.</h1><p>Una muestra para probar la selección paso a paso, antes de llevarla a la tienda.</p></section>
+    <details class="lab"><summary>Controles de evaluación <span>Comparar vistas y probar escenarios</span></summary><div class="lab-controls">
+      <label>Vista<select id="view"><option value="progressive">Progresiva</option><option value="full">Todos los controles</option></select></label>
+      <label>Apariencia<select id="theme"><option value="dark">Oscuro</option><option value="light">Claro</option></select></label>
+      <button type="button" data-scenario="reset">Reiniciar</button><button type="button" data-scenario="draft">Restaurar borrador ficticio</button><button type="button" data-scenario="error">Simular error</button><button type="button" data-scenario="empty">Sin disponibilidad</button><button type="button" data-scenario="loading">Simular carga</button>
+    </div><p>Datos ficticios. Esta muestra no guarda en tu cuenta ni realiza compras. La vista completa usa exactamente las mismas opciones.</p></details>
+    <div class="workspace">
+      <aside class="preview" aria-label="Vista ilustrativa del producto"><div class="preview-top"><span class="eyebrow">DISEÑO DE COLECCIÓN</span><span class="badge">Demostración</span></div><h2>La Playera</h2><p>El diseño está elegido.<br>Ahora hagámoslo tuyo.</p>
+      <div class="garment" aria-hidden="true"><svg viewBox="0 0 400 440"><path d="M127 42 166 24Q200 63 234 24L273 42 356 116 309 176 277 151 288 402Q200 420 112 402L123 151 91 176 44 116Z" fill="currentColor" stroke="var(--ds-color-ink)" stroke-width="3"/><path d="M166 24Q200 95 234 24M123 151 127 86M277 151 273 86M114 391Q200 408 286 391" fill="none" stroke="var(--ds-color-ink)" stroke-opacity=".3" stroke-width="3"/></svg><img src="/laika.png" alt=""></div>
+      <div class="preview-caption"><strong id="preview-selection">Tu próxima favorita</strong><span>Ilustración de muestra · no es una guía de calce</span></div></aside>
+      <section class="studio" aria-labelledby="studio-title"><div class="studio-top"><span class="eyebrow">TU ESTUDIO CREATIVO</span><span id="progress-label">Detalles</span></div><h2 id="studio-title">Partamos por tu producto.</h2><p id="instruction">Al elegir una opción, se abre la siguiente decisión. Puedes editar lo anterior cuando quieras.</p><div class="progress-track" aria-hidden="true"><div id="progress-fill"></div></div>
+        <p id="notice" role="status" aria-live="polite"></p>
+        <form id="sample-form" novalidate><div id="decisions"></div><section class="price" aria-label="Precio de demostración"><div><span>Precio de tu selección</span><strong id="price"></strong></div><small id="price-help"></small></section><button class="primary" id="continue" type="submit">Continuar · Foto de tu mascota <span aria-hidden="true">→</span></button><p class="memory" id="memory">Selección solo en esta muestra. Sin guardado remoto.</p></form>
+        <section id="pet-step" hidden tabindex="-1" aria-labelledby="pet-title"><span class="eyebrow">SIGUIENTE PASO · SIMULADO</span><h3 id="pet-title">Ahora, tu protagonista.</h3><p>Así se vería el paso de la foto de tu mascota. Para esta evaluación no necesitas subir ningún archivo.</p><dl id="pet-summary"></dl><button type="button" id="return" class="secondary">← Volver a mi selección</button></section>
+      </section>
+    </div>
+    <footer>Muestra 01 · Producto → Modelo → Talla → Color → Ubicación<br>Precios y disponibilidad ficticios, exclusivos de esta evaluación.</footer>
+  </main>
+  <script type="module" src="./progressive-disclosure.js"></script>
+</body></html>

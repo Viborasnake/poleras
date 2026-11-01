@@ -1,5 +1,5 @@
 // Provisional workshop settings; confirm with the printer before production.
-export const PRINT_POLICY = { widthCm: 28, heightCm: 40, minPpi: 150, maxBytes: 50 * 1024 * 1024 };
+export const PRINT_POLICY = { widthCm: 28, heightCm: 40, minPpi: 150, maxBytes: 12 * 1024 * 1024 };
 export const REVIEW_FEE_CLP = null; // Not priced yet; never interpret as free or paid.
 export const PRINT_EXTRAS_CLP = Object.freeze({ front: 0, back: 0, both: 3990 });
 export const QUALITY_ADJUSTMENT_CLP = 4990;

@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createDisclosureState,reconcileDisclosure,confirmDisclosure} from './progressive-disclosure.js';
+const fixture=()=>[
+ {id:'product',title:'Producto',value:'shirt',summary:'Polera',valid:true},
+ {id:'model',title:'Modelo',value:'basic',summary:'Básica',valid:true},
+ {id:'size',title:'Talla',value:'M',summary:'Mediana',valid:true},
+ {id:'color',title:'Color',value:'beige',summary:'Beige',valid:true,single:true},
+ {id:'side',title:'Ubicación',value:'front',summary:'Frente',valid:true},
+];
+function configured(){const state=createDisclosureState(),steps=fixture();for(const id of ['product','model','size','side']){reconcileDisclosure(state,steps);assert.equal(confirmDisclosure(state,steps,id),true)}return {state,steps};}
+test('prefilled values never confirm decisions or allow skipping prerequisites',()=>{const s=createDisclosureState(),steps=fixture();assert.equal(reconcileDisclosure(s,steps).pending,'product');assert.deepEqual(s.confirmed,{});assert.equal(confirmDisclosure(s,steps,'size'),false)});
+test('single valid alternatives resolve only after their prerequisites',()=>{const s=createDisclosureState(),steps=fixture();confirmDisclosure(s,steps,'product');confirmDisclosure(s,steps,'model');assert.equal(s.confirmed.color,undefined);confirmDisclosure(s,steps,'size');assert.equal(s.confirmed.color,'beige');assert.equal(s.active,'side');assert.equal(reconcileDisclosure(s,steps).complete,false);confirmDisclosure(s,steps,'side');assert.equal(reconcileDisclosure(s,steps).complete,true)});
+test('compatible edits keep confirmed descendants',()=>{const {state,steps}=configured();steps[2].value='L';confirmDisclosure(state,steps,'size');assert.equal(state.confirmed.color,'beige');assert.equal(state.confirmed.side,'front');assert.equal(reconcileDisclosure(state,steps).complete,true)});
+test('variant fallback changes invalidate downstream confirmation without losing independent choices',()=>{const {state,steps}=configured();steps[1].value='over';steps[2].value='L';steps[3].value='black';steps[3].single=false;reconcileDisclosure(state,steps);assert.equal(state.confirmed.model,undefined);assert.equal(state.confirmed.size,undefined);assert.equal(state.confirmed.color,undefined);assert.equal(state.confirmed.side,'front');confirmDisclosure(state,steps,'model');assert.equal(state.active,'size');assert.match(state.message,/Modelo/)});
+test('loading and failed availability never auto-confirm or allow completion',()=>{const s=createDisclosureState(),steps=fixture().map(item=>({...item,single:true}));assert.equal(reconcileDisclosure(s,steps,{ready:false}).complete,false);assert.deepEqual(s.confirmed,{});assert.equal(confirmDisclosure(s,steps,'product',{ready:false}),false);const {state,steps:configuredSteps}=configured();assert.equal(reconcileDisclosure(state,configuredSteps,{ready:false}).complete,false);configuredSteps[2].valid=false;assert.equal(reconcileDisclosure(state,configuredSteps).pending,'size')});
+test('persisted decisions are versioned, revalidated and do not mutate the input',()=>{const saved={version:1,confirmed:{product:'shirt',model:'basic',size:'XL',side:'back',obsolete:'old'}};const state=createDisclosureState(saved),steps=fixture();reconcileDisclosure(state,steps);assert.equal(state.active,'size');assert.equal(state.confirmed.side,undefined);assert.equal(state.confirmed.obsolete,undefined);assert.equal(saved.confirmed.obsolete,'old');assert.deepEqual(createDisclosureState({version:0,confirmed:{product:'shirt'}}).confirmed,{})});
+test('required file decision must be explicitly confirmed and invalidates when the file changes',()=>{const {state,steps}=configured();steps.push({id:'artwork',title:'Archivo',value:'front:a.webp',summary:'a.webp',valid:false});assert.equal(reconcileDisclosure(state,steps).pending,'artwork');assert.equal(confirmDisclosure(state,steps,'artwork'),false);steps.at(-1).valid=true;assert.equal(reconcileDisclosure(state,steps).complete,false);assert.equal(confirmDisclosure(state,steps,'artwork'),true);steps.at(-1).value='front:b.webp';assert.equal(reconcileDisclosure(state,steps).pending,'artwork')});
+
+test('transient fetch failures preserve confirmations until authoritative data returns',()=>{const {state,steps}=configured();const before={...state.confirmed};reconcileDisclosure(state,steps.map(step=>({...step,valid:false})),{ready:false});assert.deepEqual(state.confirmed,before);assert.equal(reconcileDisclosure(state,steps).complete,true);assert.equal(state.active,null)});
+
+test('switching checkout to pickup removes address confirmations and returning to delivery requires review',()=>{
+ const state=createDisclosureState();const contact={id:'contact',title:'Contacto',value:'qa@example.com',summary:'QA',valid:true},mode={id:'mode',title:'Entrega',value:'delivery',summary:'Despacho',valid:true};
+ const address=[{id:'region',title:'Región',value:'RM',summary:'Metropolitana',valid:true},{id:'commune',title:'Comuna',value:'RM:Providencia',summary:'Providencia',valid:true},{id:'address',title:'Dirección',value:'RM:Providencia:Calle 123',summary:'Calle 123',valid:true}];
+ const delivery=[contact,mode,...address];for(const step of delivery)assert.equal(confirmDisclosure(state,delivery,step.id),true);
+ mode.value='pickup';assert.equal(confirmDisclosure(state,[contact,mode],'mode'),true);assert.equal(reconcileDisclosure(state,[contact,mode]).complete,true);assert.equal(state.confirmed.address,undefined);
+ mode.value='delivery';confirmDisclosure(state,delivery,'mode');assert.equal(state.active,'region');assert.equal(state.confirmed.contact,'qa@example.com');assert.equal(address[2].value,'RM:Providencia:Calle 123');
+});
+test('optional references still require an explicit decision and editing an idea preserves compatible contact',()=>{
+ const state=createDisclosureState(),steps=[{id:'idea',title:'Idea',value:'Gato astronauta',summary:'Gato astronauta',valid:true},{id:'references',title:'Referencias',value:'[]',summary:'Sin referencias',valid:true},{id:'contact',title:'Contacto',value:'qa@example.com',summary:'QA',valid:true}];
+ confirmDisclosure(state,steps,'idea');assert.equal(state.active,'references');assert.equal(confirmDisclosure(state,steps,'contact'),false);
+ confirmDisclosure(state,steps,'references');confirmDisclosure(state,steps,'contact');steps[0].value='Otro gato astronauta';reconcileDisclosure(state,steps);assert.equal(state.active,'idea');assert.equal(state.confirmed.contact,'qa@example.com');confirmDisclosure(state,steps,'idea');assert.equal(reconcileDisclosure(state,steps).complete,true);
+});

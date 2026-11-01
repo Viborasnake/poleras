@@ -1,0 +1,83 @@
+/* Tema local del panel: no altera los tokens de la tienda pública. */
+html.admin-theme-dark {
+  color-scheme: dark;
+  --ds-surface-page: #000;
+  --ds-surface-raised: #171717;
+  --ds-surface-subtle: #282828;
+  --ds-surface-disabled: #303030;
+  --ds-text-primary: #fff;
+  --ds-text-secondary: #d0d0d0;
+  --ds-text-tertiary: #bcbcbc;
+  --ds-text-disabled: #c5c5c5;
+  --ds-border-control: #919191;
+  --ds-border-subtle: #505050;
+  --ds-color-link: #ded6f5;
+  --ds-color-link-hover: #fff;
+  --ds-focus-ring: #ded6f5;
+  --ds-pink-50: #311523;
+  --ds-lilac-50: #211b2e;
+  --ds-shadow-control: 0 3px 0 #000;
+  background: var(--ds-surface-page);
+  color: var(--ds-text-primary);
+}
+
+html.admin-theme-dark body { background: var(--ds-surface-page); }
+html.admin-theme-dark .admin-dialog {
+  border: 1px solid var(--ds-border-control);
+  box-shadow: 0 32px 110px #000, 0 0 0 1px var(--ds-surface-raised);
+}
+html.admin-theme-dark .admin-dialog::backdrop {
+  background: rgb(0 0 0 / 78%);
+  backdrop-filter: blur(8px) brightness(.55);
+}
+html.admin-theme-dark .admin-theme-panel { background: linear-gradient(135deg, var(--ds-surface-raised), var(--ds-lilac-50)); }
+html.admin-theme-dark .admin-search,
+html.admin-theme-dark .admin-table th { background: var(--ds-surface-subtle); }
+html.admin-theme-dark .admin-sidebar-note { background: var(--ds-surface-subtle); }
+html.admin-theme-dark .admin-sidebar nav a.active,
+html.admin-theme-dark .admin-sidebar nav a b { color: var(--ds-text-primary); }
+html.admin-theme-dark .admin-eyebrow,
+html.admin-theme-dark .admin-panel-head > a { color: var(--ds-pink-300); }
+html.admin-theme-dark .metric-icon,
+html.admin-theme-dark .quick-grid svg { color: var(--ds-pink-300); }
+html.admin-theme-dark .admin-order-edit-blocker { background: var(--ds-pink-50); }
+html.admin-theme-dark .admin-loading-logo { background: #fff; border-radius: 8px; }
+
+html.admin-theme-dark .admin-primary,
+html.admin-theme-dark .ds-cta {
+  border-color: var(--ds-brand-accent);
+  background: var(--ds-brand-accent);
+  color: var(--ds-brand-primary);
+}
+html.admin-theme-dark .admin-primary:hover,
+html.admin-theme-dark .ds-cta:hover { background: var(--ds-lime-500); border-color: var(--ds-lime-500); color: var(--ds-brand-primary); }
+html.admin-theme-dark .admin-primary:disabled,
+html.admin-theme-dark .ds-cta:disabled { background: var(--ds-surface-disabled); border-color: var(--ds-border-subtle); color: var(--ds-text-disabled); box-shadow: none; }
+html.admin-theme-dark .admin-manual-color:has(input:checked)::after,
+html.admin-theme-dark .admin-color-option:has(input:checked)::after,
+html.admin-theme-dark .supplier-workflow-choices label:has(input:checked)::after,
+html.admin-theme-dark .admin-order-progress li.complete > span,
+html.admin-theme-dark .admin-demo-pill { color: var(--ds-brand-primary); }
+html.admin-theme-dark .admin-order-action,
+html.admin-theme-dark .admin-source-pill,
+html.admin-theme-dark .admin-color-option:has(input:checked),
+html.admin-theme-dark .admin-order-complete,
+html.admin-theme-dark .admin-payment-transfer-notice { color: var(--ds-brand-primary) !important; }
+
+/* Las insignias de estado conservan texto propio sobre su fondo claro. */
+html.admin-theme-dark .status-pill { background: #fff3cf; color: #513800; }
+html.admin-theme-dark .status-pill.is-active,
+html.admin-theme-dark .admin-order-complete { background: #ddf8e8; color: #145a35; }
+html.admin-theme-dark .status-pill.is-hidden { background: #e5e3df; color: #262920; }
+
+.admin-theme-options { display: grid; gap: 4px; padding: 0 24px 22px; }
+.admin-theme-option { display: grid; gap: 10px; min-width: 0; padding: 13px 0; border-top: 1px solid var(--ds-border-subtle); }
+.admin-theme-option > div > strong { display: block; font-size: 13px; }
+.admin-theme-option > div > p { margin: 4px 0 0; color: var(--ds-text-secondary); font-size: 11px; line-height: 1.4; }
+.admin-theme-options .admin-form-status { min-height: 0; margin: 0; }
+.admin-theme-options .admin-form-status:empty { display: none; }
+.admin-settings-panel--appearance .admin-theme-options .admin-theme-setting { width: 100%; min-width: 0; justify-content: space-between; color: var(--ds-text-primary); }
+@media (max-width: 620px) {
+  .admin-theme-options { padding: 0 18px 20px; }
+  .admin-settings-panel--appearance .admin-theme-options .admin-theme-setting { width: 100%; }
+}

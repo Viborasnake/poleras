@@ -1,0 +1,15 @@
+PASA · Producto: escribir no confirma ni publica
+PASA · Producto: canal → opciones avanzadas → revisión antes de guardar
+PASA · Serializa radio, checkbox, slug y campos de paneles cerrados
+PASA · Error de validación en opciones avanzadas abre el detalle
+PASA · Edición compatible conserva método y publicación
+PASA · Bloquea doble submit durante guardado y recupera los controles
+PASA · Reabrir restaura los nodos originales y elimina pasos duplicados
+PASA · Colección: no confirma producto/categoría precargados
+PASA · Diseño: rechaza producto sin selección y exige archivo si es nuevo
+PASA · Diseño: conserva archivo actual y excluye archivo de producto no seleccionado
+PASA · Diseño: muestra debe estar entre los colores permitidos
+PASA · Diseño: los cambios de geometría sin eventos invalidan mockups
+PASA · Diseño: archivo nuevo exige reconfirmación y aparece íntegro en FormData
+PASA · Diseño: archivo inválido en mockup bloquea la revisión y permite corregir
+PASA · Guardia final comprueba campos ocultos y bloquea el envío anticipado

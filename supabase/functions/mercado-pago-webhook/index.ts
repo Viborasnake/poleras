@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { sendAdminOrderNotice } from '../_shared/order-email.ts'
+import { mercadoPaymentStatus } from '../_shared/mercado-payment-status.js'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -11,6 +12,13 @@ const safeEqual = (a: string, b: string) => {
   let difference = 0
   for (let index = 0; index < a.length; index++) difference |= a.charCodeAt(index) ^ b.charCodeAt(index)
   return difference === 0
+}
+
+const emailOrderSelect = 'source,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)'
+const emailDetailsFromOrder = (order: any) => {
+  const shippingAddress = { ...(order?.shipping_address || {}), delivery_notes: order?.shipping_address?.delivery_notes || (order?.source === 'online' ? order?.shipping_address?.notes : '') }
+  delete shippingAddress.notes
+  return { items: order?.order_items || [], subtotal_clp: order?.subtotal_clp, shipping_clp: order?.shipping_clp, discount_clp: order?.discount_clp, coupon_code: order?.coupon_code, total_clp: order?.total_clp, shipping_address: shippingAddress, price_snapshot: order?.price_snapshot }
 }
 
 const signatureIsValid = async (request: Request, dataId: string) => {
@@ -49,7 +57,7 @@ Deno.serve(async request => {
 
   const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data: pending, error: lookupError } = await admin.from('payments')
-    .select('id,order_id,amount_clp,status,provider_payment_id,orders!inner(total_clp,status)')
+    .select('id,order_id,amount_clp,status,provider_payment_id,orders!inner(total_clp,status,price_snapshot)')
     .eq('provider', 'mercado_pago').eq('provider_reference', reference).eq('order_id', orderId).maybeSingle()
   if (lookupError || !pending) return json({ error: 'Pago pendiente de registro.' }, 503)
   if (pending.status === 'approved' && pending.provider_payment_id !== dataId) return json({ error: 'El pedido ya tiene un pago aprobado.' }, 409)
@@ -57,14 +65,27 @@ Deno.serve(async request => {
   const amount = Number(payment.transaction_amount)
   if (payment.currency_id !== 'CLP' || !Number.isSafeInteger(amount) || amount !== pending.amount_clp || amount !== order?.total_clp) return json({ error: 'Monto inválido.' }, 422)
 
-  const status = payment.status === 'approved' ? 'approved' : payment.status === 'rejected' ? 'rejected' : payment.status === 'cancelled' ? 'cancelled' : 'pending'
-  if ((pending.status === 'approved' && status !== 'approved') || (pending.status === status && pending.provider_payment_id === dataId)) return json({ ok: true })
+  const status = mercadoPaymentStatus(payment)
+  if ((pending.status === 'approved' && ['pending', 'rejected', 'cancelled'].includes(status)) || (pending.status === status && pending.provider_payment_id === dataId)) return json({ ok: true })
   const confirmedAt = status === 'approved' ? new Date().toISOString() : null
   const { error: updateError } = await admin.from('payments').update({ provider_payment_id: dataId, status, confirmed_at: confirmedAt }).eq('id', pending.id)
   if (updateError) return json({ error: 'No se pudo actualizar el pago.' }, 503)
   if (status !== 'approved') {
-    const labels: Record<string, string> = { rejected: 'Pago rechazado por Mercado Pago.', cancelled: 'Pago cancelado en Mercado Pago.', pending: 'Pago pendiente de confirmación de Mercado Pago.' }
+    const labels: Record<string, string> = { rejected: 'Pago rechazado por Mercado Pago.', cancelled: 'Pago cancelado en Mercado Pago.', pending: 'Pago pendiente de confirmación de Mercado Pago.', refunded: 'Pago reembolsado completamente en Mercado Pago. No producir ni despachar.', partially_refunded: 'Pago reembolsado parcialmente en Mercado Pago. Revisar antes de continuar.', charged_back: 'Mercado Pago informó un contracargo. Detener el pedido y revisar.', in_mediation: 'Pago en mediación en Mercado Pago. Detener el pedido y revisar.' }
+    const issue = ['refunded', 'partially_refunded', 'charged_back', 'in_mediation'].includes(status)
+    if (issue) {
+      const nextSnapshot = { ...((order as any)?.price_snapshot || {}), payment_alert: status, payment_alert_at: new Date().toISOString() }
+      const orderUpdate: Record<string, unknown> = { payment_confirmed_at: null, payment_confirmed_by: null, price_snapshot: nextSnapshot, updated_at: new Date().toISOString() }
+      if ((order as any)?.status === 'paid') orderUpdate.status = 'submitted'
+      await admin.from('orders').update(orderUpdate).eq('id', orderId)
+    }
     await admin.from('order_status_history').insert({ order_id: orderId, status: (order as any)?.status || 'submitted', note: labels[status] || 'Pago actualizado por Mercado Pago.' })
+    if (issue) {
+      const { data: affectedOrder } = await admin.from('orders').select(emailOrderSelect).eq('id', orderId).single()
+      const customer = affectedOrder?.shipping_address?.customer || {}
+      try { await sendAdminOrderNotice(String(orderId), labels[status], String(customer.email || 'cliente'), emailDetailsFromOrder(affectedOrder)) }
+      catch (error) { console.error('No pudimos avisar al administrador de la reversa', error) }
+    }
     return json({ ok: true })
   }
 
@@ -75,9 +96,9 @@ Deno.serve(async request => {
     note: 'Mercado Pago aprobó el cobro. Pago por revisar en Administración.',
   })
   if (historyError) console.error('No pudimos registrar la revisión del pago', historyError)
-  const { data: pendingOrder } = await admin.from('orders').select('shipping_address').eq('id', orderId).single()
+  const { data: pendingOrder } = await admin.from('orders').select(emailOrderSelect).eq('id', orderId).single()
   const customer = pendingOrder?.shipping_address?.customer || {}
-  try { await sendAdminOrderNotice(String(orderId), 'Pago por revisar', String(customer.email || 'cliente')) }
+  try { await sendAdminOrderNotice(String(orderId), 'Pago por revisar', String(customer.email || 'cliente'), emailDetailsFromOrder(pendingOrder)) }
   catch (error) { console.error('No pudimos avisar al administrador del pago', error) }
   return json({ ok: true })
 })
