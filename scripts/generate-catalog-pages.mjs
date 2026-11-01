@@ -13,6 +13,7 @@ const SUPABASE_KEY=env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_J2zSgCPaW1
 const deploymentHost=env.VERCEL_PROJECT_PRODUCTION_URL||env.VERCEL_URL||'';
 const origin=(env.VITE_SITE_URL||env.SITE_URL||(deploymentHost?`https://${deploymentHost}`:'http://localhost:4173')).replace(/\/$/,'');
 let basePrice=14990;
+const useFallbackCatalog=env.CATALOG_SEO_ALLOW_FALLBACK==='true'||env.VERCEL_ENV!=='production';
 
 function fallbackCatalog(){
   return [{slug:'poleras',name:'Poleras',collections:fallbackCollections.map(collection=>({
@@ -43,7 +44,11 @@ async function remoteCatalog(){
 
 let products;
 try{products=await remoteCatalog();console.log(`Catálogo SEO: ${products.length} producto(s) cargado(s) desde Supabase.`)}
-catch(error){products=fallbackCatalog();console.warn(`Catálogo SEO: se usará el respaldo local (${error.message}).`)}
+catch(error){
+  if(!useFallbackCatalog)throw new Error(`No se pudo generar el catálogo SEO desde Supabase: ${error.message}`);
+  products=fallbackCatalog();
+  console.warn(`Catálogo SEO: se usará el respaldo local (${error.message}).`);
+}
 
 const template=await readFile(resolve(distRoot,'catalog-page.html'),'utf8'),pages=[];
 for(const product of products){
