@@ -11,6 +11,14 @@
     {
       "source": "/admin/",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/herramientas/semitonos-dtf",
+      "destination": "/herramientas/semitonos-dtf/index.html"
+    },
+    {
+      "source": "/herramientas/semitonos-dtf/",
+      "destination": "/herramientas/semitonos-dtf/index.html"
     }
   ]
 }

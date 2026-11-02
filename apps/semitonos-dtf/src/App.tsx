@@ -1,0 +1,1405 @@
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { inspectPng, printSize, withCanvasPrintProfile } from './print'
+import GangSheet, {type ProjectActions} from './GangSheet'
+import {parseProject,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-file'
+import {readActiveProject,writeActiveProject,deleteActiveProject,emptyProject} from './project-storage'
+import type {ProjectSaveStatus} from './use-project-autosave'
+import {renamePersonalPreset,deletePersonalPreset} from './preset-library'
+import {clearActiveProject} from './reset-project'
+import type {ResizeMethod} from './resample'
+import type {EditorDocument,GangSource} from './editor-document'
+import {migratePresetSettings} from './preset-migration'
+import {garmentPresets as presets,presetsFor,type GarmentTone,type PresetMode} from './garment-presets'
+import {contentBounds,imageContentBounds} from './crop'
+import {createHistory,recordHistory,moveHistory,type History} from './history'
+import {assessHalftoneSafety,type HalftoneSafetyReport} from './halftone-safety'
+import CropPanel, {type CropRect} from './CropPanel'
+import ColorRangePanel from './ColorRangePanel'
+import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
+import {applyEdgeMask,edgeMaskStyles,isEdgeMaskStyle,type EdgeMaskStyle} from './edge-mask'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
+import HalftoneWorker from './halftone.worker?worker&inline'
+
+type Shape = 'circle' | 'square' | 'line'
+type ViewMode = 'result' | 'split' | 'original'
+type ComparisonTarget = 'result' | 'rescale' | 'background'
+type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'garment' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
+type PrintReviewAction = 'export' | 'resized' | 'gang'
+
+export type Settings = {
+  lpi: number
+  angle: number
+  shape: Shape
+  size: number
+  contrast: number
+  brightness: number
+  whiteCutoff: number
+  preserveColor: boolean
+  invert: boolean
+  background: 'black' | 'white' | 'none' | 'custom'
+  colorRange?: ColorRange
+  customBase?: 'black' | 'white'
+  whiteRemoval?: 'all' | 'connected'
+  whiteDetail?: number
+  backgroundCleanup?: number
+  tolerance: number
+  enabled: boolean
+  screenScope: 'transitions' | 'all'
+  separateBackground?: boolean
+  screenBase?: 'black'|'white'
+  affectedColors?: ColorRange
+  protectedColors?: ColorRange
+  organic?: number
+  featherMm: number
+  cornerRadiusMm: number
+  trimMm: number
+  edgeSides: boolean[]
+  edgeMask: EdgeMaskStyle
+  edgeMaskSizeMm: number
+  sharpness: number
+  gamma: number
+  autoTone: boolean
+  autoContrast: boolean
+  autoColor: boolean
+  autoToneStrength: number
+  autoContrastStrength: number
+  solidAlpha: boolean
+  temperature: number
+  tint: number
+  autoColorStrength: number
+  resampleMethod: ResizeMethod
+  preSmooth: number
+  particleMinSize: number
+  minDotSize: number
+  protectSolid: boolean
+  protectSolidColor: string
+  protectSolidTolerance: number
+  protectSmoothEdge: boolean
+  flattenColor: boolean
+  flattenColorValue: string
+  flattenColorTolerance: number
+}
+
+const defaults: Settings = {
+  lpi: 28,
+  angle: 22.5,
+  shape: 'circle',
+  size: 92,
+  contrast: 100,
+  brightness: 100,
+  whiteCutoff: 245,
+  preserveColor: true,
+  invert: false,
+  background: 'black',
+  whiteRemoval: 'all',
+  whiteDetail: 0,
+  backgroundCleanup: 0,
+  tolerance: 25,
+  enabled: true,
+  screenScope: 'all',
+  separateBackground:true,
+  screenBase:'black',
+  featherMm: 0,
+  cornerRadiusMm: 0,
+  trimMm: 0,
+  edgeSides: [true, true, true, true],
+  edgeMask: 'none',
+  edgeMaskSizeMm: 5,
+  sharpness: 0,
+  gamma: 1,
+  autoTone: false,
+  autoContrast: false,
+  autoColor: false,
+  autoToneStrength: 100,
+  autoContrastStrength: 100,
+  solidAlpha: true,
+  temperature: 0,
+  tint: 0,
+  autoColorStrength: 100,
+  resampleMethod: 'lanczos3',
+  preSmooth: 0,
+  particleMinSize: 0,
+  minDotSize: 0,
+  protectSolid: false,
+  protectSolidColor: '#ffffff',
+  protectSolidTolerance: 10,
+  protectSmoothEdge: true,
+  flattenColor: false,
+  flattenColorValue: '#ffffff',
+  flattenColorTolerance: 12,
+}
+
+const initialSettings:Settings = {...defaults,...presets.default.values}
+
+const shapeLabels: Record<Shape, string> = { circle: 'Redondo', square: 'Cuadrado', line: 'Línea' }
+
+type SavedPreset = {id:string;name:string;settings:Settings;garment?:GarmentTone}
+const presetStorageKey = 'trama-dtf-presets-v1'
+function readSavedPresets(): SavedPreset[] {
+  try {
+    const data: unknown = JSON.parse(localStorage.getItem(presetStorageKey) || '[]')
+    if (!Array.isArray(data)) return []
+    return data.map(p=>p && typeof p==='object' && p.settings && typeof p.settings==='object'?{...p,settings:migratePresetSettings(p.settings,defaults)}:p).filter((p): p is SavedPreset => {
+      if (!p || typeof p.id !== 'string' || !p.id.startsWith('saved:') || typeof p.name !== 'string' || !p.name.trim() || !p.settings) return false
+      const s = p.settings
+      if(p.garment!==undefined&&!['dark','light'].includes(p.garment))return false
+      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],edgeMaskSizeMm:[0.5,20],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],protectSolidTolerance:[0,100],flattenColorTolerance:[0,100]}
+      return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
+        && ['circle','square','line'].includes(s.shape) && ['black','white','none','custom'].includes(s.background)
+        && (s.colorRange===undefined||validColorRange(s.colorRange))
+        && (s.background!=='custom'||validColorRange(s.colorRange))
+        && (s.customBase===undefined||['black','white'].includes(s.customBase))
+        && (s.whiteRemoval===undefined||['all','connected'].includes(s.whiteRemoval))
+        && (s.whiteDetail===undefined||(Number.isFinite(s.whiteDetail)&&s.whiteDetail>=0&&s.whiteDetail<=100))
+        && (s.backgroundCleanup===undefined||(Number.isFinite(s.backgroundCleanup)&&s.backgroundCleanup>=0&&s.backgroundCleanup<=100))
+        && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
+        && ['transitions','all'].includes(s.screenScope)
+        && typeof s.protectSolid === 'boolean' && typeof s.protectSolidColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.protectSolidColor) && typeof s.protectSmoothEdge === 'boolean'
+        && typeof s.flattenColor === 'boolean' && typeof s.flattenColorValue === 'string' && /^#[0-9a-f]{6}$/i.test(s.flattenColorValue)
+        && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
+        && Array.isArray(s.edgeSides) && s.edgeSides.length === 4 && s.edgeSides.every((v:unknown) => typeof v === 'boolean')
+        && isEdgeMaskStyle(s.edgeMask)
+    }).map(p=>({...p,settings:{...defaults,...p.settings}}))
+  } catch {return []}
+}
+
+function RangeControl({ label, value, min, max, step = 1, unit = '', onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }) {
+  const progress = ((value - min) / (max - min)) * 100
+  return (
+    <label className="range-control">
+      <span><b>{label}</b><output>{value}{unit}</output></span>
+      <input aria-label={label} style={{ '--progress': `${progress}%` } as React.CSSProperties} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </label>
+  )
+}
+
+function RangeAnchors({label,value,unit,values,onChange}:{label:string;value:number;unit:string;values:readonly number[];onChange:(v:number)=>void}){
+  return <div className="range-anchors" role="group" aria-label={`Anclas de ${label.toLowerCase()}`}>
+    {values.map(option=><button key={option} type="button" className={value===option?'active':''} aria-label={`Elegir ${option}${unit}`} aria-pressed={value===option} onClick={()=>onChange(option)}>{option}</button>)}
+  </div>
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return <button type="button" className={`toggle ${checked ? 'on' : ''}`} aria-pressed={checked} onClick={() => onChange(!checked)}><span /></button>
+}
+
+function EdgeMaskThumbnail({style}:{style:EdgeMaskStyle}) {
+  const ref=useRef<HTMLCanvasElement>(null)
+  useEffect(()=>{
+    const canvas=ref.current,ctx=canvas?.getContext('2d')
+    if(!canvas||!ctx)return
+    const image=ctx.createImageData(canvas.width,canvas.height)
+    for(let i=0;i<image.data.length;i+=4)image.data.set([40,224,190,255],i)
+    applyEdgeMask(image.data,canvas.width,canvas.height,{style,sizeMm:2.5,dpi:150,solidAlpha:true})
+    ctx.putImageData(image,0,0)
+  },[style])
+  return <canvas ref={ref} width={80} height={56} aria-hidden="true"/>
+}
+
+function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>void;initialProject:ProjectFile;resetting?:boolean}) {
+  const projectActions=useRef<ProjectActions>(null)
+  const [projectStatus,setProjectStatus]=useState<ProjectSaveStatus>({name:initialProject.name,message:'Recuperando proyecto…',pending:true,failed:false})
+  const originalSnapshot=useRef<{image:HTMLImageElement;data:string}|null>(null)
+  const [crop,setCrop]=useState<CropRect|null>(null)
+  const [showCrop,setShowCrop]=useState(false)
+  const [prepressCollapsed,setPrepressCollapsed]=useState(false)
+  const [projectCollapsed,setProjectCollapsed]=useState(true)
+  const sourceCanvas = useRef<HTMLCanvasElement>(null)
+  const originalCanvas = useRef<HTMLCanvasElement>(null)
+  const lanczosCanvas = useRef<HTMLCanvasElement>(null)
+  const resultCanvas = useRef<HTMLCanvasElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const imageRef = useRef<HTMLImageElement | null>(null)
+  const [settings, setSettings] = useState(initialSettings)
+  const [garment, setGarment] = useState<GarmentTone>(initialProject.editor?.document.garment??(initialProject.background==='white'?'light':'dark'))
+  const activeGarment:GarmentTone = garment
+  const presetMode:PresetMode = settings.enabled?'halftone':'continuous'
+  const visiblePresets = presetsFor(activeGarment,presetMode)
+  const [view, setView] = useState<ViewMode>('split')
+  const [comparisonTarget, setComparisonTarget] = useState<ComparisonTarget>('result')
+  const [zoom, setZoom] = useState(100)
+  const [fit, setFit] = useState(true)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [handTool, setHandTool] = useState(false)
+  const [brushTool, setBrushTool] = useState(false)
+  const [colorBrushTool, setColorBrushTool] = useState(false)
+  const [pickColorTool, setPickColorTool] = useState(false)
+  const [colorCorrectionVersion, setColorCorrectionVersion] = useState(0)
+  const [refinementTab, setRefinementTab] = useState<'clean'|'solid'>('clean')
+  const [brushSize, setBrushSize] = useState(24)
+  const [brushCursor, setBrushCursor] = useState<{x:number;y:number}|null>(null)
+  const manualErase = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
+  const colorCorrection = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
+  const manualBase = useRef<{data:Uint8ClampedArray;width:number;height:number}|null>(null)
+  const eraseHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
+  const colorCorrectionHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
+  const brushing = useRef<number|null>(null)
+  const colorBrushing = useRef<number|null>(null)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+  const [panning, setPanning] = useState(false)
+  const panStart = useRef<{id:number;x:number;y:number;left:number;top:number} | null>(null)
+  const handActive = handTool || spaceHeld
+  const [viewport, setViewport] = useState({width: 600, height: 600})
+  const [tool, setTool] = useState<'design' | 'gang'>('design')
+  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [pendingWorkflowDestination, setPendingWorkflowDestination] = useState<WorkflowDestination | null>(null)
+  const [gangSafetyReport,setGangSafetyReport]=useState<HalftoneSafetyReport|null>(null)
+  const [printReviewAction,setPrintReviewAction]=useState<PrintReviewAction|null>(null)
+  const [preset, setPreset] = useState('default')
+  const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets)
+  const [savingPreset, setSavingPreset] = useState(false)
+  const [renamingPreset,setRenamingPreset]=useState(false)
+  const [renameValue,setRenameValue]=useState('')
+  const [presetName, setPresetName] = useState('')
+  const [presetMessage, setPresetMessage] = useState('')
+  const [showInfo, setShowInfo] = useState(false)
+  const [showColorRange,setShowColorRange]=useState(false)
+  const [isolatedColorPick,setIsolatedColorPick]=useState(false)
+  const [tramaColorPick,setTramaColorPick]=useState<'affected'|'protected'|null>(null)
+  const [cropMessage,setCropMessage]=useState('')
+  const [gangSource, setGangSource] = useState<GangSource>()
+  const [editingAssetId,setEditingAssetId]=useState<string>()
+  const [split, setSplit] = useState(52)
+  const [fileName, setFileName] = useState('')
+  const [readyForNewImage, setReadyForNewImage] = useState(false)
+  const [dimensions, setDimensions] = useState({ width: 1400, height: 1000 })
+  const [dragging, setDragging] = useState(false)
+  const [widthCm, setWidthCm] = useState('11.8533')
+  const [dpi, setDpi] = useState(300)
+  const [imageVersion, setImageVersion] = useState(0)
+  const [readyKey, setReadyKey] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [processingProgress, setProcessingProgress] = useState(0)
+  const processingWorker = useRef<Worker | null>(null)
+  const resizedCache = useRef<{key:string;data:Uint8ClampedArray;width:number;height:number;neuralScale:number}|null>(null)
+  const [appliedNeuralScale,setAppliedNeuralScale]=useState(1)
+  const [exporting, setExporting] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [exportMessage, setExportMessage] = useState('')
+  const [transparent, setTransparent] = useState(0)
+  const [previewBg, setPreviewBg] = useState('checker')
+  const [error, setError] = useState('')
+  const loadId = useRef(0)
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, garment:true, size:true, crop:true, retoque:false, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
+  type PanelKey = keyof typeof collapsedPanels
+  const togglePanel = (panel:PanelKey) => setCollapsedPanels(current => {
+    if (current[panel]) return {presets:true,garment:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
+    return {presets:true,garment:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
+  })
+  const openWorkflowPanel = (panel:'size'|'garment'|'retoque'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, garment:true, size:true, crop:true, retoque:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
+  const goToWorkflow = (destination: WorkflowDestination) => {
+    if (colorBrushTool && destination.step !== workflowStep) {
+      setPendingWorkflowDestination(destination)
+      return
+    }
+    setWorkflowStep(destination.step)
+    setTool(destination.tool)
+    if (destination.panel) openWorkflowPanel(destination.panel)
+  }
+  const resolveWorkflowExit = (keepChanges: boolean) => {
+    const destination = pendingWorkflowDestination
+    if (!destination) return
+    if (!keepChanges) {
+      colorCorrection.current = null
+      colorCorrectionHistory.current = {past:[],future:[]}
+      setColorCorrectionVersion(v => v + 1)
+      setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})
+    }
+    setColorBrushTool(false)
+    setPickColorTool(false)
+    setPendingWorkflowDestination(null)
+    setWorkflowStep(destination.step)
+    setTool(destination.tool)
+    if (destination.panel) openWorkflowPanel(destination.panel)
+  }
+  const [displaySize,setDisplaySize]=useState<{width:number;height:number}|null>(null)
+  type Snapshot = {settings:Settings;widthCm:string;dpi:number;crop:CropRect|null;dimensions:{width:number;height:number};garment:GarmentTone}
+  const history=useRef<History<Snapshot>|null>(null)
+  const historyImage=useRef(-1)
+  const gesture=useRef(0)
+  const [historyCounts,setHistoryCounts]=useState({undo:0,redo:0})
+  useEffect(()=>{
+    if(loading)return
+    const snapshot={settings,widthCm,dpi,crop,dimensions,garment:activeGarment}
+    if(!history.current || historyImage.current!==imageVersion){history.current=createHistory(snapshot);historyImage.current=imageVersion}
+    else history.current=recordHistory(history.current,snapshot,gesture.current)
+    setHistoryCounts({undo:history.current.past.length+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:history.current.future.length+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
+  },[settings,widthCm,dpi,crop,dimensions,imageVersion,loading,activeGarment])
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!exportMenuRef.current?.contains(event.target as Node)) setExportMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [])
+  const navigateHistory=(direction:'undo'|'redo')=>{
+    const eraseStack = eraseHistory.current
+    const colorStack = colorCorrectionHistory.current
+    const colorList = direction === 'undo' ? colorStack.past : colorStack.future
+    if (!loading && colorList.length && resultCanvas.current) {
+      const canvas = resultCanvas.current
+      const current = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height
+        ? new Uint8Array(colorCorrection.current.data) : new Uint8Array(canvas.width * canvas.height)
+      const next = colorList.pop()!
+      if (direction === 'undo') colorStack.future.push(current)
+      else colorStack.past.push(current)
+      colorCorrection.current = {data:new Uint8Array(next),width:canvas.width,height:canvas.height}
+      setColorCorrectionVersion(v=>v+1)
+      setHistoryCounts({undo:(history.current?.past.length??0)+eraseStack.past.length+colorStack.past.length,redo:(history.current?.future.length??0)+eraseStack.future.length+colorStack.future.length})
+      return
+    }
+    const eraseList = direction === 'undo' ? eraseStack.past : eraseStack.future
+    if (!loading && eraseList.length && resultCanvas.current && manualErase.current) {
+      const current = new Uint8Array(manualErase.current.data)
+      const next = eraseList.pop()!
+      if (direction === 'undo') eraseStack.future.push(current)
+      else eraseStack.past.push(current)
+      manualErase.current.data = new Uint8Array(next)
+      renderManualErase(resultCanvas.current)
+      setHistoryCounts({undo:(history.current?.past.length??0)+eraseStack.past.length+colorStack.past.length,redo:(history.current?.future.length??0)+eraseStack.future.length+colorStack.future.length})
+      return
+    }
+    if(!history.current || loading)return
+    const next=moveHistory(history.current,direction)
+    if(next===history.current)return
+    history.current=next;gesture.current++
+    const s=next.present
+    setSettings(s.settings);setGarment(s.garment);setWidthCm(s.widthCm);setDpi(s.dpi);setCrop(s.crop);setDimensions(s.dimensions);setPreset('custom')
+    setHistoryCounts({undo:next.past.length+eraseStack.past.length+colorStack.past.length,redo:next.future.length+eraseStack.future.length+colorStack.future.length})
+  }
+
+  useEffect(() => {
+    const clear = () => {
+      setSpaceHeld(false)
+      setPanning(false)
+      const pan = panStart.current
+      panStart.current = null
+      if (pan && viewportRef.current?.hasPointerCapture(pan.id)) viewportRef.current.releasePointerCapture(pan.id)
+    }
+    const keyDown = (e: KeyboardEvent) => {
+      if (tool !== 'design' || e.code !== 'Space' || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return
+      e.preventDefault()
+      setSpaceHeld(true)
+    }
+    const keyUp = (e: KeyboardEvent) => { if (e.code === 'Space') setSpaceHeld(false) }
+    window.addEventListener('keydown', keyDown)
+    window.addEventListener('keyup', keyUp)
+    window.addEventListener('blur', clear)
+    return () => { window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('blur', clear); clear() }
+  }, [tool])
+
+  const startPan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (brushTool || colorBrushTool || pickColorTool) return
+    if ((!handActive && e.button !== 1) || (e.button !== 0 && e.button !== 1)) return
+    if (e.target instanceof Element && e.target.closest('.preview-background')) return
+    e.preventDefault()
+    e.stopPropagation()
+    const el = e.currentTarget
+    panStart.current = {id:e.pointerId,x:e.clientX,y:e.clientY,left:el.scrollLeft,top:el.scrollTop}
+    el.setPointerCapture(e.pointerId)
+    setPanning(true)
+  }
+
+  const brushPoint = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    if (!rect.width || !rect.height) return null
+    return {
+      x: Math.max(0, Math.min(canvas.width - 1, (e.clientX - rect.left) * canvas.width / rect.width)),
+      y: Math.max(0, Math.min(canvas.height - 1, (e.clientY - rect.top) * canvas.height / rect.height)),
+    }
+  }
+  const eraseAt = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current
+    const point = brushPoint(e)
+    if (!canvas || !point || !canvas.width || !canvas.height) return
+    const mask = manualErase.current?.width === canvas.width && manualErase.current?.height === canvas.height
+      ? manualErase.current.data
+      : new Uint8Array(canvas.width * canvas.height)
+    manualErase.current = {data: mask, width: canvas.width, height: canvas.height}
+    const radius = Math.max(1, brushSize / 2 * canvas.width / canvas.getBoundingClientRect().width)
+    const left = Math.max(0, Math.floor(point.x - radius)), right = Math.min(canvas.width - 1, Math.ceil(point.x + radius))
+    const top = Math.max(0, Math.floor(point.y - radius)), bottom = Math.min(canvas.height - 1, Math.ceil(point.y + radius))
+    const ctx = canvas.getContext('2d')!
+    const pixels = ctx.getImageData(left, top, right - left + 1, bottom - top + 1)
+    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+      if (Math.hypot(x + .5 - point.x, y + .5 - point.y) > radius) continue
+      const p = y * canvas.width + x
+      mask[p] = 1
+      pixels.data[((y - top) * pixels.width + x - left) * 4 + 3] = 0
+    }
+    ctx.putImageData(pixels, left, top)
+  }
+  const startBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!brushTool || colorBrushTool || pickColorTool || comparisonTarget === 'rescale' || e.button !== 0 || view === 'original' || processing || exporting) return
+    const canvas = resultCanvas.current
+    if (!canvas) return
+    const previous = manualErase.current?.width === canvas.width && manualErase.current?.height === canvas.height
+      ? manualErase.current.data : new Uint8Array(canvas.width * canvas.height)
+    eraseHistory.current.past.push(new Uint8Array(previous))
+    eraseHistory.current.future = []
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+colorCorrectionHistory.current.future.length})
+    e.preventDefault(); e.stopPropagation(); brushing.current = e.pointerId
+    e.currentTarget.setPointerCapture(e.pointerId); eraseAt(e)
+  }
+  const moveBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current
+    const point = brushPoint(e)
+    if (canvas && point) {
+      setBrushCursor({x: e.clientX, y: e.clientY})
+    }
+    if (brushing.current !== e.pointerId) return
+    e.preventDefault(); eraseAt(e)
+  }
+  const stopBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (brushing.current !== e.pointerId) return
+    brushing.current = null
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  const paintColorAt = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current, point = brushPoint(e)
+    if (!canvas || !point) return
+    const mask = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height ? colorCorrection.current.data : new Uint8Array(canvas.width * canvas.height)
+    colorCorrection.current = {data: mask, width: canvas.width, height: canvas.height}
+    const radius = Math.max(1, brushSize / 2 * canvas.width / canvas.getBoundingClientRect().width)
+    const left = Math.max(0, Math.floor(point.x - radius)), right = Math.min(canvas.width - 1, Math.ceil(point.x + radius))
+    const top = Math.max(0, Math.floor(point.y - radius)), bottom = Math.min(canvas.height - 1, Math.ceil(point.y + radius))
+    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+      if (Math.hypot(x + .5 - point.x, y + .5 - point.y) > radius) continue
+      mask[y * canvas.width + x] = 1
+    }
+    setColorCorrectionVersion(v => v + 1)
+  }
+  const startColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!colorBrushTool || brushTool || pickColorTool || comparisonTarget === 'rescale' || e.button !== 0 || view === 'original' || processing || exporting) return
+    const canvas = resultCanvas.current
+    if (!canvas) return
+    const previous = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height
+      ? colorCorrection.current.data : new Uint8Array(canvas.width * canvas.height)
+    colorCorrectionHistory.current.past = [...colorCorrectionHistory.current.past,new Uint8Array(previous)].slice(-50)
+    colorCorrectionHistory.current.future = []
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})
+    e.preventDefault(); e.stopPropagation(); colorBrushing.current = e.pointerId
+    e.currentTarget.setPointerCapture(e.pointerId); paintColorAt(e)
+  }
+  const moveColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => { if (colorBrushing.current === e.pointerId) { e.preventDefault(); paintColorAt(e) } }
+  const stopColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (colorBrushing.current !== e.pointerId) return
+    colorBrushing.current = null
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+  const pickOriginalColor = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pickColorTool || comparisonTarget === 'rescale' || e.button !== 0) return
+    const canvas = sourceCanvas.current, point = brushPoint(e)
+    if (!canvas || !point) return
+    const pixel = canvas.getContext('2d')!.getImageData(Math.round(point.x), Math.round(point.y), 1, 1).data
+    update('flattenColorValue', `#${[pixel[0],pixel[1],pixel[2]].map(v => v.toString(16).padStart(2,'0')).join('')}`)
+    setPickColorTool(false); e.preventDefault(); e.stopPropagation()
+  }
+
+  const renderManualErase = (canvas: HTMLCanvasElement) => {
+    const base = manualBase.current
+    if (base?.width === canvas.width && base.height === canvas.height) {
+      canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(base.data), base.width, base.height), 0, 0)
+    }
+    const saved = manualErase.current
+    if (!saved || saved.width !== canvas.width || saved.height !== canvas.height) return
+    const ctx = canvas.getContext('2d')!
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    for (let p = 0; p < saved.data.length; p++) if (saved.data[p]) image.data[p * 4 + 3] = 0
+    ctx.putImageData(image, 0, 0)
+  }
+  const clearManualBrush = () => {
+    manualErase.current = null
+    eraseHistory.current = {past:[],future:[]}
+    setBrushCursor(null)
+    setHistoryCounts({undo:(history.current?.past.length??0)+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+colorCorrectionHistory.current.future.length})
+    if (resultCanvas.current) renderManualErase(resultCanvas.current)
+  }
+  const movePan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panStart.current
+    if (!pan || pan.id !== e.pointerId) return
+    e.preventDefault()
+    e.currentTarget.scrollLeft = pan.left - (e.clientX - pan.x)
+    e.currentTarget.scrollTop = pan.top - (e.clientY - pan.y)
+  }
+  const stopPan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (panStart.current?.id !== e.pointerId) return
+    panStart.current = null
+    setPanning(false)
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => setViewport({width: entry.contentRect.width, height: entry.contentRect.height}))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const update = <K extends keyof Settings>(key: K, value: Settings[K]) => { if (key === 'autoTone' || key === 'autoToneStrength' || key === 'autoContrast' || key === 'autoContrastStrength' || key === 'autoColor' || key === 'autoColorStrength') setView('result'); setPreset('custom'); setSettings((s) => ({ ...s, [key]: value })) }
+
+  const resetPanel = (panel: 'presets'|'size'|'retoque'|'background'|'trama'|'refinamiento'|'ajustes'|'edges') => {
+    if (panel === 'presets') { applyPreset('default'); return }
+    if (panel === 'size') { setCrop(null); setDpi(300); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
+    if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
+    if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
+    if (panel === 'trama') { setSettings(s => ({...s, affectedColors:undefined,protectedColors:undefined,organic:0,screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
+    if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
+    if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
+    setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides],edgeMask:defaults.edgeMask,edgeMaskSizeMm:defaults.edgeMaskSizeMm}))
+  }
+
+  const applyPreset = (key:string) => {
+    const p=presets[key]
+    if(!p)return
+    clearManualBrush()
+    setSettings(s=>({...s,...p.values,resampleMethod:s.resampleMethod,sharpness:s.sharpness}))
+    setGarment(p.garment);setPreset(key);setPresetMessage('')
+    setPreviewBg(p.garment==='light'?'white':'black');setComparisonTarget('result');setView('result')
+  }
+  const chooseGarment = (tone:GarmentTone) => {
+    setGarment(tone)
+    setSettings(s=>({...s,screenBase:tone==='dark'?'black':'white'}))
+    setPreviewBg(tone==='light'?'white':'black')
+    setPreset('custom')
+  }
+  const choosePresetMode = (mode:PresetMode) => {
+    update('enabled', mode === 'halftone')
+    setView('result')
+  }
+  const chooseScreenScope = (scope:Settings['screenScope']) => {
+    setIsolatedColorPick(false)
+    update('screenScope', scope)
+    setView('result')
+  }
+
+  const savePreset = () => {
+    const baseName = presetName.trim().slice(0, 60)
+    if (!baseName) return
+    const existing = readSavedPresets()
+    let name = baseName, suffix = 2
+    while (existing.some(p => p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) name = `${baseName} (${suffix++})`
+    const saved: SavedPreset = {id:`saved:${crypto.randomUUID()}`,name,garment:activeGarment,settings:{...settings,edgeSides:[...settings.edgeSides]}}
+    try {
+      localStorage.setItem(presetStorageKey, JSON.stringify([...existing,saved]))
+      setSavedPresets([...existing,saved])
+      setPreset(saved.id)
+      setSavingPreset(false)
+      setPresetName('')
+      setPresetMessage(`“${name}” guardado en este navegador.`)
+    } catch {setPresetMessage('No se pudo guardar. Revisa que el navegador permita almacenamiento local.')}
+  }
+  const renamePreset = () => {
+    try {
+      const next=renamePersonalPreset(readSavedPresets(),preset,renameValue)
+      localStorage.setItem(presetStorageKey,JSON.stringify(next));setSavedPresets(next);setRenamingPreset(false)
+      setPresetMessage('Nombre actualizado. Los ajustes del preset no cambiaron.')
+    }catch(e){setPresetMessage((e as Error).message)}
+  }
+  const deletePreset = () => {
+    const selected=savedPresets.find(p=>p.id===preset)
+    if(!selected||!window.confirm(`¿Eliminar el preset «${selected.name}» de tu biblioteca? No se puede deshacer. Los ajustes de la imagen actual se conservarán.`))return
+    try {
+      const next=deletePersonalPreset(readSavedPresets(),preset)
+      localStorage.setItem(presetStorageKey,JSON.stringify(next));setSavedPresets(next);setPreset('custom');setRenamingPreset(false)
+      setPresetMessage('Preset eliminado de la biblioteca. Los ajustes actuales se conservan.')
+    }catch(e){setPresetMessage((e as Error).message)}
+  }
+
+  const ratio = dimensions.width / dimensions.height
+  let output: ReturnType<typeof printSize> | undefined
+  let sizeError = ''
+  try { if(fileName) output = printSize(Number(widthCm), ratio, dpi) } catch (e) { sizeError = (e as Error).message }
+  const resizeInfo = output ? {
+    sourceWidth: dimensions.width,
+    sourceHeight: dimensions.height,
+    outputWidth: output.width,
+    outputHeight: output.height,
+    percent: output.width / dimensions.width * 100,
+  } : null
+  const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop,colorCorrectionVersion,garment,comparisonTarget==='background'])
+  const resizeKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings.resampleMethod, settings.sharpness, crop])
+  const processing = loading || (!!output && readyKey !== renderKey && !error)
+  const neuralProcessing=settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4'
+  const processingLabel=neuralProcessing
+    ? processingProgress<63?`Procesando Neural ×${settings.resampleMethod==='neural4'?4:2} en tu equipo…`:'Terminando reescalado y trama…'
+    : settings.enabled?'Procesando trama…':'Procesando imagen…'
+  const visibleSize=displaySize ?? dimensions
+  const previewScale = fit ? Math.min((viewport.width - 48) / visibleSize.width, (viewport.height - 48) / visibleSize.height, 1) : zoom / 100
+  const shownZoom = Math.max(1, Math.round(previewScale * 100))
+  // CSS assumes 96 px per inch. This maps output pixels to their physical
+  // printed size at the selected output DPI (e.g. 300 ppp => 32% zoom).
+  const realSizeZoom = 96 / dpi * 100
+  const changeZoom = (factor: number) => { setZoom(Math.max(5, Math.min(400, Math.round(shownZoom * factor)))); setFit(false) }
+  const rescaleMethodLabel = settings.resampleMethod === 'neural2' || settings.resampleMethod === 'neural4'
+    ? appliedNeuralScale > 1 ? `Neural ×${appliedNeuralScale}` : 'Lanczos-3 · respaldo'
+    : settings.resampleMethod === 'lanczos3' ? 'Lanczos-3'
+      : settings.resampleMethod === 'bicubic' ? 'Bicúbico'
+        : settings.resampleMethod === 'bilinear' ? 'Bilineal' : 'Vecino más cercano'
+  const compareNeuralToLanczos = comparisonTarget === 'rescale' && appliedNeuralScale > 1 && !!lanczosCanvas.current?.width
+  const selectComparison = (target:ComparisonTarget) => {
+    setComparisonTarget(target)
+    setView('split')
+    setBrushTool(false)
+    setColorBrushTool(false)
+    setPickColorTool(false)
+    if (target === 'rescale') { setFit(false); setZoom(100) }
+  }
+
+  const loadImage = (src: string, name: string, sourceDpi=300, physicalWidth?:number, document?:EditorDocument,assetId?:string) => {
+    const id = ++loadId.current
+    setLoading(true)
+    const img = new Image()
+    img.onload = () => {
+      if (src.startsWith('blob:')) URL.revokeObjectURL(src)
+      if (id !== loadId.current) return
+      if (!img.naturalWidth || !img.naturalHeight) { setError('La imagen no tiene dimensiones válidas.'); setLoading(false); return }
+      imageRef.current = img
+      manualErase.current = null
+      colorCorrection.current = null
+      colorCorrectionHistory.current = {past:[],future:[]}
+      setColorCorrectionVersion(v => v + 1)
+      manualBase.current = null
+      eraseHistory.current = {past:[],future:[]}
+      setBrushTool(false)
+      setCrop(document?.crop ?? null)
+      setEditingAssetId(assetId)
+      if(document){setSettings({...defaults,...document.settings,edgeSides:[...document.settings.edgeSides]});if(document.garment)setGarment(document.garment);setPreset('custom')}
+      setShowCrop(false)
+      setDimensions({ width: document?.crop?.width ?? img.naturalWidth, height: document?.crop?.height ?? img.naturalHeight })
+      setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
+      setDpi(sourceDpi)
+      setFileName(name)
+      setReadyForNewImage(false)
+      setWorkflowStep(1)
+      setError('')
+      setExportMessage('')
+      setLoading(false)
+      setImageVersion(v => v + 1)
+      setFit(true)
+    }
+    img.onerror = () => { if (id === loadId.current) { setLoading(false); setError('No se pudo abrir la imagen. Prueba con PNG, JPG o WebP.') } if (src.startsWith('blob:')) URL.revokeObjectURL(src) }
+    img.src = src
+  }
+
+  useEffect(() => () => { loadId.current++ }, [])
+  useEffect(() => {
+    if (!imageRef.current || !output || loading) return
+    let cancelled = false
+    let worker: Worker | undefined
+    const { width, height } = output
+    setError('')
+    setExportMessage('')
+    setProcessingProgress(0)
+    const timer = setTimeout(() => {
+      try {
+        const src = sourceCanvas.current!, out = resultCanvas.current!
+        const native = document.createElement('canvas')
+        native.width = imageRef.current!.naturalWidth
+        native.height = imageRef.current!.naturalHeight
+        const ctx = native.getContext('2d', { willReadFrequently: true })!
+        ctx.drawImage(imageRef.current!, 0, 0)
+        const input = ctx.getImageData(crop?.x ?? 0, crop?.y ?? 0, crop?.width ?? native.width, crop?.height ?? native.height)
+        const original = originalCanvas.current!
+        original.width = input.width
+        original.height = input.height
+        original.getContext('2d')!.putImageData(input, 0, 0)
+        // Keep the worker in the application bundle. GitHub Pages replaces the
+        // previous deployment atomically, so an older cached page could point
+        // at a hashed worker file that no longer exists after a deploy.
+        worker = new HalftoneWorker()
+        processingWorker.current = worker
+        worker.onmessage = ({ data }) => {
+          if (cancelled) return
+          if (data.type === 'progress') { setProcessingProgress(data.progress); return }
+          if (data.error) setError(data.error)
+          else {
+            setExportMessage(data.warning || '')
+            // Resize only when the replacement is ready: resizing clears canvas pixels.
+            const originalPixels=new ImageData(data.original,width,height)
+            const resultPixels=new ImageData(data.data,width,height)
+            if(data.lanczosComparison){
+              const baseline=lanczosCanvas.current!
+              baseline.width=width;baseline.height=height
+              baseline.getContext('2d')!.putImageData(new ImageData(data.lanczosComparison,width,height),0,0)
+            } else if ((data.neuralScale ?? 1) === 1 && lanczosCanvas.current) {
+              lanczosCanvas.current.width=lanczosCanvas.current.height=0
+            }
+            if(data.background){original.width=width;original.height=height;original.getContext('2d')!.putImageData(new ImageData(data.background,width,height),0,0)}
+            resizedCache.current={key:resizeKey,data:new Uint8ClampedArray(data.original),width,height,neuralScale:data.neuralScale ?? 1}
+            setAppliedNeuralScale(data.neuralScale ?? 1)
+            src.width = out.width = width
+            src.height = out.height = height
+            src.getContext('2d')!.putImageData(originalPixels, 0, 0)
+            out.getContext('2d')!.putImageData(resultPixels, 0, 0)
+            manualBase.current={data:new Uint8ClampedArray(data.data),width,height}
+            renderManualErase(out)
+            setDisplaySize({width,height})
+            setTransparent(data.transparent)
+            setReadyKey(renderKey)
+            setProcessingProgress(100)
+          }
+          worker?.terminate()
+          if (processingWorker.current === worker) processingWorker.current = null
+        }
+        worker.onerror = event => {
+          if (!cancelled) {
+            const detail = event.message && event.message !== 'Script error.' ? ` Detalle: ${event.message}` : ''
+            setError(`No se pudo iniciar el procesador.${detail} Recarga la aplicación e inténtalo nuevamente.`)
+          }
+          worker?.terminate()
+          if (processingWorker.current === worker) processingWorker.current = null
+        }
+        worker.onmessageerror = () => {
+          if (!cancelled) setError('El navegador no pudo leer el resultado del procesador. Recarga la aplicación e inténtalo nuevamente.')
+          worker?.terminate()
+          if (processingWorker.current === worker) processingWorker.current = null
+        }
+        const cachedEntry=resizedCache.current?.key===resizeKey ? resizedCache.current : null
+        const cached=cachedEntry ? new Uint8ClampedArray(cachedEntry.data) : null
+        const workerData=cached??input.data
+        const correctionData = colorCorrection.current?.width === width && colorCorrection.current.height === height ? new Uint8Array(colorCorrection.current.data) : undefined
+        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, sourceWidth: input.width, sourceHeight: input.height, assetOrigin:window.location.origin,compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
+        worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
+        native.width = native.height = 1
+      } catch (e) { if (!cancelled) setError((e as Error).message) }
+    }, neuralProcessing?500:120)
+    return () => { cancelled = true; clearTimeout(timer); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
+  }, [renderKey, loading, resizeKey])
+
+  const stopProcessing = () => {
+    loadId.current++
+    processingWorker.current?.terminate()
+    processingWorker.current = null
+    setLoading(false)
+    setProcessingProgress(0)
+    setError('Procesamiento detenido.')
+  }
+
+  const handleFile = async (file?: File, print?:{widthCm:number;dpi:number}) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Selecciona una imagen PNG, JPG, WebP o SVG.'); return }
+    const request=++loadId.current
+    setLoading(true)
+    let sourceDpi=300
+    try {
+      if(file.type==='image/png'){
+        const info=inspectPng(new Uint8Array(await file.arrayBuffer()))
+        sourceDpi=[150,300,600].find(value=>Math.abs(info.dpi-value)<.02&&Math.abs(info.dpiY-value)<.02) ?? 300
+      }
+      if(request!==loadId.current)return
+      loadImage(URL.createObjectURL(file), file.name, print?.dpi ?? sourceDpi,print?.widthCm)
+    } catch(e){if(request===loadId.current){setLoading(false);setError((e as Error).message)}}
+  }
+
+  const requestImport = (file?: File) => {
+    if (!file) return
+    handleFile(file)
+    setTool('design')
+  }
+
+  const trimToContent=()=>{
+    const image=imageRef.current
+    if(!image || loading)return
+    setCropMessage('')
+    try {
+      const area=crop ?? {x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}
+      let bounds=imageContentBounds(image,area)
+      // If the source is an opaque JPG/PNG, the current processing may still
+      // have removed its background (for example with the color-range mask).
+      // Use that alpha only to find the crop rectangle; the original pixels
+      // remain untouched and are rendered again inside the new rectangle.
+      if(bounds&&bounds.width===area.width&&bounds.height===area.height&&readyKey===renderKey&&resultCanvas.current?.width&&resultCanvas.current.height){
+        const canvas=resultCanvas.current
+        const pixels=canvas.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,canvas.width,canvas.height).data
+        const processed=contentBounds(pixels,canvas.width,canvas.height)
+        if(processed&&!(processed.x===0&&processed.y===0&&processed.width===canvas.width&&processed.height===canvas.height)){
+          const x=Math.max(0,Math.floor(processed.x*area.width/canvas.width)),y=Math.max(0,Math.floor(processed.y*area.height/canvas.height))
+          const right=Math.min(area.width,Math.ceil((processed.x+processed.width)*area.width/canvas.width)),bottom=Math.min(area.height,Math.ceil((processed.y+processed.height)*area.height/canvas.height))
+          if(right>x&&bottom>y)bounds={x:area.x+x,y:area.y+y,width:right-x,height:bottom-y}
+        }
+      }
+      if(!bounds){setCropMessage('La imagen no contiene píxeles visibles.');return}
+      if(bounds.width===area.width && bounds.height===area.height){setCropMessage('No hay márgenes transparentes que recortar. Los fondos opacos (JPG o PNG sin alfa) cuentan como contenido.');return}
+      setWidthCm((Number(widthCm)*bounds.width/dimensions.width).toFixed(4))
+      setDimensions({width:bounds.width,height:bounds.height});setCrop(bounds);setFit(true);setCropMessage(`Recortado a ${bounds.width} × ${bounds.height} px. Puedes deshacerlo.`)
+    } catch(e){setError(e instanceof Error?e.message:'No se pudo detectar el contenido.')}
+  }
+
+  const exportPng = async () => {
+    const canvas = resultCanvas.current
+    if (!canvas || !output || readyKey !== renderKey || loading || exporting) return
+    setExporting(true)
+    setExportMessage('')
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo generar el PNG.')), 'image/png'))
+      const bytes = withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()), dpi)
+      const metadata = inspectPng(bytes)
+      if (metadata.width !== output.width || metadata.height !== output.height || Math.abs(metadata.dpi - dpi) > .02 || Math.abs(metadata.dpiY - dpi) > .02 || metadata.profile !== 'sRGB') throw new Error('El PNG no coincide con el tamaño solicitado.')
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
+      const link = document.createElement('a')
+      link.download = `${fileName.replace(/\.[^.]+$/, '')}-${output.width}x${output.height}-${dpi}ppp.png`
+      link.href = url
+      document.body.append(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      setExportMessage(`PNG verificado: ${metadata.width} × ${metadata.height} px · ${dpi} ppp · ${output.widthCm.toFixed(2)} × ${output.heightCm.toFixed(2)} cm. Descarga solicitada.`)
+    } catch (e) { setError((e as Error).message) }
+    finally { setExporting(false) }
+  }
+
+  const exportResizedPng = async () => {
+    const canvas = sourceCanvas.current
+    if (!canvas || !output || readyKey !== renderKey || loading || exporting) return
+    setExporting(true)
+    setExportMessage('')
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo generar la imagen reescalada.')), 'image/png'))
+      const bytes = withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()), dpi)
+      const metadata = inspectPng(bytes)
+      if (metadata.width !== output.width || metadata.height !== output.height || Math.abs(metadata.dpi - dpi) > .02 || Math.abs(metadata.dpiY - dpi) > .02 || metadata.profile !== 'sRGB') throw new Error('La imagen reescalada no coincide con el tamaño solicitado.')
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
+      const link = document.createElement('a')
+      link.download = `${fileName.replace(/\.[^.]+$/, '')}-reescalada-${output.width}x${output.height}-${dpi}ppp.png`
+      link.href = url
+      document.body.append(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      setExportMessage(`Imagen reescalada verificada: ${metadata.width} × ${metadata.height} px · ${dpi} ppp. Descarga solicitada.`)
+    } catch (e) { setError((e as Error).message) }
+    finally { setExporting(false) }
+  }
+
+  const snapshotEditor = () => {
+    if(loading)throw new Error('Espera a que termine de cargar la imagen antes de guardar.')
+    if(!imageRef.current)return undefined
+    if(originalSnapshot.current?.image!==imageRef.current){
+      const native=document.createElement('canvas')
+      native.width=imageRef.current.naturalWidth;native.height=imageRef.current.naturalHeight
+      native.getContext('2d',{colorSpace:'srgb'})!.drawImage(imageRef.current,0,0)
+      originalSnapshot.current={image:imageRef.current,data:native.toDataURL('image/png')}
+      native.width=native.height=1
+    }
+    const doc:EditorDocument={version:1,original:originalSnapshot.current.data,settings:structuredClone(settings),crop:crop?{...crop}:null,widthCm:Number(widthCm),dpi,garment:activeGarment}
+    return {name:fileName,document:doc,assetId:editingAssetId}
+  }
+  const restoreProjectEditor = (editor:{name:string;document:EditorDocument;assetId?:string}|undefined) => {
+    setGangSource(undefined)
+    if(editor){loadImage(editor.document.original,editor.name,editor.document.dpi,editor.document.widthCm,editor.document,editor.assetId)}
+    else {loadId.current++;imageRef.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('')}
+  }
+  const sendToGang = () => {
+    if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
+    const name = fileName
+    const width = output.widthCm
+    const sourceDpi=dpi
+    const native=document.createElement('canvas')
+    native.width=imageRef.current.naturalWidth;native.height=imageRef.current.naturalHeight
+    native.getContext('2d',{colorSpace:'srgb'})!.drawImage(imageRef.current,0,0)
+    const editorDocument:EditorDocument={version:1,original:native.toDataURL('image/png'),settings:structuredClone(settings),crop:crop?{...crop}:null,widthCm:width,dpi:sourceDpi,garment:activeGarment}
+    native.width=native.height=1
+    const replaceId=editingAssetId
+    setExporting(true)
+    resultCanvas.current?.toBlob(async blob => {
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(5);setTool('gang')}
+      catch(e){setError((e as Error).message)}finally{setExporting(false)}
+    }, 'image/png')
+  }
+
+  const reviewPrint = (action:PrintReviewAction) => {
+    if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
+    if(action==='gang')setWorkflowStep(4)
+    setPrintReviewAction(action)
+    const upscaleFactor = appliedNeuralScale
+    setGangSafetyReport(assessHalftoneSafety({dpi,sourceDpi:dimensions.width/output.widthCm*2.54,upscaleFactor,neuralRequested:settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4',neuralFailureReason:upscaleFactor===1?exportMessage:undefined,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:action==='resized'?false:settings.enabled}))
+  }
+  const reviewBeforeGang = () => reviewPrint('gang')
+  const reviewBeforeExport = () => reviewPrint('export')
+  const canOptimizeForDtf = printReviewAction !== 'resized' && (!settings.solidAlpha || (settings.enabled && settings.lpi > Math.floor(dpi / 6)))
+  const optimizeForDtf = () => {
+    setSettings(current=>({...current,solidAlpha:true,lpi:current.enabled?Math.min(current.lpi,Math.floor(dpi/6)):current.lpi}))
+    setPreset('custom');setGangSafetyReport(null)
+    const action=printReviewAction;setPrintReviewAction(null)
+    if(action==='gang')setWorkflowStep(2)
+    setExportMessage('Optimización DTF aplicada. Espera el nuevo resultado y revísalo antes de exportar.')
+  }
+
+  const editGangDocument = (document:EditorDocument,name:string,id:string) => {
+    loadImage(document.original,name,document.dpi,document.widthCm,document,id)
+    setTool('design')
+  }
+
+  return (
+    <div className="app-shell" inert={resetting} onPointerDownCapture={()=>{gesture.current++}} onKeyDownCapture={e=>{
+      if(!e.repeat)gesture.current++
+      if(tool!=='design' || showCrop || showColorRange || tramaColorPick || !(e.metaKey||e.ctrlKey))return
+      if(e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable=true]'))return
+      if(e.key.toLowerCase()==='z'){e.preventDefault();navigateHistory(e.shiftKey?'redo':'undo')}
+      else if(e.key.toLowerCase()==='y'){e.preventDefault();navigateHistory('redo')}
+    }}>
+      <header className="topbar">
+        <div className="brand" aria-label="Droska Trama DTF"><span className="brand-word">droska</span><small>TRAMA DTF</small></div>
+        <div className={`project-status ${projectStatus.failed?'save-failed':''}`}>
+          <button type="button" className="project-disclosure" aria-expanded={!projectCollapsed} aria-controls="project-details project-actions" aria-label={projectCollapsed?'Mostrar detalles y acciones del proyecto':'Ocultar detalles y acciones del proyecto'} onClick={()=>setProjectCollapsed(value=>!value)}><strong title={`${projectStatus.name}.trama.json`}>{projectStatus.name}.trama.json</strong><ChevronDown size={16} aria-hidden="true"/></button>
+          <span role="status">{projectStatus.message}</span>
+          <div className="project-details" id="project-details" hidden={projectCollapsed}>
+          <span className="project-file-size" title="Tamaño del JSON completo, incluidas las imágenes. El espacio interno del navegador puede diferir.">{projectStatus.bytes===undefined?'Peso: calculando…':`Peso del proyecto: ${projectStatus.bytes<1_000_000?`${(projectStatus.bytes/1_000).toLocaleString('es-CL',{maximumFractionDigits:1})} KB`:`${(projectStatus.bytes/1_000_000).toLocaleString('es-CL',{maximumFractionDigits:2})} MB`}`}</span>
+          <small className="project-location" title={`Autoguardado en el almacenamiento de ${window.location.origin}. Las copias descargadas se guardan en la carpeta que elijas en tu navegador.`}>Ubicación: este navegador · {window.location.host}</small>
+          {fileName&&<small title={fileName}>{fileName} · {dimensions.width} × {dimensions.height} px</small>}
+          </div>
+        </div>
+        <div className="top-actions">
+          {fileName && tool === 'design' && <>
+            <button type="button" className="btn top-change-image" onClick={() => fileInput.current?.click()}><Upload size={16} aria-hidden="true"/><span>Cambiar imagen</span></button>
+            <button type="button" className="btn top-gang-send" title="Revisar la seguridad de la trama y añadir el diseño a la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={reviewBeforeGang}><Layers3 size={16} aria-hidden="true"/><span>{editingAssetId?'Revisar y actualizar Gang Sheet':'Revisar y enviar a Gang Sheet'}</span></button>
+            <div className="export-dropdown" ref={exportMenuRef}>
+              <button type="button" className="btn export export-trigger" aria-expanded={exportMenuOpen} aria-haspopup="menu" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={() => setExportMenuOpen(value => !value)}><Download size={17} /> <span>{exporting ? 'Exportando…' : 'Exportar'}</span><ChevronDown size={15} /></button>
+              {exportMenuOpen && <div className="export-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); reviewBeforeExport() }}><CircleDot size={16} /><span><b>Imagen semitoneada</b><small>Revisar calidad antes de exportar</small></span></button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); reviewPrint('resized') }}><ImageIcon size={16} /><span><b>Imagen reescalada</b><small>Revisar calidad antes de exportar</small></span></button>
+              </div>}
+            </div>
+          </>}
+        </div>
+      </header>
+      <div className="project-toolbar" id="project-actions" role="group" aria-label="Acciones del proyecto" hidden={projectCollapsed}>
+        <span className="project-toolbar-label">Proyecto</span>
+        <button className="btn ghost" disabled={loading||projectStatus.pending} onClick={()=>projectActions.current?.open()}><FolderOpen size={15} aria-hidden="true"/>Abrir proyecto</button>
+        <button className="btn ghost" disabled={loading} onClick={()=>projectActions.current?.save()}><Download size={15} aria-hidden="true"/>Descargar proyecto</button>
+        <button className="btn project-delete" disabled={loading||exporting||projectStatus.pending||resetting} onClick={onNewProject} title="Eliminar el proyecto guardado en este navegador y volver al inicio"><Trash2 size={15} aria-hidden="true"/>{resetting?'Eliminando…':'Eliminar proyecto y empezar de cero'}</button>
+        {fileName && tool === 'design' && <button className="btn ghost reset-adjustments" onClick={() => {setSettings(initialSettings); setGarment('dark'); setPreset('default');setPreviewBg('black')}}><RotateCcw size={15} /> Restablecer ajustes</button>}
+      </div>
+
+      <nav className="tool-tabs" aria-label="Flujo de trabajo">
+        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => goToWorkflow({step:1,tool:'design',panel:'size'})}><b>1</b><span>Tamaño y retoque</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => goToWorkflow({step:2,tool:'design',panel:'garment'})}><b>2</b><span>Semitono</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => goToWorkflow({step:3,tool:'design',panel:'refinamiento'})}><b>3</b><span>Refinamiento</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={reviewBeforeGang} disabled={!fileName || processing}><b>4</b><span>Revisión</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={() => goToWorkflow({step:5,tool:'gang'})}><b>5</b><span>Gang Sheet</span></button>
+        <span>Todo se procesa en tu equipo</span>
+      </nav>
+      <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
+      <main className={`workspace workflow-layout-${workflowStep} ${prepressCollapsed || !fileName ? 'prepress-collapsed' : ''} ${!fileName ? 'empty-editor' : ''}`} style={{display: tool === 'design' ? undefined : 'none'}}>
+        <aside className={`sidebar workflow-step-${workflowStep}`} id="prepress-panel" hidden={prepressCollapsed || !fileName}>
+          <div className="sidebar-title"><div><Sparkles size={18} /><span>Pre-prensa</span></div><div className="sidebar-title-actions"><button type="button" className="sidebar-collapse-toggle" aria-label="Ocultar controles de Pre-prensa" title="Ocultar controles" onClick={()=>setPrepressCollapsed(true)}><ChevronLeft size={17}/></button><button type="button" aria-label="Información" aria-expanded={showInfo} onClick={() => setShowInfo(v => !v)}><Info size={17} /></button></div></div>
+          {showInfo && <div className="tip-card"><p>1. Ajusta el tamaño y retoques. 2. En Semitono elige un preset, el color de prenda, elimina el fondo y luego decide si usar trama. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
+
+          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" data-flow-order="1" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>togglePanel('presets')}><span><SwatchBook size={17} /> Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('presets')}>Restablecer valores</button>
+            <label className="field">Preset<select aria-label="Preset" value={preset.startsWith('saved:')||visiblePresets.some(([key])=>key===preset)?preset:'custom'} onChange={e => {
+              const key = e.target.value
+              const saved = savedPresets.find(p => p.id === key)
+              setPresetMessage('');setRenamingPreset(false)
+              if(saved){setSettings({...saved.settings,edgeSides:[...saved.settings.edgeSides]});if(saved.garment)setGarment(saved.garment);setPreset(key);setComparisonTarget('result');setView('result');if(saved.settings.background!=='none')setPreviewBg(saved.settings.background);else if(saved.garment)setPreviewBg(saved.garment==='light'?'white':'black')}
+              else applyPreset(key)
+            }}><option value="custom" disabled>Personalizado</option><optgroup label={`${activeGarment==='dark'?'Prenda oscura':'Prenda clara'} · ${presetMode==='halftone'?'Semitono':'Sin semitono'}`}>{visiblePresets.map(([key,p]) => <option key={key} value={key}>{p.label}</option>)}</optgroup>{savedPresets.length>0 && <optgroup label="Mis presets">{savedPresets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}</select></label>
+            <p className="help-text">{preset in presets ? presets[preset].description : preset.startsWith('saved:') ? 'Preset guardado: trama, nitidez, fondo y bordes. El tamaño de impresión se mantiene.' : 'Ajustes personalizados.'}</p>
+            <p className="help-text preset-note">Cambiar de categoría aplica su primer preset. Los incluidos conservan tamaño, ppp, recorte y bordes. Negro y blanco son los fondos de referencia: sobre otras prendas de color el resultado puede variar. Revisa la vista previa y haz una prueba de impresión.</p>
+            <button className="btn save-preset" aria-expanded={savingPreset} onClick={() => {setSavingPreset(v=>!v);setPresetMessage('')}}>Guardar preset</button>
+            {preset.startsWith('saved:')&&<div className="preset-library-actions"><button className="btn" onClick={()=>{setRenameValue(savedPresets.find(p=>p.id===preset)?.name||'');setRenamingPreset(true);setSavingPreset(false);setPresetMessage('')}}>Renombrar preset</button><button className="btn danger" onClick={deletePreset}>Eliminar preset</button></div>}
+            {renamingPreset&&preset.startsWith('saved:')&&<form className="save-preset-form" onSubmit={e=>{e.preventDefault();renamePreset()}}><label className="field">Nuevo nombre<input autoFocus aria-label="Nuevo nombre del preset" maxLength={60} value={renameValue} onChange={e=>setRenameValue(e.target.value)}/></label><button className="btn export" disabled={!renameValue.trim()}>Guardar nombre</button><button type="button" className="btn" onClick={()=>setRenamingPreset(false)}>Cancelar</button></form>}
+            {savingPreset && <form className="save-preset-form" onSubmit={e=>{e.preventDefault();savePreset()}}><label className="field">Nombre del preset<input autoFocus aria-label="Nombre del preset" type="text" maxLength={60} placeholder="Ej. DTF negro fino" value={presetName} onChange={e=>setPresetName(e.target.value)} /></label><button className="btn export" type="submit" disabled={!presetName.trim()}>Guardar mis ajustes</button><p className="help-text">Se guarda en este navegador. Incluye trama, color, fondo, nitidez y bordes; excluye tamaño y zoom.</p></form>}
+            {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
+          </div></section>
+
+          <section className={`control-card ${collapsedPanels.garment ? '' : 'open'}`}><button className="section-heading" data-flow-order="2" aria-expanded={!collapsedPanels.garment} aria-controls="garment-controls" onClick={()=>togglePanel('garment')}><span><SwatchBook size={17} /> Color de prenda</span><ChevronDown size={17}/></button><div className="section-body" id="garment-controls" hidden={collapsedPanels.garment}>
+            <div className="segmented preset-segments" role="group" aria-label="Color de prenda">{([['dark','Prenda oscura'],['light','Prenda clara']] as const).map(([tone,label])=><button key={tone} type="button" className={activeGarment===tone?'active':''} aria-pressed={activeGarment===tone} onClick={()=>chooseGarment(tone)}>{label}</button>)}</div>
+            <p className="help-text">Define el color del sustrato para elegir el fondo que vas a retirar y revisar la tinta sobre la prenda correcta.</p>
+          </div></section>
+
+          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>togglePanel('size')}><span><Ruler size={17} /> Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('size')}>Restablecer valores</button>
+            <details className="advanced-controls"><summary>Escala por porcentaje</summary><div className="advanced-body">
+            <label className="field">Reescalado de imagen (%)<input aria-label="Reescalado de imagen en porcentaje" type="number" min="1" max="2000" step="25" value={widthCm && Number(widthCm) > 0 ? Number((Number(widthCm) / 2.54 * dpi / dimensions.width * 100).toFixed(1)) : ''} onChange={e => setWidthCm(e.target.value ? (dimensions.width * Number(e.target.value) / 100 / dpi * 2.54).toFixed(4) : '')} /></label>
+            <div className="scale-presets">{[100,200,300,400].map(percent => <button key={percent} onClick={() => setWidthCm((dimensions.width * percent / 100 / dpi * 2.54).toFixed(4))}>{percent}%</button>)}</div>
+            </div></details>
+            <div className="dimension-fields"><label>Ancho (cm)<input aria-label="Ancho en centímetros" type="number" min="0.1" step="0.1" value={widthCm} onChange={e => setWidthCm(e.target.value)} /></label><label>Alto (cm)<input aria-label="Alto en centímetros" type="number" min="0.1" step="0.1" value={widthCm && Number(widthCm) > 0 ? (Number(widthCm) / ratio).toFixed(2) : ''} onChange={e => setWidthCm(e.target.value ? String(Number(e.target.value) * ratio) : '')} /></label></div>
+            <label className="field">Resolución<select aria-label="Resolución de impresión" value={dpi} onChange={e => setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
+            <p className="help-text">Salida PNG sRGB, 8 bits por canal. Comprueba los ppp requeridos por tu RIP. Aumentarlos no recupera detalle del original.</p>
+            <p className="help-text">Proporciones bloqueadas.</p>
+            <label className="field">Método de reescalado<select aria-label="Método de reescalado" value={settings.resampleMethod} onChange={e => {const method=e.target.value as ResizeMethod;update('resampleMethod',method);if(method==='neural2'||method==='neural4')selectComparison('rescale')}}><option value="lanczos3">Lanczos-3 · fotos y detalle</option><option value="bicubic">Bicúbico · fotos suaves</option><option value="bilinear">Bilineal · rapidez</option><option value="nearest">Vecino más cercano · pixel art</option><option value="neural2">Neural x2 · experimental</option><option value="neural4">Neural x4 · experimental</option></select></label>
+            <p className="help-text">{({lanczos3:'Recomendado para fotografías y ampliaciones con mucho detalle. Es el método más definido, pero puede marcar más los bordes.',bicubic:'Recomendado para fotografías cuando buscas un resultado más suave y con menos riesgo de halos.',bilinear:'Recomendado para previsualizaciones rápidas o ampliaciones moderadas. Suaviza más y conserva menos detalle fino.',nearest:'Recomendado para pixel art, gráficos con píxeles intencionales o formas muy duras. No usar para fotografías.',neural2:'Real-ESRGAN x2 en tu equipo. Procesa también imágenes grandes por bloques; el tiempo depende del tamaño y de la aceleración disponible.',neural4:'Real-ESRGAN x4 en tu equipo. Procesa también imágenes grandes por bloques. Requiere más tiempo y memoria; revisa el detalle generado al 100%.'} as Record<ResizeMethod,string>)[settings.resampleMethod]}</p>
+            {resizeInfo && <div className="resize-summary" role="status">
+              <strong>Reescalado activo</strong>
+              <span>Original: {resizeInfo.sourceWidth.toLocaleString()} × {resizeInfo.sourceHeight.toLocaleString()} px</span>
+              <span>Salida: {resizeInfo.outputWidth.toLocaleString()} × {resizeInfo.outputHeight.toLocaleString()} px · {resizeInfo.percent.toFixed(1)}%</span>
+              <span>Método: {({lanczos3:'Lanczos-3',bicubic:'Bicúbico',bilinear:'Bilineal',nearest:'Vecino más cercano',neural2:'Neural x2 experimental',neural4:'Neural x4 experimental'} as Record<ResizeMethod,string>)[settings.resampleMethod]} · Se aplica antes del semitono</span>
+              {(settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4')&&<span>{processing?'Neural: procesando modelo…':readyKey===renderKey?(appliedNeuralScale>1?`Neural ×${appliedNeuralScale}: aplicado. Compáralo directamente con Lanczos-3 en Reescalado al 100%.`:`Neural: ${exportMessage||'no se aplicó; se usó Lanczos-3.'}`):'Neural: esperando actualización.'}</span>}
+            </div>}
+            <p className="help-text">La ampliación aumenta los píxeles de salida, pero no recupera detalle que no exista en el original.</p>
+            <RangeControl label="Nitidez post-reescalado" value={settings.sharpness} min={0} max={100} unit="%" onChange={v => update('sharpness', v)} />
+            <div className="field"><span>Presets de nitidez</span><div className="scale-presets sharpness-presets" role="group" aria-label="Presets de nitidez">{[0,25,50].map(value => <button key={value} type="button" aria-pressed={settings.sharpness===value} onClick={() => update('sharpness', value)}>{value}%</button>)}</div></div>
+            <p className="help-text">Se aplica después de ampliar y antes del semitono. Usa valores bajos para fotografías y valores altos solo para gráficos definidos; el alfa se protege para reducir halos.</p>
+            {sizeError && <p className="error-text" role="alert">{sizeError}</p>}
+          </div></section>
+
+          <section className={`control-card ${collapsedPanels.crop ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.crop} aria-controls="crop-controls" onClick={()=>togglePanel('crop')}><span><Crop size={17} /> Recorte</span><ChevronDown size={17}/></button><div className="section-body" id="crop-controls" hidden={collapsedPanels.crop}>
+            <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen</button>
+            <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
+            <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
+          </div></section>
+
+          <section className={`control-card ${collapsedPanels.retoque ? '' : 'open'}`}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.retoque} aria-controls="flatten-controls" onClick={() => togglePanel('retoque')}><span><Pipette size={17} /> Aplanar colores</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="flatten-controls" hidden={collapsedPanels.retoque}>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('retoque')}>Restablecer valores</button>
+              <div className="row-label"><span>Aplanar color seleccionado</span><Toggle checked={settings.flattenColor} onChange={v => update('flattenColor', v)} /></div>
+              <label className="color-picker-field"><span>Color aplanado</span><input aria-label="Color aplanado" type="color" value={settings.flattenColorValue} onChange={e => update('flattenColorValue', e.target.value)} /></label>
+              <div className="solid-protection-presets"><button type="button" onClick={() => {update('flattenColorValue','#ffffff');update('flattenColor',true)}}>Aplanar blancos</button><button type="button" onClick={() => {update('flattenColorValue','#000000');update('flattenColor',true)}}>Aplanar negros</button></div>
+              <RangeControl label="Tolerancia de color" value={settings.flattenColorTolerance} min={0} max={40} unit="%" onChange={v => update('flattenColorTolerance', v)} />
+              <button type="button" className={`btn ${pickColorTool ? 'active' : ''}`} onClick={() => {setPickColorTool(v => !v);setColorBrushTool(false)}} disabled={!fileName || processing}>{pickColorTool ? 'Haz clic en el color original…' : 'Tomar color del original'}</button>
+              {pickColorTool && <p className="help-text color-pick-hint">Selector activo: haz clic sobre el color en la imagen para tomarlo.</p>}
+              <button type="button" className={`btn ${colorBrushTool ? 'active' : ''}`} onClick={() => {setColorBrushTool(v => !v);setPickColorTool(false);setBrushTool(false)}} disabled={!output || processing}>{colorBrushTool ? 'Cerrar pincel corrector' : 'Pincel corrector de color'}</button>
+              {colorBrushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
+              {colorBrushTool && <button type="button" className="text-button" onClick={() => {colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]};setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})}}>Restaurar correcciones de color</button>}
+              {colorBrushTool && <p className="help-text">Pinta directamente con el color seleccionado. Conserva el alfa y se aplica antes del semitono y de proteger color.</p>}
+              <p className="help-text">Convierte el color elegido y sus tonos cercanos en un color plano antes del semitono. Conserva el alfa original y no modifica el resto de la imagen.</p>
+            </div>
+          </section>
+
+          <section className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
+            <button className="section-heading" data-flow-order="4" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => togglePanel('trama')}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="trama-controls" hidden={collapsedPanels.trama}>
+              <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>choosePresetMode(mode)}>{label}</button>)}</div></div>
+              {settings.enabled ? <>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('trama')}>Restablecer valores</button>
+              <div className="preset-group"><span className="preset-group-label">Control de trama</span>
+                <p className="help-text">2. Aplica la trama al diseño que quedó tras borrar el fondo. Las zonas protegidas conservan su color y no recuperan el fondo eliminado.</p>
+                <label className="field">Cómo generar los puntos<select value={settings.affectedColors?'all':settings.screenScope} disabled={!!settings.affectedColors} onChange={e=>chooseScreenScope(e.target.value as Settings['screenScope'])}><option value="all">Según los tonos del diseño</option><option value="transitions">Sólo transparencias suaves</option></select></label>
+                <button className="btn color-range-trigger" disabled={processing} onClick={()=>setTramaColorPick('affected')}><Pipette size={16}/> {settings.affectedColors?'Editar zonas con trama':'Elegir zonas con trama'}</button>
+                <p className="help-text">{settings.affectedColors?'Trama sólo en tu selección; el resto conserva su color.':'Trama en todo el diseño visible.'}</p>
+                {settings.affectedColors&&<button className="text-button" onClick={()=>update('affectedColors',undefined)}>Volver a tramar todo</button>}
+                <button className="btn color-range-trigger" disabled={processing} onClick={()=>setTramaColorPick('protected')}><Pipette size={16}/> {settings.protectedColors?'Editar zonas protegidas':'Proteger zonas sin trama'}</button>
+                {settings.protectedColors&&<><p className="help-text">Protección activa: tiene prioridad donde se superponen las selecciones.</p><button className="text-button" onClick={()=>update('protectedColors',undefined)}>Quitar protección de trama</button></>}
+              </div>
+              <button className="btn" disabled={processing} onClick={()=>{setComparisonTarget('background');setView('split')}}>Comparar fondo eliminado / trama</button>
+              <button className="text-button" onClick={()=>{setSettings(s=>({...s,affectedColors:undefined,protectedColors:undefined,protectSolid:false,screenScope:'all',size:100,contrast:100,brightness:100,gamma:1,invert:false,organic:0}));setPreset('custom');setView('result');setComparisonTarget('result')}}>Reiniciar selección y tono de trama</button>
+              <RangeControl label="Irregularidad de los puntos" value={settings.organic??0} min={0} max={100} unit="%" onChange={v=>update('organic',v)}/>
+              <p className="help-text">0%: trama regular. Aumenta para desplazar suavemente los puntos y reducir la apariencia de rejilla. Revisa los detalles al 100%.</p>
+              <div className="range-setting">
+                <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
+                <RangeAnchors label="Frecuencia" value={settings.lpi} unit=" LPI" values={[20,24,28,32,45]} onChange={v=>update('lpi',v)}/>
+              </div>
+              <div className="range-setting">
+                <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
+                <RangeAnchors label="Ángulo" value={settings.angle} unit="°" values={[0,15,22.5,30,45]} onChange={v=>update('angle',v)}/>
+              </div>
+              <div className="field"><span>Forma del punto</span><div className="segmented shapes">
+                {(['circle', 'square', 'line'] as Shape[]).map((shape) => <button key={shape} className={settings.shape === shape ? 'active' : ''} onClick={() => update('shape', shape)}><i className={`shape-${shape}`} />{shapeLabels[shape]}</button>)}
+              </div></div>
+              <div className="range-setting">
+                <RangeControl label="Tamaño máximo" value={settings.size} min={45} max={125} unit="%" onChange={(v) => update('size', v)} />
+                <RangeAnchors label="Tamaño máximo" value={settings.size} unit="%" values={[75,85,90,100,110]} onChange={v=>update('size',v)}/>
+              </div>
+              <div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div>
+              <p className="help-text">Cada punto exportado es opaco; los huecos permanecen transparentes. Desactívalo para conservar alfa parcial en los bordes.</p>
+              <div className="row-label"><span>Conservar color</span><Toggle checked={settings.preserveColor} onChange={(v) => update('preserveColor', v)} /></div>
+              <p className="help-text">Mantiene el color original en los puntos. Desactívalo para generar una tinta única según la prenda.</p>
+              <div className="row-label"><span>Invertir trama</span><Toggle checked={settings.invert} onChange={v => update('invert', v)} /></div>
+              <p className="help-text">Invierte las zonas de tinta y transparencia del semitono.</p>
+              </> : <p className="help-text">Sin semitono conserva la imagen que quedó tras eliminar el fondo. Puedes volver a activar Semitono sin perder el color de prenda ni la selección del gotero.</p>}
+            </div>
+          </section>
+
+          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" data-flow-order="3" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span><Eraser size={17} /> Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('background')}>Restablecer valores</button>
+            <p className="help-text">1. Borra únicamente el fondo que no se imprimirá. Este paso cambia la transparencia; no genera puntos. Luego elige las zonas con trama en Semitono.</p>
+            <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
+            {!settings.enabled && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); las zonas ya transparentes y el fondo eliminado permanecen transparentes. Úsalo para DTF si no necesitas transparencias suaves.</p></>}
+            <button className={`btn color-range-trigger ${settings.background==='custom'?'active':''}`} disabled={!fileName||loading} onClick={()=>{setIsolatedColorPick(false);setShowColorRange(true)}}><Pipette size={16}/><span>{settings.background==='custom'?'Editar color del sustrato…':'Gotero · Color del sustrato…'}</span></button>
+            {settings.background==='custom'&&<p className="help-text">Color borrado: {settings.colorRange?.colors.join(', ')}. Tolerancia {settings.colorRange?.tolerance}%. No se elimina ningún otro color automáticamente.</p>}
+            {settings.background === 'black' && <RangeControl label="Tolerancia al negro" value={settings.tolerance} min={0} max={100} onChange={(v) => update('tolerance', v)} />}
+            {settings.background === 'white' && <RangeControl label="Umbral de blancos" value={settings.whiteCutoff} min={170} max={255} onChange={(v) => update('whiteCutoff', v)} />}
+            {settings.background==='white' && <p className="help-text">Elimina los blancos dentro del umbral. Para borrar un tono específico, como crema, usa el gotero. Los colores conservados se mantienen para el paso de trama.</p>}
+            <p className="help-text">«Vista sobre» cambia solo la previsualización. La eliminación de fondo se elige aquí.</p>
+          </div></section>
+
+          <section className={`control-card ${collapsedPanels.refinamiento ? '' : 'open'}`}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.refinamiento} aria-controls="refinement-controls" onClick={() => togglePanel('refinamiento')}><span><Sparkles size={17} /> Refinamiento</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="refinement-controls" hidden={collapsedPanels.refinamiento}>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('refinamiento')}>Restablecer valores</button>
+              <div className="refinement-tabs" role="tablist" aria-label="Herramientas de refinamiento">
+                <button type="button" role="tab" aria-selected={refinementTab==='clean'} className={refinementTab==='clean'?'active':''} onClick={() => setRefinementTab('clean')}>Limpiar</button>
+                <button type="button" role="tab" aria-selected={refinementTab==='solid'} className={refinementTab==='solid'?'active':''} onClick={() => setRefinementTab('solid')}>Proteger sólidos</button>
+              </div>
+              {refinementTab === 'clean' && <>
+                <RangeControl label="Eliminar partículas pequeñas" value={settings.particleMinSize} min={0} max={12} unit=" px" onChange={v => update('particleMinSize', v)} />
+                <p className="help-text">Elimina islas de tinta conectadas menores al tamaño indicado. 0 px desactiva la limpieza.</p>
+                <RangeControl label="Tamaño mínimo de punto" value={settings.minDotSize} min={0} max={2} step={0.1} unit=" px" onChange={v => update('minDotSize', v)} />
+                <p className="help-text">Descarta puntos demasiado pequeños para imprimir. Úsalo con moderación para no perder detalle fino.</p>
+                <RangeControl label="Suavizado previo" value={settings.preSmooth} min={0} max={2} step={1} unit=" px" onChange={v => update('preSmooth', v)} />
+                <p className="help-text">Suaviza el original antes del semitono para reducir ruido y variaciones de antialiasing.</p>
+                <div className="brush-tools">
+                  <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel de limpieza'}</button>
+                  {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
+                  {brushTool && <button type="button" className="text-button" onClick={clearManualBrush}>Restaurar borrado del pincel</button>}
+                  {brushTool && <p className="help-text">Retoque puntual sobre el resultado. Arrastra sobre las pintitas o bordes contaminados; la imagen original permanece intacta.</p>}
+                </div>
+              </>}
+              {refinementTab === 'solid' && <>
+                <div className="row-label"><span>Proteger color sólido</span><Toggle checked={settings.protectSolid} onChange={v => update('protectSolid', v)} /></div>
+                <label className="color-picker-field"><span>Color protegido</span><input aria-label="Color protegido" type="color" value={settings.protectSolidColor} onChange={e => update('protectSolidColor', e.target.value)} /></label>
+                <div className="solid-protection-presets"><button type="button" onClick={() => {update('protectSolidColor','#ffffff');update('protectSolidTolerance',30);update('protectSolid',true)}}>Proteger blancos</button><button type="button" onClick={() => {update('protectSolidColor','#000000');update('protectSolidTolerance',20);update('protectSolid',true)}}>Proteger negros</button></div>
+                <RangeControl label="Tolerancia de color" value={settings.protectSolidTolerance} min={0} max={40} unit="%" onChange={v => update('protectSolidTolerance', v)} />
+                <div className="row-label"><span>Conservar borde suave</span><Toggle checked={settings.protectSmoothEdge} onChange={v => update('protectSmoothEdge', v)} /></div>
+                <p className="help-text">El color elegido y sus tonos cercanos quedan fuera del semitono. Con Alfa sólido (DTF), sus bordes también son opacos; Conservar borde suave se aplica cuando Alfa sólido está desactivado. No protege colores que el fondo seleccionado ya elimina.</p>
+              </>}
+            </div>
+          </section>
+
+          <section className={`control-card ${collapsedPanels.ajustes ? '' : 'open'}`}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.ajustes} aria-controls="image-controls" onClick={() => togglePanel('ajustes')}><span><SlidersHorizontal size={17} /> Ajustes de imagen</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="image-controls" hidden={collapsedPanels.ajustes}>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('ajustes')}>Restablecer valores</button>
+              <div className="auto-adjustments">
+                <span className="field">Correcciones automáticas</span>
+                {([['autoTone','Tono automático','Amplía el rango de cada canal de color.'],['autoContrast','Contraste automático','Amplía el rango con el mismo ajuste para los tres canales.'],['autoColor','Color automático','Reduce dominantes usando los tonos casi neutros.']] as const).map(([key,label,description]) => <div className="auto-adjust-item" key={key}><button className={`auto-adjust-button ${settings[key] ? 'active' : ''}`} type="button" aria-pressed={settings[key]} title={description} onClick={()=>update(key,!settings[key])}><Sparkles size={14}/><span>{label}</span>{settings[key] && <Check size={14}/>}</button>{settings[key]&&<RangeControl label={`Intensidad ${label.toLowerCase()}`} value={key==='autoTone'?settings.autoToneStrength:key==='autoContrast'?settings.autoContrastStrength:settings.autoColorStrength} min={0} max={100} unit="%" onChange={v=>update(key==='autoTone'?'autoToneStrength':key==='autoContrast'?'autoContrastStrength':'autoColorStrength',v)} />}</div>)}
+                <p className="help-text">Pulsa para activar o desactivar. Puedes combinarlas; se calculan desde el original antes de la trama y se incluyen al guardar un preset.</p>
+              </div>
+              {(settings.autoTone||settings.autoContrast)&&<p className="help-text">0% conserva el tono original; 100% aplica toda la corrección automática.</p>}
+              <div className="advanced-heading"><span>Ajustes avanzados de imagen</span><button type="button" className="text-button" onClick={()=>resetPanel('ajustes')}>Restablecer valores</button></div>
+              <details className="advanced-controls"><summary>Mostrar controles avanzados</summary><div className="advanced-body">
+              <RangeControl label="Contraste" value={settings.contrast} min={50} max={180} unit="%" onChange={(v) => update('contrast', v)} />
+              <RangeControl label={settings.background==='white'?'Densidad de tinta':'Brillo'} value={settings.brightness} min={60} max={140} unit="%" onChange={(v) => update('brightness', v)} />
+              <RangeControl label="Degradados (gamma)" value={settings.gamma} min={0.5} max={2} step={0.05} onChange={v => update('gamma', v)} />
+              <div className="white-balance-title"><span>Balance de blancos</span><button className="text-button" onClick={()=>{update('temperature',0);update('tint',0);update('autoColorStrength',100)}}>Reiniciar</button></div>
+              <RangeControl label="Temperatura" value={settings.temperature} min={-100} max={100} onChange={v => update('temperature', v)} />
+              <RangeControl label="Tinte magenta / verde" value={settings.tint} min={-100} max={100} onChange={v => update('tint', v)} />
+              <p className="help-text">Temperatura negativa enfría hacia azul; positiva calienta hacia amarillo. Tinte negativo va a verde; positivo a magenta.</p>
+              </div></details>
+            </div>
+          </section>
+
+          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" data-flow-order="5" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span><Frame size={17} /> Bordes y máscaras</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('edges')}>Restablecer valores</button>
+            <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true],edgeMask:'none',edgeMaskSizeMm:5}))}>Reiniciar bordes</button>
+            <div className="field"><span>Máscaras de borde</span><div className="edge-mask-grid" role="group" aria-label="Máscaras de borde"><button type="button" aria-pressed={settings.edgeMask==='none'} onClick={()=>update('edgeMask','none')}><EdgeMaskThumbnail style="none"/><span>Sin máscara</span></button>{edgeMaskStyles.map(style=><button key={style.id} type="button" aria-pressed={settings.edgeMask===style.id} onClick={()=>update('edgeMask',style.id)}><EdgeMaskThumbnail style={style.id}/><span>{style.name}</span></button>)}</div></div>
+            {settings.edgeMask!=='none'&&<RangeControl label="Profundidad de máscara" value={settings.edgeMaskSizeMm} min={0.5} max={20} step={0.5} unit=" mm" onChange={v=>update('edgeMaskSizeMm',v)}/>}
+            <RangeControl label="Borrar margen" value={settings.trimMm} min={0} max={15} step={0.5} unit=" mm" onChange={v => update('trimMm', v)} />
+            <RangeControl label="Desvanecido hacia dentro" value={settings.featherMm} min={0} max={30} step={0.5} unit=" mm" onChange={v => update('featherMm', v)} />
+            <RangeControl label="Radio de esquinas" value={settings.cornerRadiusMm} min={0} max={50} step={0.5} unit=" mm" onChange={v => update('cornerRadiusMm', v)} />
+            <div className="edge-sides">{['Arriba', 'Derecha', 'Abajo', 'Izquierda'].map((label, index) => <label key={label}><input type="checkbox" checked={settings.edgeSides[index]} onChange={e => update('edgeSides', settings.edgeSides.map((v, i) => i === index ? e.target.checked : v))} />{label}</label>)}</div>
+            <p className="help-text">Las máscaras recortan el borde visible del diseño y se combinan con la trama, el desvanecido y los lados seleccionados. El tamaño del lienzo se conserva.</p>
+          </div></section>
+          <div className="tip-card"><div><Check size={14} /> {processing ? 'ACTUALIZANDO…' : `${transparent}% TRANSPARENTE`}</div><p>{settings.background==='custom'?'Se quitan los colores muestreados en toda la imagen. Puedes revisar o modificar la selección con el gotero.':settings.background === 'black' ? 'El negro lo aporta la prenda. Se eliminan los tonos oscuros del diseño completo.' : settings.background === 'white' ? settings.whiteRemoval==='connected'?'Se quita el fondo claro conectado al borde; se conservan los detalles interiores.':'Se eliminan los blancos del diseño completo.' : settings.enabled?'Se conserva el color y se perfora con la trama.':'Se conserva la imagen sin generar puntos.'} El fondo de vista previa no se exporta.</p></div>
+          {error && <p className="error-text" role="alert">{error}</p>}
+          {exportMessage && <p className="export-message" role="status">{exportMessage}</p>}
+        </aside>
+
+        <section className={`stage ${dragging ? 'dragging' : ''}`} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}>
+          <div className="stage-toolbar" hidden={!fileName}>
+            <button className="btn prepress-toggle" aria-label={prepressCollapsed?'Mostrar controles de Pre-prensa':'Ocultar controles de Pre-prensa'} aria-expanded={!prepressCollapsed} aria-controls="prepress-panel" onClick={()=>setPrepressCollapsed(v=>!v)} title={prepressCollapsed?'Mostrar controles de Pre-prensa':'Ocultar controles de Pre-prensa'}>{prepressCollapsed?<ChevronRight size={18}/>:<ChevronLeft size={18}/>}</button>
+            <div className="history-controls" role="group" aria-label="Historial de ajustes">
+              <button className="btn" disabled={loading||!historyCounts.undo} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button>
+              <button className="btn" disabled={loading||!historyCounts.redo} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button>
+            </div>
+            <div className="view-controls">
+              <div className="view-switch" role="group" aria-label="Modo de vista">
+                <button className={view === 'original' ? 'active' : ''} onClick={() => setView('original')}><ImageIcon size={15} /> {comparisonTarget==='background'?'Fondo eliminado':comparisonTarget==='rescale'?'Original sin reescalar':'Original'}</button>
+                <button className={view === 'split' ? 'active' : ''} onClick={() => setView('split')}><Layers3 size={15} /> Divisor</button>
+                <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> {comparisonTarget === 'rescale' ? 'Reescalado' : comparisonTarget==='background'?'Con trama':'Resultado'}</button>
+              </div>
+              <div className="comparison-switch" role="group" aria-label="Contenido de la comparación">
+                <span>Comparar:</span>
+                <button type="button" className={comparisonTarget==='result'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='result'} onClick={()=>selectComparison('result')}>Resultado final</button>
+                <button type="button" className={comparisonTarget === 'rescale' ? 'active' : ''} aria-label={appliedNeuralScale>1?'Comparar Lanczos-3 y Neural':'Comparar original sin reescalar y reescalado'} title="Abre al 100% para revisar el detalle generado por el método de reescalado" aria-pressed={comparisonTarget === 'rescale'} disabled={!output || processing} onClick={() => selectComparison('rescale')}><Layers3 size={15} /> Reescalado</button>
+                <button type="button" className={comparisonTarget==='background'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='background'} onClick={()=>selectComparison('background')}>Fondo / trama</button>
+              </div>
+            </div>
+            <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}>
+              <option value="checker">Transparencia</option>
+              <optgroup label="Neutros · claro → normal → oscuro">
+                <option value="white">Blanco · claro</option>
+                <option value="#596778">Gris · normal</option>
+                <option value="black">Negro · oscuro</option>
+              </optgroup>
+              <optgroup label="Azules · claro → normal → oscuro">
+                <option value="#8ecae6">Celeste · claro</option>
+                <option value="#2563eb">Azul rey · normal</option>
+                <option value="#304b70">Azul marino · oscuro</option>
+                <option value="#102a43">Azul oscuro · oscuro</option>
+              </optgroup>
+              <optgroup label="Verdes · claro → normal → oscuro">
+                <option value="#86efac">Verde menta · claro</option>
+                <option value="#16a34a">Verde · normal</option>
+                <option value="#166534">Verde botella · oscuro</option>
+                <option value="#808000">Verde olivo · normal</option>
+                <option value="#4b5320">Verde militar · oscuro</option>
+              </optgroup>
+              <optgroup label="Morados · claro → normal → oscuro">
+                <option value="#c4b5fd">Lavanda · claro</option>
+                <option value="#7c3aed">Morado · normal</option>
+                <option value="#4c1d95">Morado oscuro · oscuro</option>
+              </optgroup>
+              <optgroup label="Rojos · claro → normal → oscuro">
+                <option value="#fda4af">Rosado · claro</option>
+                <option value="#c1121f">Rojo fuerte · normal</option>
+                <option value="#7b2931">Rojo oscuro · oscuro</option>
+              </optgroup>
+              <optgroup label="Amarillos y naranjas · claro → normal → oscuro">
+                <option value="#fde68a">Amarillo · claro</option>
+                <option value="#f59e0b">Mostaza · normal</option>
+                <option value="#ea580c">Naranjo · oscuro</option>
+              </optgroup>
+              <optgroup label="Cafés · claro → normal → oscuro">
+                <option value="#e7d3b0">Beige · claro</option>
+                <option value="#a16207">Café · normal</option>
+                <option value="#3b2418">Café oscuro · oscuro</option>
+              </optgroup>
+            </select></div>
+            <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
+          </div>
+          {processing && <div className="processing stage-processing" role="status" aria-live="polite">
+            <span className="processing-spinner" />
+            <div className="processing-content">
+              <div className="processing-label"><span>{processingLabel}</span><b>{processingProgress}%</b></div>
+              {neuralProcessing&&processingProgress<63&&<small className="processing-help">El tiempo depende del tamaño de la imagen y de tu equipo.</small>}
+              <div className="processing-progress" role="progressbar" aria-label="Progreso del procesamiento" aria-valuemin={0} aria-valuemax={100} aria-valuenow={processingProgress}><i style={{ width: `${processingProgress}%` }} /></div>
+            </div>
+            <button type="button" className="processing-stop" onClick={stopProcessing}>Detener</button>
+          </div>}
+
+          <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${(brushTool || colorBrushTool || pickColorTool) ? 'brush-active' : ''} ${pickColorTool ? 'color-picker-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={e=>{pickOriginalColor(e);startColorBrush(e);startBrush(e)}} onPointerMove={e=>{movePan(e);moveColorBrush(e);moveBrush(e)}} onPointerLeave={()=>setBrushCursor(null)} onPointerUp={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}}>
+            {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
+            <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
+              <canvas ref={originalCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' || (view === 'split' && compareNeuralToLanczos) ? 'hidden' : 'visible' }} />
+              <canvas ref={lanczosCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'split' && compareNeuralToLanczos ? 'visible' : 'hidden' }} />
+              <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}>
+                <canvas ref={sourceCanvas} className="art-canvas" style={{visibility: comparisonTarget === 'rescale' ? 'visible' : 'hidden'}} />
+                <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget !== 'rescale' ? 'visible' : 'hidden'}} />
+              </div>
+              {(brushTool || colorBrushTool || pickColorTool) && brushCursor && resultCanvas.current && <div className={`brush-cursor ${pickColorTool ? 'color-picker-cursor' : ''}`} style={{left: brushCursor.x, top: brushCursor.y, width: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
+              {view === 'split' && <div className="comparison-labels" aria-hidden="true">
+                <span className="comparison-label-left">{comparisonTarget==='rescale'?(compareNeuralToLanczos?`Lanczos-3 · ${resizeInfo?.outputWidth.toLocaleString()} × ${resizeInfo?.outputHeight.toLocaleString()} px`:`Original · ${resizeInfo?.sourceWidth.toLocaleString()} × ${resizeInfo?.sourceHeight.toLocaleString()} px`):comparisonTarget==='background'?'Fondo eliminado':'Original'}</span>
+                <span className="comparison-label-right">{comparisonTarget==='rescale'?`${rescaleMethodLabel} · ${resizeInfo?.outputWidth.toLocaleString()} × ${resizeInfo?.outputHeight.toLocaleString()} px`:comparisonTarget==='background'?'Con trama':'Resultado final'}</span>
+              </div>}
+              {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div>{!brushTool && !colorBrushTool && !pickColorTool && <input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} />}</>}
+            </div>
+            {fileName&&comparisonTarget==='rescale'&&view==='split'&&<p className="rescale-compare-hint">Vista al 100% · arrastra el divisor para comparar {compareNeuralToLanczos?'Lanczos-3 y Neural':'el original y el reescalado'}.</p>}
+            {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
+          </div>
+
+          <div className="statusbar" hidden={!fileName}>
+            <div><span className="status-dot" /> Vista previa en tiempo real</div>
+            <div className="zoom-control"><button className={`hand-button ${handActive ? 'active' : ''}`} aria-label="Mano para mover imagen" aria-pressed={handTool} title="Mano: arrastra para mover. También puedes mantener Espacio o usar el botón central del ratón." onClick={() => setHandTool(v => !v)}><Hand size={16} /></button><ZoomIn size={15} /><button aria-label="Reducir zoom" onClick={() => changeZoom(.8)}><Minus size={14} /></button><span>{shownZoom}%</span><button aria-label="Aumentar zoom" onClick={() => changeZoom(1.25)}><Plus size={14} /></button><button className="zoom-text" onClick={() => setFit(true)}>Ajustar</button><button className="zoom-text" aria-label="Zoom al 100 por ciento" title="Mostrar al 100% de la imagen" onClick={() => {setFit(false);setZoom(100)}}>100%</button><button className="zoom-text" aria-label={`Tamaño real: ${Math.round(realSizeZoom)}%`} title={`Tamaño real aproximado a ${dpi} ppp`} onClick={() => {setFit(false);setZoom(realSizeZoom)}}>Tamaño real</button></div>
+            <div>PNG · Fondo transparente</div>
+          </div>
+        </section>
+      </main>
+      {pendingWorkflowDestination && <div className="modal-backdrop tool-confirm-backdrop" role="presentation">
+        <section className="import-modal tool-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="color-brush-exit-title">
+          <span className="modal-kicker">PINCEL CORRECTOR</span>
+          <h2 id="color-brush-exit-title">¿Deseas salir del pincel corrector sin guardar cambios?</h2>
+          <p className="help-text">Puedes conservar las correcciones aplicadas, eliminarlas antes de cambiar de sección o volver al pincel.</p>
+          <div className="modal-actions">
+            <button type="button" className="btn ghost" onClick={() => setPendingWorkflowDestination(null)}>Volver</button>
+            <button type="button" className="btn ghost" onClick={() => resolveWorkflowExit(false)}>Borrar</button>
+            <button type="button" className="btn export" onClick={() => resolveWorkflowExit(true)}>Guardar cambio</button>
+          </div>
+        </section>
+      </div>}
+      {gangSafetyReport && <div className="modal-backdrop tool-confirm-backdrop" role="presentation">
+        <section className="import-modal tool-confirm-modal halftone-safety-modal" role="dialog" aria-modal="true" aria-labelledby="halftone-safety-title">
+          <span className="modal-kicker">REVISIÓN PREVIA A GANG SHEET</span>
+          <h2 id="halftone-safety-title">{gangSafetyReport.issues.length?'Revisa estos puntos antes de producir':'Trama lista para enviar'}</h2>
+          <div className="safety-metrics" aria-label="Medidas de seguridad de la trama">
+            <span><b>{Math.round(gangSafetyReport.sourceDpi)} ppp</b>{gangSafetyReport.generatedResolution ? `Resolución Neural ×${appliedNeuralScale}` : 'Original efectivo'}</span>
+            <span><b>{settings.lpi} LPI</b>Frecuencia</span>
+            <span><b>{gangSafetyReport.cellPixels.toFixed(1)} px</b>Por celda</span>
+            <span><b>{gangSafetyReport.recommendedMinimumDotPixels} px</b>Punto mínimo sugerido</span>
+            <span><b>{gangSafetyReport.recommendedMinimumDotMm.toFixed(2)} mm</b>A {dpi} ppp</span>
+          </div>
+          {gangSafetyReport.issues.length ? <ul className="safety-issues">{gangSafetyReport.issues.map(issue=><li key={issue.title}><b>{issue.title}</b><span>{issue.message}</span></li>)}</ul> : <p className="help-text">La resolución, frecuencia y tamaño máximo del punto cumplen la referencia de seguridad de esta revisión.</p>}
+          {gangSafetyReport.generatedResolution && <p className="help-text">Neural generó píxeles adicionales antes de la trama. Mejora la resolución disponible para esta salida, pero el detalle creado es estimado: revísalo al 100% y con una prueba física.</p>}
+          <p className="help-text">Esta revisión detecta riesgos de resolución, tamaño y filtros. Un semitono representa los tonos más claros con transparencias, por lo que no puede garantizar un degradado sin huecos blancos; confirma siempre una prueba física y el comportamiento de tu RIP.</p>
+          <div className="modal-actions">
+            <button type="button" className="btn ghost" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')setWorkflowStep(3)}}>Volver a ajustar</button>
+            {canOptimizeForDtf&&<button type="button" className="btn" onClick={optimizeForDtf}>Optimizar para DTF</button>}
+            <button type="button" className="btn export" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')sendToGang();else if(action==='resized')exportResizedPng();else exportPng()}}>{printReviewAction==='gang'?(gangSafetyReport.issues.length?'Enviar de todas formas':'Enviar a Gang Sheet'):printReviewAction==='resized'?'Exportar PNG reescalado':'Exportar PNG'}</button>
+          </div>
+        </section>
+      </div>}
+      {showCrop && imageRef.current && <CropPanel image={imageRef.current} initial={crop ?? {x:0,y:0,width:dimensions.width,height:dimensions.height}} onCancel={()=>setShowCrop(false)} onApply={rect=>{setWidthCm((Number(widthCm)*rect.width/dimensions.width).toFixed(4));setDimensions({width:rect.width,height:rect.height});setCrop(rect);setShowCrop(false);setFit(true)}}/>}
+      {tramaColorPick&&imageRef.current&&<ColorRangePanel purpose={tramaColorPick} image={imageRef.current} processedSource={sourceCanvas.current} outputWidth={output?.width} settings={{...settings,dpi,screenBase:garment==='dark'?'black':'white'}} crop={crop} initial={(tramaColorPick==='affected'?settings.affectedColors:settings.protectedColors)??{...defaultColorRange,useColors:false,strokes:[]}} onCancel={()=>setTramaColorPick(null)} onApply={range=>{setSettings(s=>({...s,[tramaColorPick==='affected'?'affectedColors':'protectedColors']:range,...(tramaColorPick==='affected'?{screenScope:'all' as const}:{}),separateBackground:true}));setPreset('custom');setComparisonTarget('background');setView('split');setTramaColorPick(null)}}/>}
+      {showColorRange&&imageRef.current&&<ColorRangePanel purpose={isolatedColorPick?'isolated':'background'} image={imageRef.current} processedSource={sourceCanvas.current} outputWidth={output?.width} settings={{...settings,dpi,screenBase:garment==='dark'?'black':'white'}} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>{setShowColorRange(false);setIsolatedColorPick(false)}} onApply={colorRange=>{setSettings(s=>({...s,background:'custom',colorRange,preserveColor:true,separateBackground:true}));setPreset('custom');setComparisonTarget('background');setView('split');setShowColorRange(false);setIsolatedColorPick(false)}}/>}
+    </div>
+  )
+}
+
+export default function ProjectSession() {
+  const [session,setSession]=useState(0)
+  const [project,setProject]=useState<ProjectFile|null>(null)
+  const [checking,setChecking]=useState(true)
+  const [recoveryFailed,setRecoveryFailed]=useState(false)
+  const [name,setName]=useState('')
+  const [error,setError]=useState('')
+  const [busy,setBusy]=useState(false)
+  const [legacy,setLegacy]=useState(false)
+  const [resetting,setResetting]=useState(false)
+  const input=useRef<HTMLInputElement>(null)
+  const recover=async()=>{
+    setChecking(true);setError('');setRecoveryFailed(false)
+    try {
+      const saved=await readActiveProject()
+      if(saved)setProject(saved.project)
+      else {
+        const legacyName=localStorage.getItem('trama-dtf-project-name')||''
+        setName(legacyName)
+        setLegacy(!!localStorage.getItem('trama-dtf-gang-sheet-v1'))
+      }
+    }catch(e){setRecoveryFailed(true);setError('No se pudo leer el guardado. No se sobrescribió. '+(e as Error).message)}
+    finally{setChecking(false)}
+  }
+  useEffect(()=>{void recover()},[])
+  async function start(imported?:ProjectFile) {
+    if(recoveryFailed)return
+    setBusy(true);setError('')
+    try {
+      let next=imported??emptyProject(name)
+      if(!imported&&legacy){
+        const items=JSON.parse(localStorage.getItem('trama-dtf-gang-sheet-v1')||'[]')
+        const sheet=JSON.parse(localStorage.getItem('trama-dtf-sheet-settings')||'null')
+        next=parseProject(JSON.stringify({...next,items,sheet:sheet??next.sheet}))
+      }
+      await writeActiveProject(next)
+      // Request durable browser storage where supported; not a disk-file write.
+      void navigator.storage?.persist?.().catch(()=>false)
+      setProject(next)
+    }catch(e){setError((e as Error).message)}finally{setBusy(false)}
+  }
+  async function newProject() {
+    if(resetting||!window.confirm(`¿Eliminar el proyecto «${project?.name??''}» y empezar de cero?\n\nSe borrarán su autoguardado, las imágenes del editor y la plancha de este navegador. Esta acción no se puede deshacer.\n\nTus presets y los archivos descargados se conservan. Descarga el proyecto antes si quieres poder recuperarlo.`))return
+    setResetting(true)
+    try {clearActiveProject(localStorage);await deleteActiveProject();setProject(null);setName('');setLegacy(false);setError('');setRecoveryFailed(false);setSession(s=>s+1)}
+    catch(e){window.alert('No se pudo eliminar el proyecto: '+(e as Error).message)}
+    finally{setResetting(false)}
+  }
+  if(project)return <App key={session} initialProject={project} resetting={resetting} onNewProject={()=>{void newProject()}}/>
+  return <main className="project-start"><section className="project-start-card">
+    <span className="eyebrow">DROSKA · TRAMA DTF</span><h1>{checking?'Buscando tu proyecto…':'Nombra tu proyecto'}</h1>
+    <p>Un nombre para guardar y continuar tu trabajo.</p>
+    {!checking&&<><form onSubmit={e=>{e.preventDefault();void start()}}>
+      <label className="field">Nombre del archivo<input autoFocus aria-label="Nombre del archivo de proyecto" maxLength={80} placeholder="Ej. Poleras septiembre" value={name} onChange={e=>setName(e.target.value)}/></label>
+      <small>.trama.json</small>
+      <p className="help-text">Los cambios se guardan automáticamente en este navegador. Al volver, se recupera el último proyecto. Para conservar una copia fuera del navegador, usa «Descargar proyecto». No se sobrescribe un archivo del disco automáticamente.</p>
+      {legacy&&<p className="help-text">Se encontró una plancha anterior: se conservará dentro de este proyecto.</p>}
+      <button className="btn export" disabled={busy||recoveryFailed||!name.trim()}>{busy?'Guardando…':'Crear y comenzar'}</button>
+    </form><button className="btn ghost" disabled={busy||recoveryFailed} onClick={()=>input.current?.click()}>Abrir proyecto .trama.json</button>
+    <input hidden ref={input} type="file" accept=".json,.trama.json" onChange={async e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;try{if(file.size>MAX_PROJECT_FILE_BYTES)throw new Error('El proyecto supera el límite de 1 GB.');await start(parseProject(await file.text()))}catch(err){setError((err as Error).message)}}}/></>}
+    {error&&<div role="alert"><p className="error-text">{error}</p><button className="btn" onClick={()=>{void recover()}}>Volver a comprobar guardado</button></div>}
+  </section></main>
+}

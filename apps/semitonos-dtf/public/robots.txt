@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://droska.frontbook.cl/herramientas/semitonos-dtf/sitemap.xml

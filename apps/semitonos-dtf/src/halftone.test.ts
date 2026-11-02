@@ -1,0 +1,351 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { halftone } from './halftone.ts'
+import type { HalftoneSettings } from './halftone.ts'
+import {whiteGarmentHalftone} from './white-garment.ts'
+const settings: HalftoneSettings = { lpi: 30, angle: 22.5, shape: 'circle', size: 100, contrast: 100, brightness: 100, whiteCutoff: 245, preserveColor: true, invert: false, background: 'black', tolerance: 25 }
+function image(r: number, g: number, b: number, a = 255) {
+  const data = new Uint8ClampedArray(64 * 64 * 4)
+  for (let i = 0; i < data.length; i += 4) data.set([r, g, b, a], i)
+  return data
+}
+test('screen selection and protection preserve solid colors and never restore removed background',()=>{
+  const data=image(128,64,32)
+  const selected={colors:['#804020'],tolerance:0,softness:0}
+  const base={...settings,background:'none' as const,affectedColors:selected,organic:65}
+  assert.ok(halftone(data,64,64,base).transparent>0)
+  assert.deepEqual(halftone(data,64,64,{...base,protectedColors:selected}).data,data)
+  assert.deepEqual(halftone(data,64,64,{...base,affectedColors:{...selected,colors:['#ffffff']}}).data,data)
+  assert.equal(halftone(data,64,64,{...base,background:'custom',colorRange:selected,protectedColors:selected}).transparent,100)
+})
+test('organic dots are deterministic and keep comparable coverage and solid endpoints',()=>{
+  const data=image(128,128,128)
+  const regular=halftone(data,64,64,settings)
+  const organic=halftone(data,64,64,{...settings,organic:100})
+  assert.notDeepEqual(regular.data,organic.data)
+  assert.deepEqual(organic.data,halftone(data,64,64,{...settings,organic:100}).data)
+  assert.ok(Math.abs(regular.transparent-organic.transparent)<5)
+  for(const shape of ['circle','square','line'] as const)assert.equal(halftone(image(255,255,255),64,64,{...settings,organic:100,shape}).transparent,0)
+})
+test('black and near-black backgrounds are truly transparent', () => {
+  for (const tone of [0, 12, 25]) {
+    const result = halftone(image(tone, tone, tone), 64, 64, settings)
+    assert.equal(result.transparent, 100)
+    assert.ok(result.data.every(v => v === 0))
+  }
+})
+test('white detail and saturated red survive black removal', () => {
+  for (const rgb of [[255,255,255], [255,0,0]]) {
+    const result = halftone(image(rgb[0],rgb[1],rgb[2]), 64, 64, settings)
+    assert.equal(result.transparent, 0)
+    assert.deepEqual(Array.from(result.data.slice(0,4)), [...rgb,255])
+  }
+})
+test('screened transparent artwork keeps saturated ink solid on its substrate', () => {
+  const red=image(255,25,18)
+  const result=halftone(red,64,64,{...settings,background:'none',prepared:true,screenBase:'black',solidAlpha:true})
+  assert.equal(result.transparent,0)
+  assert.deepEqual(Array.from(result.data.slice(0,4)),[255,25,18,255])
+  const gray=halftone(image(128,128,128),64,64,{...settings,background:'none',prepared:true,screenBase:'black',solidAlpha:true})
+  assert.ok(gray.transparent>10&&gray.transparent<90)
+})
+test('midtones contain holes and unmatted bright ink', () => {
+  const result = halftone(image(110,110,110), 64, 64, settings)
+  assert.ok(result.transparent > 10 && result.transparent < 90)
+  for (let i=0; i<result.data.length; i+=4) if(result.data[i+3]) assert.equal(result.data[i],255)
+})
+test('transition-only screening preserves solid artwork and dots only partial edges',()=>{
+  const solid=image(110,70,35)
+  const transitionSettings={...settings,background:'none' as const,screenScope:'transitions' as const,solidAlpha:true}
+  const preserved=halftone(solid,64,64,transitionSettings).data
+  for(let i=0;i<preserved.length;i+=4)assert.deepEqual(Array.from(preserved.slice(i,i+4)),[110,70,35,255])
+
+  const partial=image(110,70,35,96)
+  const dotted=halftone(partial,64,64,transitionSettings).data
+  const visible=Array.from(dotted).filter((_,i)=>i%4===3&&dotted[i]===255).length
+  assert.ok(visible>0&&visible<64*64)
+
+  const screened=halftone(solid,64,64,{...transitionSettings,screenScope:'all'}).data
+  assert.ok(Array.from(screened).some((_,i)=>i%4===3&&screened[i]===0))
+})
+test('isolated eyedropper screening preserves retained pixels while complete mode keeps legacy tonality',()=>{
+  const gray=image(128,128,128)
+  const custom={...settings,background:'custom' as const,customBase:'white' as const,colorRange:{colors:['#ffffff'],tolerance:0,softness:0},solidAlpha:true,size:45}
+  const isolated=halftone(gray,64,64,{...custom,screenScope:'transitions'}).data
+  for(let i=0;i<isolated.length;i+=4)assert.deepEqual(Array.from(isolated.slice(i,i+4)),[128,128,128,255])
+  const transition=halftone(gray,64,64,{...custom,colorRange:{colors:['#ffffff'],tolerance:0,softness:100},screenScope:'transitions'}).data
+  const transitionDots=Array.from(transition).filter((_,i)=>i%4===3&&transition[i]===255).length
+  assert.ok(transitionDots>0&&transitionDots<64*64)
+  const complete=halftone(gray,64,64,{...custom,screenScope:'all'}).data
+  assert.ok(Array.from(complete).some((_,i)=>i%4===3&&complete[i]===0))
+})
+test('white mode removes white and keeps black', () => {
+  const s = {...settings, background: 'white' as const}
+  assert.equal(halftone(image(255,255,255),64,64,s).transparent,100)
+  assert.equal(halftone(image(0,0,0),64,64,s).transparent,0)
+})
+test('protected color is selected from the original source and preserves alpha', () => {
+  const source=image(255,255,255,128)
+  const near=image(248,248,248,96)
+  const s={...settings,protectSolid:true,protectSolidColor:'#ffffff',protectSolidTolerance:10}
+  const protectedResult=halftone(near,64,64,s,near,source)
+  assert.equal(protectedResult.protectedMask[0],1)
+  assert.equal(protectedResult.data[3],0)
+  assert.equal(halftone(image(255,255,255),64,64,{...s,background:'white'}).protectedMask[0],0)
+})
+test('neutral protection does not capture warm beige pixels at high tolerance', () => {
+  const s={...settings,protectSolid:true,protectSolidColor:'#ffffff',protectSolidTolerance:40}
+  const beige=image(232,216,190)
+  const result=halftone(beige,64,64,s)
+  assert.equal(result.protectedMask[0],0)
+})
+test('white garment preset produces real dots and preserves mean tone on white at each output DPI',()=>{
+  const side=256
+  const colors=[[128,128,128],[60,45,30],[235,25,15],[245,236,210],[230,145,145]]
+  for(const dpi of [150,300,600])for(const lpi of [32,65])for(const rgb of colors){
+    const data=new Uint8ClampedArray(side*side*4)
+    for(let i=0;i<data.length;i+=4)data.set([...rgb,255],i)
+    const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,dpi,lpi}).data
+    let holes=0,ink=0;const totals=[0,0,0]
+    for(let i=0;i<out.length;i+=4){
+      const a=out[i+3]/255
+      assert.ok(a===0||a===1)
+      if(a)ink++;else holes++
+      for(let c=0;c<3;c++)totals[c]+=out[i+c]*a+255*(1-a)
+    }
+    assert.ok(holes>0&&ink>0,`No dots for ${rgb} at ${dpi}/${lpi}`)
+    for(let c=0;c<3;c++)assert.ok(Math.abs(totals[c]/(side*side)-rgb[c])<3,`Tone shift for ${rgb} at ${dpi}/${lpi}: ${totals[c]/(side*side)}`)
+  }
+})
+test('solid and antialiased screening keep comparable mean coverage instead of inflating dots',()=>{
+  const side=256,data=new Uint8ClampedArray(side*side*4)
+  for(let i=0;i<data.length;i+=4)data.set([128,128,128,255],i)
+  for(const shape of ['circle','square','line'] as const){
+    const means=[true,false].map(solidAlpha=>{
+      const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,whiteDetail:0,lpi:65,shape,solidAlpha}).data
+      let sum=0;for(let i=3;i<out.length;i+=4)sum+=255-out[i]
+      return sum/(side*side)
+    })
+    assert.ok(Math.abs(means[0]-128)<2);assert.ok(Math.abs(means[0]-means[1])<2)
+  }
+})
+test('white detail reduces broken fine lines and pixel error while keeping binary alpha',()=>{
+  const side=256,data=new Uint8ClampedArray(side*side*4).fill(255)
+  for(let y=8;y<side-8;y++)for(let x=8;x<side-8;x++){
+    if(x%4===0||x===y)data.set([150,125,100,255],(y*side+x)*4)
+  }
+  const metrics=[0,70,100].map(whiteDetail=>{
+    const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,whiteDetail}).data
+    let lost=0,error=0
+    for(let i=0;i<data.length;i+=4){
+      const a=out[i+3]/255;assert.ok(a===0||a===1)
+      if(data[i]===255){assert.equal(a,0);continue}
+      if(!a)lost++
+      for(let c=0;c<3;c++)error+=(out[i+c]*a+255*(1-a)-data[i+c])**2
+    }
+    return {lost,error}
+  })
+  for(let i=1;i<metrics.length;i++){
+    assert.ok(metrics[i].lost<metrics[i-1].lost)
+    assert.ok(metrics[i].error<metrics[i-1].error)
+    // Detail improves continuity, but even 100% must still screen midtones.
+    assert.ok(metrics[i].lost>0)
+  }
+})
+test('white screening retains tonal coverage instead of a near-solid floor at high detail',()=>{
+  const side=256,tones=[255,230,191,128,64,0]
+  for(const dpi of [150,300,600])for(const whiteDetail of [0,30,90,100])for(const shape of ['circle','square','line'] as const){
+    const coverages=tones.map(tone=>{
+      const data=new Uint8ClampedArray(side*side*4)
+      for(let i=0;i<data.length;i+=4)data.set([tone,tone,tone,255],i)
+      const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,dpi,lpi:35,shape,whiteDetail}).data
+      let ink=0;for(let i=3;i<out.length;i+=4)ink+=out[i]/255
+      const coverage=ink/(side*side),base=1-tone/255
+      assert.ok(Math.abs(coverage-(base+base*(1-base)*whiteDetail/100))<.015)
+      return coverage
+    })
+    assert.equal(coverages[0],0);assert.equal(coverages.at(-1),1)
+    assert.ok(coverages[1]<.2,'Pale tones must not become almost-solid ink')
+    for(let i=1;i<coverages.length;i++)assert.ok(coverages[i]>coverages[i-1]+.05)
+  }
+})
+test('detail compensation keeps average colors over white at every strength',()=>{
+  const side=256
+  for(const rgb of [[128,128,128],[60,45,30],[230,145,145],[245,236,210]]){
+    const data=new Uint8ClampedArray(side*side*4)
+    for(let i=0;i<data.length;i+=4)data.set([...rgb,255],i)
+    for(const whiteDetail of [0,40,70,100]){
+      const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,whiteDetail}).data
+      const means=[0,0,0]
+      for(let i=0;i<out.length;i+=4)for(let c=0;c<3;c++)means[c]+=out[i+c]*out[i+3]/255+255-out[i+3]
+      for(let c=0;c<3;c++)assert.ok(Math.abs(means[c]/(side*side)-rgb[c])<2)
+    }
+  }
+})
+test('white detail does not affect black, no-removal or connected-white output',()=>{
+  const data=image(140,100,65)
+  for(const background of ['black','none','white'] as const){
+    const base={...settings,background,whiteRemoval:'connected' as const}
+    assert.deepEqual(halftone(data,64,64,{...base,whiteDetail:100}).data,halftone(data,64,64,base).data)
+  }
+})
+test('connected white removal preserves enclosed fur, cream details and saturated ink',()=>{
+  const data=image(250,248,245)
+  // Closed dark border enclosing white fur and a cream highlight.
+  for(let y=16;y<48;y++)for(let x=16;x<48;x++)data.set([20,15,10,255],(y*64+x)*4)
+  for(let y=20;y<44;y++)for(let x=20;x<44;x++)data.set([255,255,255,255],(y*64+x)*4)
+  data.set([245,236,210,255],(32*64+32)*4)
+  data.set([235,25,15,255],(20*64+16)*4)
+  for(const enabled of [true,false]){
+    const out=halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected',whiteCutoff:242,solidAlpha:false,enabled}).data
+    assert.equal(out[3],0)
+    for(let y=16;y<48;y++)for(let x=16;x<48;x++)assert.deepEqual(out.slice((y*64+x)*4,(y*64+x)*4+4),data.slice((y*64+x)*4,(y*64+x)*4+4))
+  }
+  const all=halftone(data,64,64,{...settings,background:'white',whiteRemoval:'all',whiteCutoff:242}).data
+  assert.equal(all[(30*64+30)*4+3],0)
+})
+test('white threshold affects only near-white regions reachable from an edge',()=>{
+  const data=image(240,240,240)
+  assert.equal(halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected',whiteCutoff:242}).transparent,0)
+  assert.equal(halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected',whiteCutoff:235}).transparent,100)
+  assert.equal(halftone(image(0,0,0,0),64,64,{...settings,background:'white',whiteRemoval:'connected'}).transparent,100)
+})
+test('connected white removal traverses transparent margins without removing colored interior',()=>{
+  const data=image(0,0,0,0)
+  for(let y=8;y<56;y++)for(let x=8;x<56;x++)data.set([255,255,255,255],(y*64+x)*4)
+  data.set([230,20,15,255],(32*64+32)*4)
+  const out=halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected'}).data
+  assert.equal(out[(8*64+8)*4+3],0)
+  assert.deepEqual(Array.from(out.slice((32*64+32)*4,(32*64+32)*4+4)),[230,20,15,255])
+})
+test('original transparent pixels never acquire ink', () => {
+  assert.equal(halftone(image(255,255,255,0),64,64,settings).transparent,100)
+})
+test('edge trim deletes outer border without changing canvas size',()=>{
+  const result=halftone(image(255,255,255),64,64,{...settings,trimMm:1,featherMm:2})
+  assert.equal(result.data.length,64*64*4)
+  for(let x=0;x<64;x++)assert.equal(result.data[x*4+3],0)
+  assert.equal(result.data[(32*64+32)*4+3],255)
+})
+test('edge controls only affect selected sides',()=>{
+  const result=halftone(image(255,255,255),64,64,{...settings,trimMm:1,edgeSides:[true,false,false,false]})
+  assert.equal(result.data[3],0)
+  assert.equal(result.data[(63*64)*4+3],255)
+})
+test('disabled screening and no background removal preserve RGBA',()=>{
+  const data=image(125,85,60,128)
+  assert.deepEqual(halftone(data,64,64,{...settings,enabled:false,background:'none'}).data,data)
+})
+test('gamma opens up midtones monotonically for gradients',()=>{
+  const source=image(110,110,110)
+  const normal=halftone(source,64,64,settings)
+  const lifted=halftone(source,64,64,{...settings,gamma:1.25})
+  assert.ok(lifted.transparent<normal.transparent)
+})
+test('additional sharpness leaves flat colors unchanged',()=>{
+  const source=image(200,100,50)
+  assert.deepEqual(halftone(source,64,64,{...settings,sharpness:100}).data,halftone(source,64,64,settings).data)
+})
+test('solid alpha exports opaque dots and transparent holes',()=>{
+  const result=halftone(image(110,110,110),64,64,{...settings,solidAlpha:true})
+  const alpha=new Set<number>()
+  for(let i=3;i<result.data.length;i+=4)alpha.add(result.data[i])
+  assert.ok(alpha.has(0));assert.ok(alpha.has(255));assert.equal([...alpha].some(a=>a>0&&a<255),false)
+})
+test('fractional alpha remains available when solid alpha is disabled',()=>{
+  const result=halftone(image(110,110,110),64,64,{...settings,solidAlpha:false})
+  const alpha=new Set<number>()
+  for(let i=3;i<result.data.length;i+=4)alpha.add(result.data[i])
+  assert.ok([...alpha].some(a=>a>0&&a<255))
+})
+test('solid alpha handles semitransparent originals with and without screening',()=>{
+ for(const enabled of [true,false]){
+  const data=image(255,0,0,100);data[3]=0
+  const result=halftone(data,64,64,{...settings,enabled,solidAlpha:true})
+  const alpha=Array.from(result.data).filter((_,i)=>i%4===3)
+  assert.ok(alpha.includes(255));assert.ok(alpha.every(a=>a===0||a===255));assert.equal(alpha[0],0)
+ }
+ assert.equal(halftone(image(255,0,0,100),64,64,{...settings,enabled:false,solidAlpha:false}).data[3],100)
+})
+test('continuous solid alpha without removal ignores near-transparent export residue',()=>{
+ const data=new Uint8ClampedArray([
+  255,255,255,8,
+  255,255,255,9,
+ ])
+ const out=halftone(data,2,1,{...settings,enabled:false,background:'none',solidAlpha:true}).data
+ assert.deepEqual(Array.from(out),[0,0,0,0,255,255,255,255])
+})
+test('screened solid alpha does not turn near-transparent colour residue into a border',()=>{
+ const data=new Uint8ClampedArray([
+  255,0,180,8,
+  255,0,180,9,
+ ])
+ const out=halftone(data,2,1,{...settings,enabled:true,background:'none',solidAlpha:true,size:125}).data
+ assert.equal(out[3],0)
+ assert.ok(out[7]===0||out[7]===255)
+})
+test('continuous solid alpha removes weak matte residue instead of promoting it to opaque ink',()=>{
+ const data=image(255,255,255)
+ data.set([20,20,20,255],0)
+ data.set([160,160,160,255],4)
+ const out=halftone(data,2,1,{...settings,enabled:false,background:'black',solidAlpha:true}).data
+ assert.equal(out[3],0)
+ assert.equal(out[7],255)
+})
+test('continuous solid alpha keeps faint anti-aliased edge pixels after black removal',()=>{
+ const data=image(255,255,255)
+ data.set([60,60,60,255],0)
+ const out=halftone(data,2,1,{...settings,enabled:false,background:'black',solidAlpha:true}).data
+ assert.equal(out[3],255)
+})
+test('continuous solid alpha removes isolated dark speckles but keeps connected edges',()=>{
+ const data=image(255,255,255)
+ data.set([60,60,60,255],0)
+ data.set([60,60,60,255],4)
+ const out=halftone(data,3,1,{...settings,enabled:false,background:'black',solidAlpha:true}).data
+ assert.equal(out[3],0)
+ assert.equal(out[7],255)
+ assert.equal(out[11],255)
+})
+test('continuous solid black removal does not bake a dark matte into opaque edges',()=>{
+ const data=new Uint8ClampedArray([
+  0,0,0,255,
+  60,60,60,255,
+  255,255,255,255,
+  80,20,10,255,
+ ])
+ const out=halftone(data,4,1,{...settings,enabled:false,solidAlpha:true,tolerance:0}).data
+ assert.deepEqual(Array.from(out),[
+  0,0,0,0,
+  255,255,255,255,
+  255,255,255,255,
+  255,64,32,255,
+ ])
+})
+test('black removal neutralizes chromatic fringes on near-gray anti-aliasing',()=>{
+ const data=new Uint8ClampedArray([12,8,14,255, 220,100,80,255])
+ const out=halftone(data,2,1,{...settings,enabled:false,background:'black',solidAlpha:true,tolerance:0}).data
+ assert.equal(out[0],out[1]);assert.equal(out[1],out[2])
+ assert.ok(out[4]!==out[5]||out[5]!==out[6])
+})
+test('rounded corners retain quarter-circle interior instead of cutting squares',()=>{
+ const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,dpi:254,cornerRadiusMm:1})
+ const alpha=(x:number,y:number)=>result.data[(y*64+x)*4+3]
+ assert.equal(alpha(0,0),0);assert.equal(alpha(8,2),255);assert.equal(alpha(32,0),255)
+ for(let y=0;y<64;y++)for(let x=0;x<64;x++){
+  assert.equal(alpha(x,y),alpha(63-x,y));assert.equal(alpha(x,y),alpha(x,63-y))
+ }
+ const count=Array.from(result.data).filter((v,i)=>i%4===3&&v===0).length
+ assert.equal(result.transparent,Math.round(count/4096*100))
+})
+test('radius clamps on small artwork and empty artwork remains empty',()=>{
+ assert.equal(halftone(image(255,255,255,0),64,64,{...settings,cornerRadiusMm:50}).transparent,100)
+ const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,cornerRadiusMm:50})
+ assert.equal(result.data[3],0);assert.equal(result.data[(32*64+32)*4+3],255)
+})
+test('corner radius uses inward feathering for a softened halftone edge',()=>{
+ const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,background:'none',dpi:254,cornerRadiusMm:8,featherMm:2})
+ const alpha=(x:number,y:number)=>result.data[(y*64+x)*4+3]
+ assert.ok(alpha(10,10)>0&&alpha(10,10)<255)
+ assert.equal(alpha(0,0),0)
+})
