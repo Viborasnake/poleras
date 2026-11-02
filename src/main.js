@@ -13,7 +13,7 @@ import './style.css';
 import './accessibility.css';
 import './drop-wall.css';
 import './dialog-motion.js';
-import {supabase,SUPABASE_URL,initialStoreSettings,useDropWall} from './storefront-runtime.js';
+import {supabase,SUPABASE_URL,initialStoreSettings,localSignOutOptions,useDropWall} from './storefront-runtime.js';
 import { applyStoreSettings } from './store-settings.js';
 import { authErrorMessage } from './auth-messages.js';
 import { PRINT_POLICY, PRINT_EXTRAS_CLP, QUALITY_ADJUSTMENT_CLP, checkResolution, orderTotal } from './print-check.js';
@@ -342,7 +342,7 @@ document.addEventListener('click',event=>{
 },true);
 const accountDate=value=>new Intl.DateTimeFormat('es-CL',{day:'numeric',month:'short',year:'numeric'}).format(new Date(value));
 function accountDashboardShell(active){return `<div class="account-welcome"><span class="account-initial large">${safe(account.name).slice(0,1).toUpperCase()}</span><div><strong>${safe(account.name)}</strong><small>${safe(account.email)}</small></div></div><nav class="account-sections" aria-label="Secciones de mi cuenta"><button type="button" class="${active==='orders'?'active':''}" data-account-section="orders" ${active==='orders'?'aria-current="page"':''}>Mis pedidos</button><button type="button" class="${active==='data'?'active':''}" data-account-section="data" ${active==='data'?'aria-current="page"':''}>Mis datos</button></nav><div class="account-panel" id="account-panel" aria-live="polite"><div class="account-loading"><span></span>Cargando…</div></div><button type="button" class="account-logout" id="logout-account" aria-label="Cerrar sesión de ${safe(account.email)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></svg><span><strong>Cerrar sesión</strong><small>Salir de esta cuenta en este dispositivo</small></span></button>`}
-async function signOutAccount(button){button.disabled=true;const {error}=await supabase.auth.signOut();button.disabled=false;if(error)return toast(error.message,'error');account=null;updateCommerceNav();if(accountModal.open)renderAccount('register');toast('Sesión cerrada.')}
+async function signOutAccount(button){button.disabled=true;const {error}=await supabase.auth.signOut(localSignOutOptions);button.disabled=false;if(error)return toast(error.message,'error');account=null;updateCommerceNav();if(accountModal.open)renderAccount('register');toast('Sesión cerrada.')}
 function bindAccountDashboard(){document.querySelectorAll('[data-account-section]').forEach(button=>button.onclick=()=>renderAccountDashboard(button.dataset.accountSection));document.querySelector('#logout-account').onclick=event=>signOutAccount(event.currentTarget)}
 async function accountOrders(){
  let {data,error}=await supabase.from('orders').select('id,source,request_type,request_details,quote_message,quoted_total_clp,status,total_clp,shipping_clp,created_at,shipping_address,payment_confirmed_at,payment_confirmed_by,payment_instructions,payment_transfer_notice_at,archived_at,payments(provider,status),order_items(id,name_snapshot,quantity,line_total_clp),order_status_history(id,status,note,created_at)').eq('user_id',account.id).order('created_at',{ascending:false});

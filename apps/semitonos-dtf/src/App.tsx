@@ -948,7 +948,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       else if(e.key.toLowerCase()==='y'){e.preventDefault();navigateHistory('redo')}
     }}>
       <header className="topbar">
-        <div className="brand" aria-label="Droska Trama DTF"><span className="brand-word">droska</span><small>TRAMA DTF</small></div>
+        <div className="brand">
+          <img className="brand-logo" src="/droska-print-logo.png" alt="droska SHIRT" width="2366" height="542" />
+          <small>TRAMA DTF</small>
+        </div>
         <div className={`project-status ${projectStatus.failed?'save-failed':''}`}>
           <button type="button" className="project-disclosure" aria-expanded={!projectCollapsed} aria-controls="project-details project-actions" aria-label={projectCollapsed?'Mostrar detalles y acciones del proyecto':'Ocultar detalles y acciones del proyecto'} onClick={()=>setProjectCollapsed(value=>!value)}><strong title={`${projectStatus.name}.trama.json`}>{projectStatus.name}.trama.json</strong><ChevronDown size={16} aria-hidden="true"/></button>
           <span role="status">{projectStatus.message}</span>

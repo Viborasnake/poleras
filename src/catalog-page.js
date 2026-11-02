@@ -14,7 +14,7 @@ import { shareLink } from './share.js';
 const SUPABASE_URL=import.meta.env.VITE_SUPABASE_URL||'https://dgndcklmmnnxyqfmnckh.supabase.co';
 const SUPABASE_KEY=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_J2zSgCPaW1rENVCdEuYGNQ_62EhSxtS';
 const root=document.querySelector('#catalog-page');
-const catalogClient=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const catalogClient=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 
 const seoTheme=localStorage.getItem('droska-theme')==='light'?'light':'dark';
 document.documentElement.classList.toggle('theme-dark',seoTheme==='dark');

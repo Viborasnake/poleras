@@ -635,6 +635,14 @@ input[type='range']::-webkit-slider-thumb {
   backdrop-filter: blur(20px);
 }
 .brand { gap: 11px; font-family: var(--ds-font-display); letter-spacing: normal; }
+.brand-logo {
+  display: block;
+  width: 158px;
+  height: auto;
+  padding: 5px 7px;
+  border-radius: 8px;
+  background: #fff;
+}
 .brand .brand-word {
   color: var(--ds-pink);
   font-size: 25px;
@@ -940,9 +948,12 @@ input[type='range']::-webkit-slider-thumb {
   box-shadow: 0 28px 90px #000c;
 }
 .auth-card h1, .project-start-card h1 { font-family: var(--ds-font-display); letter-spacing: -.04em; }
+.auth-logo { display:block; width:min(270px,100%); height:auto; margin:0 0 22px; padding:7px 9px; border-radius:10px; background:#fff; }
 .auth-card > p { color: var(--ds-text-secondary); }
 .auth-card .eyebrow, .project-start-card .eyebrow { color: var(--ds-pink); font-weight: 800; letter-spacing: .14em; }
 .auth-card .btn.export, .project-start-card .btn.export { width: 100%; justify-content: center; }
+.auth-card > a { display:inline-flex; min-height:44px; align-items:center; margin-top:14px; color:var(--ds-lilac-soft); font-weight:700; text-underline-offset:4px; }
+.auth-card > a:focus-visible { outline:3px solid var(--ds-lilac); outline-offset:3px; }
 
 .resolution-warning, .safety-issues li {
   border-color: var(--ds-warning);
@@ -962,6 +973,7 @@ input[type='range']::-webkit-slider-thumb {
 }
 @media (max-width:800px) {
   .app-shell > .topbar { background: var(--ds-black); }
+  .brand-logo { width:132px; }
   .brand .brand-word { font-size: 21px; }
   .brand small { font-size: 8px; }
   .tool-tabs { min-height: 48px; padding: 0 10px; }

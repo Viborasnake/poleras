@@ -32,9 +32,10 @@ import { matchesDesignFilters } from './admin-design-filters.js';
 import {purchaseMethodLabel} from './purchase-methods.js';
 import {PRODUCT_COLORS,COLOR_PRODUCT_FAMILIES,activeProductColorCodes,invalidDesignProductColors,productColorAvailability,productColorGroups} from './product-colors.js';
 import {designProductColorMap} from '../supabase/functions/_shared/catalog-product-colors.js';
+import {adminAuthOptions,localSignOutOptions} from './auth-client-options.js';
 
 const root=document.querySelector('#admin-app');
-const supabase=createClient(import.meta.env.VITE_SUPABASE_URL||'https://dgndcklmmnnxyqfmnckh.supabase.co',import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_J2zSgCPaW1rENVCdEuYGNQ_62EhSxtS');
+const supabase=createClient(import.meta.env.VITE_SUPABASE_URL||'https://dgndcklmmnnxyqfmnckh.supabase.co',import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_J2zSgCPaW1rENVCdEuYGNQ_62EhSxtS',{auth:adminAuthOptions});
 const CATALOG_BUCKET='catalog-designs';
 const CATALOG_SOURCE_MAX_BYTES=CATALOG_IMAGE_POLICY.sourceMaxBytes;
 const LOCAL_DEMO_ORDERS_KEY='droska-local-demo-orders';
@@ -90,7 +91,7 @@ function loadingView(){
  root.innerHTML='<section class="admin-loading" role="status" aria-live="polite"><div class="admin-loading-card"><img class="admin-loading-logo" src="/droska-print-logo.png" alt="droska SHIRT" width="2366" height="542"><p class="admin-loading-message">Cargando panel…</p><div class="admin-loading-track" aria-hidden="true"><i></i></div></div></section>';
 }
 function deniedView(){root.innerHTML='<section class="admin-login"><a class="admin-brand" href="/">droska<span>*</span></a><h1>Sin acceso</h1><p>Esta cuenta no tiene permisos de administración.</p><button class="admin-secondary" type="button" id="admin-logout">Cerrar sesión</button></section>';root.querySelector('#admin-logout').onclick=logout}
-async function logout(){if(adminOrdersChannel){await supabase.removeChannel(adminOrdersChannel);adminOrdersChannel=null}await supabase.auth.signOut();sessionUser=null;adminData=null;loginView()}
+async function logout(){if(adminOrdersChannel){await supabase.removeChannel(adminOrdersChannel);adminOrdersChannel=null}await supabase.auth.signOut(localSignOutOptions);sessionUser=null;adminData=null;loginView()}
 
 async function readAdminData(){
  const [variants,orders,profiles,productTypes,categories,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories,supplierComponents,supplierVariantLinks,recentArchived]=await Promise.all([
@@ -149,7 +150,8 @@ function navMarkup(active){
  const link=([id,iconName,label],catalog=false)=>`<a href="#${id}" class="${active===id?'active ':''}${catalog?'admin-catalog-link ':''}${id==='productos'?'admin-catalog-parent ':''}${catalog&&id!=='productos'?'admin-catalog-child ':''}${['resumen','productos','categorias','colecciones','disenos','pedidos','insumos','precios','cupones','clientes','configuracion'].includes(id)?'':' is-planned'}" aria-label="${label}" title="${label}" ${active===id?'aria-current="page"':''}>${icon(iconName)}<span>${label}</span>${id==='pedidos'&&activeOrderCount?`<b aria-hidden="true">${activeOrderCount}</b>`:''}</a>`;
  const catalog=routes.filter(([id])=>catalogIds.has(id));
  const catalogNav=`<div class="admin-catalog-nav${catalogIds.has(active)?' has-active-child':''}" role="group" aria-label="Productos y contenido del catálogo">${link(catalog[0],true)}<div class="admin-catalog-children">${catalog.slice(1).map(item=>link(item,true)).join('')}</div></div>`;
- return routes.filter(([id])=>!catalogIds.has(id)).map(route=>route[0]==='resumen'?`${link(route)}${catalogNav}`:link(route)).join('');
+ const toolLink=`<a href="${DTF_SEMITONE_URL}" target="_blank" rel="noreferrer" aria-label="Semitonos DTF, abre en una pestaña nueva" title="Semitonos DTF">${icon('image')}<span>Semitonos DTF</span></a>`;
+ return `${routes.filter(([id])=>!catalogIds.has(id)).map(route=>route[0]==='resumen'?`${link(route)}${catalogNav}`:link(route)).join('')}${toolLink}`;
 }
 function pageHeading(eyebrow,title,copy,action=''){return `<div class="admin-page-heading"><div><span class="admin-eyebrow">${eyebrow}</span><h1>${title}</h1><p>${copy}</p></div>${action}</div>`}
 function shell(content,active){

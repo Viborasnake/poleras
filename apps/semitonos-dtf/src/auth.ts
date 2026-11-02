@@ -1,23 +1,24 @@
-const AUTH_USER = 'viborasnake@gmail.com'
-const PASSWORD_SHA256 = 'ea9f503828bcde861fa882c193c13a7a6bb26ce00c07332d1e51af2590f2cabd'
-const SESSION_KEY = 'trama-dtf-authenticated'
+import {createClient} from '@supabase/supabase-js'
+import {ADMIN_AUTH_STORAGE_KEY,adminAuthOptions,localSignOutOptions} from '../../../src/auth-client-options.js'
 
-function digest(value: string) {
-  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)).then(bytes =>
-    [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join(''))
+export {ADMIN_AUTH_STORAGE_KEY}
+
+const SUPABASE_URL=import.meta.env.VITE_SUPABASE_URL||'https://dgndcklmmnnxyqfmnckh.supabase.co'
+const SUPABASE_KEY=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_J2zSgCPaW1rENVCdEuYGNQ_62EhSxtS'
+
+export const adminSupabase=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:adminAuthOptions})
+
+export async function hasAdminAccess() {
+  const {data:{user},error:userError}=await adminSupabase.auth.getUser()
+  if(userError||!user)return false
+  const {data:isAdmin,error:roleError}=await adminSupabase.rpc('is_admin')
+  return !roleError&&isAdmin===true
 }
 
-export function hasAuthSession() {
-  try { return sessionStorage.getItem(SESSION_KEY) === '1' } catch { return false }
+export async function authenticateAdmin(email:string,password:string) {
+  const {error}=await adminSupabase.auth.signInWithPassword({email:email.trim(),password})
+  if(error)return {ok:false,message:'El correo o la contraseña no son correctos.'}
+  if(await hasAdminAccess())return {ok:true,message:''}
+  await adminSupabase.auth.signOut(localSignOutOptions)
+  return {ok:false,message:'Esta cuenta no tiene permisos de administración.'}
 }
-
-export async function authenticate(user: string, password: string) {
-  if (user.trim().toLocaleLowerCase() !== AUTH_USER) return false
-  if (!crypto.subtle) return false
-  const passwordHash = await digest(password)
-  if (passwordHash !== PASSWORD_SHA256) return false
-  try { sessionStorage.setItem(SESSION_KEY, '1') } catch { /* private browsing can reject storage */ }
-  return true
-}
-
-export {AUTH_USER}

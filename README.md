@@ -14,7 +14,7 @@ El DS es la referencia para nuevas interfaces de Droska. La matriz de contraste 
 
 `npm install`, luego `npm run dev`. Para producción estática: `npm run build`; el resultado se genera en `dist/`.
 
-El editor privado de semitonos DTF vive en el workspace `apps/semitonos-dtf` y se publica junto con la tienda en `/herramientas/semitonos-dtf/`. Para desarrollarlo de forma aislada usa `npm run dev:semitonos`; `npm run build` compila tanto la tienda como el editor. Los proyectos del editor se autoguardan por origen: antes de dejar la dirección histórica de GitHub Pages, descarga los trabajos que quieras trasladar como archivos `.trama.json` y ábrelos una vez en la ruta de Droska.
+El editor privado de semitonos DTF vive en el workspace `apps/semitonos-dtf` y se publica junto con la tienda en `/herramientas/semitonos-dtf/`. Para desarrollarlo de forma aislada usa `npm run dev:semitonos`; `npm run build` compila tanto la tienda como el editor. Semitonos comparte exclusivamente la sesión de Administración y vuelve a validar el rol `is_admin`; la tienda pública persiste su cuenta en otra clave. Ambos cierres de sesión usan alcance local, por lo que salir del panel no cierra la cuenta del home y viceversa. Los proyectos del editor se autoguardan por origen: antes de dejar la dirección histórica de GitHub Pages, descarga los trabajos que quieras trasladar como archivos `.trama.json` y ábrelos una vez en la ruta de Droska.
 
 ## Supabase local
 
