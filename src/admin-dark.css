@@ -42,6 +42,7 @@ html.admin-theme-dark .metric-icon,
 html.admin-theme-dark .quick-grid svg { color: var(--ds-pink-300); }
 html.admin-theme-dark .admin-order-edit-blocker { background: var(--ds-pink-50); }
 html.admin-theme-dark .admin-loading-logo { content: url('/droska-print-logo-dark.png'); }
+html.admin-theme-dark .admin-brand-logo { content: url('/droska-print-logo-dark.png'); }
 
 html.admin-theme-dark .admin-primary,
 html.admin-theme-dark .ds-cta {

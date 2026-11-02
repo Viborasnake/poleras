@@ -540,6 +540,8 @@
 @media(max-width:760px){.admin-order-heading-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.admin-order-heading-actions .admin-secondary,.admin-order-heading-actions .admin-primary{width:100%;justify-content:center}.admin-order-heading-actions #open-archive-history{grid-column:1/-1}}
 
 .admin-sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.admin-brand-logo{display:block;width:150px;height:auto}
+.admin-login .admin-brand-logo{width:min(245px,100%)}
 .admin-kanban-card-top>div{min-width:0;flex-wrap:wrap;justify-content:flex-end}
 .admin-kanban-card .admin-source-pill{max-width:145px;overflow:hidden;color:var(--ds-text-primary);font-size:10px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
 .admin-kanban-card-type{color:var(--ds-text-primary);font-size:11px;line-height:1.35}
@@ -562,6 +564,8 @@
  .is-sidebar-collapsed .admin-sidebar nav .admin-catalog-child{min-height:44px}
 }
 @media(max-width:1050px){.admin-sidebar-toggle{display:none}}
+@media(max-width:1050px){.admin-sidebar .admin-brand-logo{display:none}}
+@media(min-width:1051px){.is-sidebar-collapsed .admin-brand-logo{display:none}}
 @media(max-width:760px){.admin-sidebar-head{display:none}}
 
 /* Admin: roles oficiales y estados de interacción compartidos. */
