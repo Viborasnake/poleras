@@ -639,9 +639,6 @@ input[type='range']::-webkit-slider-thumb {
   display: block;
   width: 158px;
   height: auto;
-  padding: 5px 7px;
-  border-radius: 8px;
-  background: #fff;
 }
 .brand .brand-word {
   color: var(--ds-pink);
@@ -948,7 +945,7 @@ input[type='range']::-webkit-slider-thumb {
   box-shadow: 0 28px 90px #000c;
 }
 .auth-card h1, .project-start-card h1 { font-family: var(--ds-font-display); letter-spacing: -.04em; }
-.auth-logo { display:block; width:min(270px,100%); height:auto; margin:0 0 22px; padding:7px 9px; border-radius:10px; background:#fff; }
+.auth-logo { display:block; width:min(270px,100%); height:auto; margin:0 0 22px; }
 .auth-card > p { color: var(--ds-text-secondary); }
 .auth-card .eyebrow, .project-start-card .eyebrow { color: var(--ds-pink); font-weight: 800; letter-spacing: .14em; }
 .auth-card .btn.export, .project-start-card .btn.export { width: 100%; justify-content: center; }

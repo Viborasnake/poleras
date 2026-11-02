@@ -949,7 +949,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     }}>
       <header className="topbar">
         <div className="brand">
-          <img className="brand-logo" src="/droska-print-logo.png" alt="droska SHIRT" width="2366" height="542" />
+          <img className="brand-logo" src="/droska-print-logo-dark.png" alt="droska SHIRT" width="2366" height="542" />
           <small>TRAMA DTF</small>
         </div>
         <div className={`project-status ${projectStatus.failed?'save-failed':''}`}>
