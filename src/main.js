@@ -14,7 +14,7 @@ import './accessibility.css';
 import './drop-wall.css';
 import './dialog-motion.js';
 import {supabase,SUPABASE_URL,initialStoreSettings,localSignOutOptions,useDropWall} from './storefront-runtime.js';
-import { applyStoreSettings } from './store-settings.js';
+import { applyStoreSettings, defaultStoreSettings } from './store-settings.js';
 import { authErrorMessage } from './auth-messages.js';
 import {authWithCaptcha,requestCaptchaToken,signInAnonymouslyWithCaptcha} from './auth-captcha.js';
 import { PRINT_POLICY, PRINT_EXTRAS_CLP, QUALITY_ADJUSTMENT_CLP as DEFAULT_QUALITY_ADJUSTMENT_CLP, checkResolution, orderTotal } from './print-check.js';
