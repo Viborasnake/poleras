@@ -10,7 +10,7 @@ test('personalización exige una foto compatible y no vacía', () => {
   for(const type of ['image/jpeg','image/png','image/webp']) assert.equal(petPhotoError({type,size:12*1024*1024}), '');
 });
 
-import {sendPetRequest,petStepHtml,petSubmitLabel} from './pet-personalization.js';
+import {sendPetRequest,petStepHtml,petSubmitLabel,petPhotoLimit} from './pet-personalization.js';
 test('el respaldo automático conserva foto, selección e identificador sin duplicar la carga',async()=>{
  const draft={file:{name:'pet.jpg',size:100,type:'image/jpeg',lastModified:1},firstName:'Test',email:'test@example.com',phone:'123'};
  const payloads=[];let uploads=0;
@@ -33,7 +33,7 @@ test('si fallan confirmación y respaldo conserva el intento y la foto para rein
  await assert.rejects(sendPetRequest({draft,design:{id:'kaiju',name:'Kaiju'},selection:{variantId:42,model:'Body',size:'M',color:'Blanco',side:'front'},supabase,uploadPhoto:async()=>{uploads++;return 'private/photo.jpg'},onStatus:()=>{}}),/WhatsApp/);
  assert.equal(uploads,1);
  assert.ok(draft.attempt?.id);
- assert.equal(draft.uploaded.path,'private/photo.jpg');
+ assert.equal(draft.uploaded[0].path,'private/photo.jpg');
 });
 test('la recepción recuperada explica que el equipo conserva los datos',()=>{
  const html=petStepHtml({step:3,draft:{orderId:123,recovered:true},selection:{},designName:'Kaiju',escapeText:String});
@@ -70,7 +70,8 @@ test('WhatsApp pide adjuntar la foto en el chat y no muestra carga local',()=>{
 test('los diseños para personas piden una foto de persona y conservan el nombre en la solicitud',async()=>{
  const html=petStepHtml({step:2,subject:'people',draft:{},selection:{},designName:'Navidad',escapeText:String});
  assert.match(html,/Nombre de la persona/);
- assert.match(html,/Subir foto de la persona/);
+ assert.match(html,/Subir foto de las personas/);
+ assert.match(html,/multiple/);
  assert.doesNotMatch(html,/Tu mascota/);
  assert.match(petPhotoError(null,'people'),/foto de la persona/);
  const draft={file:{name:'familia.jpg',size:100,type:'image/jpeg',lastModified:1},petName:'Familia',firstName:'Ana',email:'ana@example.com',phone:'123'};
@@ -80,4 +81,20 @@ test('los diseños para personas piden una foto de persona y conservan el nombre
  assert.match(payload.idea,/con la persona de la foto adjunta/);
  assert.match(payload.idea,/Persona: Familia/);
  assert.doesNotMatch(payload.idea,/Mascota:/);
+});
+test('personas envía hasta tres fotos distintas en una solicitud y recupera la carga tras un error',async()=>{
+ const files=[1,2,3].map(number=>({name:`rostro-${number}.webp`,size:100,type:'image/webp',lastModified:number}));
+ assert.equal(petPhotoLimit('people'),3);assert.equal(petPhotoLimit('pets'),1);
+ const draft={files,firstName:'Ana',email:'ana@example.com',phone:'123'};
+ let uploads=0,payload;
+ const supabase={auth:{getSession:async()=>({data:{session:{user:{id:'user'}}}})},functions:{invoke:async(_name,{body})=>{payload=body;return {data:{orderId:124}}}}};
+ await sendPetRequest({draft,design:{id:'angelito',name:'Mi Angelito',customerPhotoSubject:'people'},selection:{variantId:42,model:'Polera',size:'M',color:'Blanco',side:'front'},supabase,uploadPhoto:async(_user,file)=>{uploads++;return `private/${file.name}`},onStatus:()=>{}});
+ assert.equal(uploads,3);assert.deepEqual(payload.references.map(reference=>reference.name),files.map(file=>file.name));
+ assert.equal(draft.orderId,124);
+});
+test('la solicitud rechaza una cuarta foto antes de subir archivos',async()=>{
+ const draft={files:[1,2,3,4].map(number=>({name:`rostro-${number}.jpg`,size:100,type:'image/jpeg',lastModified:number}))};
+ let uploads=0;
+ await assert.rejects(sendPetRequest({draft,design:{id:'angelito',name:'Mi Angelito',customerPhotoSubject:'people'},selection:{},supabase:{},uploadPhoto:async()=>{uploads++},onStatus:()=>{}}),/hasta 3 fotos/);
+ assert.equal(uploads,0);
 });

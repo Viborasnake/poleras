@@ -1,7 +1,9 @@
+import { printPrice } from '../_shared/print-pricing.js'
 import {designProductArtworks,modelProductSlug} from '../_shared/catalog-product-artworks.js'
 import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant} from '../_shared/variant-selection.js'
 import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage} from '../_shared/catalog-personalization.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
+import { normalizePrintConfiguration, printConfigurationCount } from '../_shared/print-configuration.js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,7 +64,6 @@ Deno.serve(async request => {
   for (const item of items) {
     if (!allowedModels.has(item.modelCode) || !allowedSizeForModel(item.modelCode, item.size) || !allowedSides.has(item.printSides) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20 || !hexColor.test(item.color || '')) return json({ error: 'Uno de los productos no es válido.' }, 400)
     if (item.catalogDesignCustomerImage != null && typeof item.catalogDesignCustomerImage !== 'boolean') return json({ error: 'Uno de los productos no es válido.' }, 400)
-    if (item.catalogDesignSlug && item.printSides === 'both') return json({ error: 'Los diseños de colección solo permiten frente o espalda.' }, 400)
     if (item.modelCode === 'tote' && (!['M', 'L'].includes(item.size) || item.printSides !== 'front')) return json({ error: 'La tote bag debe usar talla M o L e impresión solo por el frente.' }, 400)
   }
 
@@ -72,6 +73,9 @@ Deno.serve(async request => {
   const { data: variants, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(code,name,active)').eq('active', true).eq('product_models.active',true)
   if (variantError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
   const normalizedVariants=normalizeVariantRows(variants||[])
+  const { data: storeSettings, error: settingsError } = await admin.from('storefront_settings').select('quality_review_fee_clp,front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
+  if (settingsError) return json({ error: 'No pudimos validar el valor de revisión técnica.' }, 503)
+  const qualityReviewFee = Number.isSafeInteger(storeSettings?.quality_review_fee_clp) && storeSettings.quality_review_fee_clp >= 0 && storeSettings.quality_review_fee_clp <= 1000000 ? storeSettings.quality_review_fee_clp : 4990
 
   const designSlugs = [...new Set(items.map((item: any) => item.catalogDesignSlug).filter(Boolean))]
   const designMap = new Map<string, any>()
@@ -95,8 +99,8 @@ Deno.serve(async request => {
     const variant=selectedVariants[index].variant!
     const modelRow=variants?.find((row:any)=>row.id===variant.id)
     const model=Array.isArray(modelRow?.product_models)?modelRow.product_models[0]:modelRow?.product_models
-    const printExtra = item.printSides === 'both' ? 3990 : 0
-    const qualityExtra = item.qualityReview ? 4990 : 0
+    const printExtra = item.modelCode === 'tote' ? 0 : printPrice(normalizePrintConfiguration(item.printConfiguration,item.printSides),item.printSides,storeSettings)
+    const qualityExtra = item.qualityReview ? qualityReviewFee : 0
     const unitPrice = variant.priceClp + printExtra + qualityExtra
     const lineTotal = unitPrice * item.quantity
     subtotal += lineTotal
@@ -109,6 +113,7 @@ Deno.serve(async request => {
       sku_snapshot: variant.sku,
       color_hex: variant.color.toUpperCase(),
       print_sides: item.printSides,
+      print_configuration: normalizePrintConfiguration(item.printConfiguration,item.printSides),
       quantity: item.quantity,
       unit_price_clp: unitPrice,
       line_total_clp: lineTotal,
@@ -156,7 +161,7 @@ Deno.serve(async request => {
     shipping_clp: shipping,
     discount_clp: discount,
     total_clp: subtotal + shipping - discount,
-    price_snapshot: { demo: true, request_id: requestId, provider: 'mercado_pago_simulation', shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null },
+    price_snapshot: { demo: true, request_id: requestId, provider: 'mercado_pago_simulation', quality_review_fee_clp: qualityReviewFee, shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null },
     shipping_address: shippingAddress,
     submitted_at: now,
   }).select('id,total_clp').single()

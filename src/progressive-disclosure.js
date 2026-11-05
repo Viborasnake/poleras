@@ -40,15 +40,17 @@ function trackDisclosureFocusModality(){
  document.addEventListener('keydown',()=>{disclosureFocusFromKeyboard=true},{capture:true});
  document.addEventListener('pointerdown',()=>{disclosureFocusFromKeyboard=false},{capture:true});
 }
-export function focusDisclosure(element){
+export function focusDisclosure(element,{align='nearest'}={}){
  if(!element)return;
  trackDisclosureFocusModality();
  element.toggleAttribute?.('data-disclosure-silent-focus',!disclosureFocusFromKeyboard);
  element.addEventListener?.('blur',()=>element.removeAttribute?.('data-disclosure-silent-focus'),{once:true});
  element.focus({preventScroll:true});
  const bounds=element.getBoundingClientRect();
- const scroller=element.closest('.studio-controls'),clip=scroller?.getBoundingClientRect();
- if(bounds.top<(clip?.top??0)+12||bounds.bottom>Math.min(innerHeight,clip?.bottom??innerHeight)-12)element.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+ const studio=element.closest('#studio');
+ const scroller=studio?.classList.contains('is-request-mode')?studio.querySelector('.studio-body'):element.closest('.studio-controls');
+ const clip=scroller?.getBoundingClientRect();
+ if(align==='start'||bounds.top<(clip?.top??0)+12||bounds.bottom>Math.min(innerHeight,clip?.bottom??innerHeight)-12)element.scrollIntoView({block:align,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
 }
 // Moves existing nodes rather than cloning them, preserving input and file state.
 export function mountDisclosure({container,state,steps,ready=true,onEdit=()=>{},idPrefix='disclosure',multiple=false}){

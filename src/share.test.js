@@ -19,3 +19,9 @@ test('shareLink reports cancelled native sharing without copying unexpectedly',a
   assert.equal(result,'cancelled');
   assert.equal(copied,false);
 });
+
+test('shareLink prefers native sharing when both APIs are available',async()=>{
+  let shared=false,copied=false;
+  const result=await shareLink({url:'/productos/poleras/',origin:'https://droska.frontbook.cl',navigatorObject:{share:async()=>{shared=true}},clipboard:{writeText:async()=>{copied=true}}});
+  assert.equal(result,'shared');assert.equal(shared,true);assert.equal(copied,false);
+});

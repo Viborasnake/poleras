@@ -14,7 +14,7 @@ const safeEqual = (a: string, b: string) => {
   return difference === 0
 }
 
-const emailOrderSelect = 'source,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)'
+const emailOrderSelect = 'source,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides,print_configuration)'
 const emailDetailsFromOrder = (order: any) => {
   const shippingAddress = { ...(order?.shipping_address || {}), delivery_notes: order?.shipping_address?.delivery_notes || (order?.source === 'online' ? order?.shipping_address?.notes : '') }
   delete shippingAddress.notes

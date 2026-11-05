@@ -1,7 +1,10 @@
+import { printPrice } from '../_shared/print-pricing.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { designProductArtworks, modelProductSlug } from '../_shared/catalog-product-artworks.js'
 import { catalogDesignRequiresCustomerImage } from '../_shared/catalog-personalization.js'
 import { allowedColorsForModel } from '../_shared/catalog-product-colors.js'
+import { verifyTurnstile } from '../_shared/turnstile.ts'
+import { normalizePrintConfiguration, printConfigurationCount } from '../_shared/print-configuration.js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,8 +44,10 @@ Deno.serve(async request => {
   if (!fullName || !email.includes('@') || !phone) return json({ error: 'Faltan datos de contacto.' }, 400)
   if (idea.length > 4000 || details.length > 4000) return json({ error: 'El detalle es demasiado extenso.' }, 400)
 
-  const { data: existing } = await admin.from('orders').select('id').eq('whatsapp_request_id', requestId).maybeSingle()
+  const { data: existing } = await admin.from('orders').select('id').eq('whatsapp_request_id', requestId).eq('user_id', userData.user.id).maybeSingle()
   if (existing) return json({ orderId: existing.id, duplicate: true })
+  if (!Deno.env.get('TURNSTILE_SECRET_KEY')) return json({ error: 'La verificación de seguridad no está configurada.' }, 503)
+  if (!await verifyTurnstile(body?.captchaToken)) return json({ error: 'No pudimos verificar tu solicitud. Vuelve a intentarlo.' }, 403)
 
   const now = new Date().toISOString()
   const shippingAddress = { fulfillment: 'pending', channel: 'whatsapp', customer: { first_name: fullName, email, phone } }
@@ -90,7 +95,9 @@ Deno.serve(async request => {
     ? design?.customer_photo_subject === 'people' ? 'people_personalization' : 'pet_personalization'
     : design?.accepts_customer_image && design?.customer_photo_subject === 'people' ? 'people_base'
     : design ? 'catalog_design' : 'own_artwork'
-  const printExtra = printSides === 'both' ? 3990 : 0
+  const { data: storeSettings, error: settingsError } = await admin.from('storefront_settings').select('front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
+  if (settingsError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
+  const printExtra = model.code === 'tote' ? 0 : printPrice(normalizePrintConfiguration(product.printConfiguration,printSides),printSides,storeSettings)
   const total = Number(variant.price_clp) + printExtra
   const productLabel = model.code === 'tote' ? 'Tote bag' : model.code === 'body' ? 'Body bebé' : `Polera ${model.name}`
   const name = design?.name ? `${productLabel} · ${design.name}` : `${productLabel} personalizada`
@@ -105,6 +112,7 @@ Deno.serve(async request => {
     order_id: order.id, product_variant_id: variant.id, catalog_design_id: design?.id || null,
     catalog_artwork_path: design && !customerImage ? designProductArtworks(design)[modelProductSlug(model.code)] : null,
     name_snapshot: name, sku_snapshot: variant.sku, color_hex: variant.color_hex, print_sides: printSides,
+    print_configuration: normalizePrintConfiguration(product.printConfiguration,printSides),
     quantity: 1, unit_price_clp: total, line_total_clp: total,
   })
   if (itemError) { await admin.from('orders').delete().eq('id', order.id); return json({ error: 'No pudimos guardar el detalle del pedido.' }, 503) }

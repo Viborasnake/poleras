@@ -1,3 +1,5 @@
+import { printConfigurationLabel } from './print-configuration.js'
+
 export const orderEmailLabels: Record<string, string> = {
   submitted: 'Pedido ingresado',
   quoted: 'Cotización disponible',
@@ -53,14 +55,13 @@ const htmlEntities: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }
 export const escapeHtml = (value: unknown) => String(value || '').replace(/[&<>"']/g, char => htmlEntities[char] || char)
-type OrderEmailItem = { name_snapshot?: string; quantity?: number; unit_price_clp?: number; line_total_clp?: number; print_sides?: string }
+type OrderEmailItem = { name_snapshot?: string; quantity?: number; unit_price_clp?: number; line_total_clp?: number; print_sides?: string; print_configuration?: Record<string, unknown> }
 type PaymentInstructions = { transfer?: { holder?: string; bank?: string; account_type?: string; account_number?: string; rut?: string; email?: string }; mercado_pago_url?: string }
 type OrderDelivery = { fulfillment?: string; region?: string; commune?: string; address?: string; address_extra?: string; delivery_notes?: string }
 type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; discount_clp?: number; total_clp?: number; coupon_code?: string; shipping_address?: OrderDelivery; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean; creative?: boolean; request_details?: string; quote_message?: string; adminNotice?: boolean; referenceCount?: number }
 const formatClp = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0))
-const printSideLabel = (value: unknown) => value === 'back' ? 'Espalda' : value === 'both' ? 'Frente y espalda' : value === 'front' ? 'Frente' : String(value || '')
 const lineLabel = (item: OrderEmailItem) => {
-  const placement = printSideLabel(item.print_sides)
+  const placement = printConfigurationLabel(item.print_configuration, item.print_sides)
   return `${item.quantity || 1} × ${item.name_snapshot || 'Producto'}${placement ? ` · ${placement}` : ''}`
 }
 function orderDetails(details: OrderEmailDetails = {}) {

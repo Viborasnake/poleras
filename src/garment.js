@@ -104,6 +104,22 @@ export function garmentPrintArea(kind) {
   return { width: .95, height: 1.357, y: .15 };
 }
 
+export function printPlacementCoordinates(placement, baseY, offsetX = 0, offsetY = 0) {
+  const presets = {
+    center: { x: 0, y: baseY },
+    upper_back: { x: 0, y: baseY + .34 },
+    chest_left: { x: -.28, y: baseY + .28 },
+    chest_right: { x: .28, y: baseY + .28 },
+    sleeve_left: { x: -.62, y: baseY + .43 },
+    sleeve_right: { x: .62, y: baseY + .43 },
+  };
+  const selected = presets[placement] || presets.center;
+  return {
+    x: selected.x + Math.max(-2, Math.min(2, Number(offsetX) || 0)) * .07,
+    y: selected.y - Math.max(-2, Math.min(2, Number(offsetY) || 0)) * .07,
+  };
+}
+
 function keepForwardFacingDecal(geometry, back = false, threshold = .52) {
   const position = geometry.getAttribute('position');
   const normal = geometry.getAttribute('normal');
@@ -301,8 +317,10 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const requestedScale = next.printScale || 1;
     const maxScale = next.catalogPreview ? 2 : next.catalogDesign ? 1.7 : 1.6;
     const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
+    const placement = next.printPlacement || 'center';
+    const offsetX = Number(next.printOffsetX) || 0, offsetY = Number(next.printOffsetY) || 0;
     const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : next.catalogDesign ? 'catalog-studio-decal-v2' : 'safe-fit-v4';
-    const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + fitMode : '';
+    const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + placement + '|' + offsetX + '|' + offsetY + '|' + fitMode : '';
     if (key === currentImage) return;
     const previousImage = currentImage;
     currentImage = key;
@@ -326,15 +344,17 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       const printArea = garmentPrintArea(next.kind);
       const baseWidth = Math.min(printArea.width, printArea.height * aspect) * safeScale;
       let useFlatPreview = next.catalogPreview || hero;
-      const placementY = printArea.y + (1 - safeScale) * .35 - (useFlatPreview ? 0 : .12);
-      const facingThreshold = next.kind === 'over' ? .05 : next.catalogDesign ? .32 : .52;
+      const basePlacementY = printArea.y + (1 - safeScale) * .35 - (useFlatPreview ? 0 : .12);
+      const placementPoint = printPlacementCoordinates(placement, basePlacementY, offsetX, offsetY), placementX = placementPoint.x, placementY = placementPoint.y;
+      const specialPlacement = placement.startsWith('sleeve_') || placement.startsWith('chest_');
+      const facingThreshold = next.kind === 'over' || placement.startsWith('sleeve_') ? .05 : next.catalogDesign ? .32 : specialPlacement ? .22 : .52;
       group.updateMatrixWorld(true);
       const rayDirection = new THREE.Vector3(0, 0, back ? 1 : -1).transformDirection(group.matrixWorld);
       const castOnShirt = (x, y) => {
         ray.set(new THREE.Vector3(x, y, back ? -3 : 3).applyMatrix4(group.matrixWorld), rayDirection);
         return ray.intersectObject(shirt, false)[0];
       };
-      const centerHit = castOnShirt(0, placementY);
+      const centerHit = castOnShirt(placementX, placementY);
       const targetZ = centerHit ? group.worldToLocal(centerHit.point.clone()).z : back ? -.4 : .4;
       let fittedScale = printScale;
       if (!useFlatPreview) {
@@ -342,7 +362,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
         const fits = scale => {
           const width = baseWidth * scale, height = width / aspect;
           return edges.every(({ u, v }) => {
-            const hit = castOnShirt((u - .5) * width, placementY + (.5 - v) * height);
+            const hit = castOnShirt(placementX + (u - .5) * width, placementY + (.5 - v) * height);
             return hit && isPrintableFacing(hit.face.normal.z, back, facingThreshold)
               && Math.abs(group.worldToLocal(hit.point.clone()).z - targetZ) < .48;
           });
@@ -374,7 +394,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       // convertirlos en una lámina plana: los vértices siguen sobre la tela.
       const rawDecal = new DecalGeometry(
         shirt,
-        new THREE.Vector3(0, placementY, targetZ),
+        new THREE.Vector3(placementX, placementY, targetZ),
         new THREE.Euler(0, back ? Math.PI : 0, 0),
         new THREE.Vector3(width, height, 1.45),
       );
@@ -395,7 +415,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       printMaterial.needsUpdate = true;
       print = new THREE.Mesh(decal, printMaterial);
       if (useFlatPreview) {
-        print.position.set(0, placementY, targetZ + (back ? -.08 : .08));
+        print.position.set(placementX, placementY, targetZ + (back ? -.08 : .08));
         print.rotation.y = back ? Math.PI : 0;
         print.renderOrder = 2;
       }

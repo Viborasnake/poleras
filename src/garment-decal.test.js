@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isPrintableFacing, printVisibilityForFacing, responsiveCameraDistance } from './garment.js';
+import { isPrintableFacing, printPlacementCoordinates, printVisibilityForFacing, responsiveCameraDistance } from './garment.js';
 
 test('el estampado frontal no se proyecta sobre paneles laterales',()=>{
   assert.equal(isPrintableFacing(.92),true);
@@ -29,4 +29,13 @@ test('el hero móvil aleja la cámara para mantener la polera completa',()=>{
  assert.equal(responsiveCameraDistance(4.75,1.2,true),4.75);
  assert.ok(responsiveCameraDistance(4.75,.67,true)>6.3);
  assert.equal(responsiveCameraDistance(4.75,.67,false),4.75);
+});
+
+test('las ubicaciones opcionales permiten solo movimientos pequeños',()=>{
+ const chest=printPlacementCoordinates('chest_left',.2,1,-1);
+ assert.ok(Math.abs(chest.x-(-.21))<.0001);
+ assert.ok(Math.abs(chest.y-.55)<.0001);
+ const bounded=printPlacementCoordinates('center',.2,99,99);
+ assert.ok(Math.abs(bounded.x-.14)<.0001);
+ assert.ok(Math.abs(bounded.y-.06)<.0001);
 });

@@ -10,7 +10,7 @@ export function authErrorMessage(error) {
   if (message.includes('password should be at least')) return 'La contraseña debe tener al menos 6 caracteres.';
   if (message.includes('rate limit')) return 'Hiciste demasiados intentos. Espera un momento y vuelve a probar.';
   if (message.includes('anonymous sign-ins are disabled')) {
-    return 'El envío de ideas no está disponible en este momento. Escríbenos por WhatsApp para continuar.';
+    return 'El acceso como invitado no está disponible. Inicia sesión o crea una cuenta para continuar.';
   }
   if (message.includes('no pudimos iniciar la compra como invitado')) {
     return 'La compra como invitado no está disponible ahora. Crea una cuenta o inicia sesión para continuar.';

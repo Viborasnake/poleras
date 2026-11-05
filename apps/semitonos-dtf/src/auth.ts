@@ -1,5 +1,6 @@
 import {createClient} from '@supabase/supabase-js'
 import {ADMIN_AUTH_STORAGE_KEY,adminAuthOptions,localSignOutOptions} from '../../../src/auth-client-options.js'
+import {requestCaptchaToken} from '../../../src/auth-captcha.js'
 
 export {ADMIN_AUTH_STORAGE_KEY}
 
@@ -16,7 +17,8 @@ export async function hasAdminAccess() {
 }
 
 export async function authenticateAdmin(email:string,password:string) {
-  const {error}=await adminSupabase.auth.signInWithPassword({email:email.trim(),password})
+  const captchaToken=await requestCaptchaToken()
+  const {error}=await adminSupabase.auth.signInWithPassword({email:email.trim(),password,options:{captchaToken}})
   if(error)return {ok:false,message:'El correo o la contraseña no son correctos.'}
   if(await hasAdminAccess())return {ok:true,message:''}
   await adminSupabase.auth.signOut(localSignOutOptions)

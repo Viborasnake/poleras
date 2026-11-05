@@ -937,6 +937,8 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
 @media(max-width:640px){
  .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption{right:70px;bottom:14px;left:14px}
  .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-collection-tools{right:12px;bottom:12px}
+ .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-labels{flex-direction:column;align-items:flex-start}
+ .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-design-price{top:90px}
 }
 @media(min-width:1001px) and (hover:hover) and (pointer:fine){
  .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .catalog-product-badge[data-tooltip]::after{

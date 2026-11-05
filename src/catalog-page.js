@@ -80,19 +80,12 @@ if(!data)data=await loadLivePage();
 syncMetadata(data);
 void hydrateFooter();
 fetchStoreSettings(catalogClient).then(settings=>applyStoreSettings(settings)).catch(error=>console.warn('No pudimos actualizar la información de la tienda:',error));
-const touchCardZoom=window.matchMedia('(hover: none), (pointer: coarse)');
 root.addEventListener('click',event=>{
   const shareButton=event.target.closest('[data-share-url]');
   if(shareButton){event.preventDefault();shareLink({url:shareButton.dataset.shareUrl,title:shareButton.dataset.shareTitle,text:shareButton.dataset.shareText}).then(result=>{
     if(result==='copied')showShareFeedback(shareButton,'Link copiado');
-    else if(result==='failed')showShareFeedback(shareButton,'No pudimos copiar el link');
+    else if(result==='failed')showShareFeedback(shareButton,'No pudimos compartir el enlace');
   });return}
-  if(!touchCardZoom.matches)return;
-  const preview=event.target.closest('.seo-mockup-photo,.seo-shirt');if(!preview)return;
-  const visual=preview.closest('.seo-card-visual');if(!visual)return;
-  event.preventDefault();event.stopPropagation();
-  root.querySelectorAll('.seo-card-visual.is-zoomed').forEach(item=>{if(item!==visual)item.classList.remove('is-zoomed')});
-  visual.classList.toggle('is-zoomed');
 });
 function showShareFeedback(button,message){
   const label=button.querySelector('span:last-child');

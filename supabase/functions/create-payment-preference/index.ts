@@ -1,9 +1,11 @@
+import { printPrice } from '../_shared/print-pricing.js'
 import {designProductArtworks,modelProductSlug} from '../_shared/catalog-product-artworks.js'
 import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant} from '../_shared/variant-selection.js'
 import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage} from '../_shared/catalog-personalization.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { sendAdminOrderNotice, sendOrderEmail } from '../_shared/order-email.ts'
 import { headPrivateDesign } from '../_shared/private-design-r2.ts'
+import { normalizePrintConfiguration, printConfigurationCount } from '../_shared/print-configuration.js'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } })
@@ -48,7 +50,14 @@ Deno.serve(async request => {
   if (!items.length || items.length > 20 || !customer.firstName || !customer.lastName || !String(customer.email).includes('@') || !customer.phone) return json({ error: 'Faltan datos de contacto o productos.' }, 400)
   if (!bodyCommerceReady && items.some((item: any) => item.modelCode === 'body')) return json({ error: 'Los Bodys aún no están disponibles para compra.' }, 409)
   if (fulfillment === 'delivery' && (!body.shippingAddress?.region || !body.shippingAddress?.commune || !body.shippingAddress?.address)) return json({ error: 'Falta la dirección de despacho.' }, 400)
-  if (items.some((item: any) => !models.has(item.modelCode) || !allowedSizeForModel(item.modelCode, item.size) || !sides.has(item.printSides) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20 || !hex.test(item.color || '') || (item.catalogDesignCustomerImage != null && typeof item.catalogDesignCustomerImage !== 'boolean') || (item.catalogDesignSlug && (typeof item.catalogDesignSlug !== 'string' || item.printSides === 'both')) || (item.modelCode === 'tote' && (!['M', 'L'].includes(item.size) || item.printSides !== 'front')))) return json({ error: 'Uno de los productos no es válido.' }, 400)
+  if (items.some((item: any) => !models.has(item.modelCode) || !allowedSizeForModel(item.modelCode, item.size) || !sides.has(item.printSides) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20 || !hex.test(item.color || '') || (item.catalogDesignCustomerImage != null && typeof item.catalogDesignCustomerImage !== 'boolean') || (item.catalogDesignSlug && typeof item.catalogDesignSlug !== 'string') || (item.modelCode === 'tote' && (!['M', 'L'].includes(item.size) || item.printSides !== 'front')))) return json({ error: 'Uno de los productos no es válido.' }, 400)
+  const printConfigurations = items.map((item: any) => normalizePrintConfiguration(item.printConfiguration, item.printSides))
+  if (printConfigurations.some((configuration: any, index: number) => {
+    const count = printConfigurationCount(configuration, items[index].printSides)
+    const configuredSides = configuration.prints ? [...new Set(configuration.prints.map((print: any) => print.side))].sort().join(',') : items[index].printSides === 'both' ? 'back,front' : items[index].printSides
+    const declaredSides = items[index].printSides === 'both' ? 'back,front' : items[index].printSides
+    return count < 1 || count > 4 || configuredSides !== declaredSides
+  })) return json({ error: 'La composición de estampados no es válida.' }, 400)
 
   const { data: variants, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(code,name,active)').eq('active', true).eq('product_models.active',true)
   if (variantError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
@@ -72,17 +81,22 @@ Deno.serve(async request => {
   const flowType = flowTypes.length === 1 ? flowTypes[0] : 'mixed'
   const personalizedFlows = ['own_artwork', 'people_personalization', 'pet_personalization']
   const purchaseType = flowTypes.some(type => personalizedFlows.includes(type)) ? (flowTypes.every(type => personalizedFlows.includes(type)) ? 'personalized' : 'mixed') : 'catalog'
-  if (paymentMethod !== 'draft') for (const item of items) {
+  if (paymentMethod !== 'draft') for (const [itemIndex, item] of items.entries()) {
     if (item.catalogDesignSlug && !item.catalogDesignCustomerImage) continue
-    for (const side of item.printSides === 'both' ? ['front', 'back'] : [item.printSides]) {
-      const path = String(side === 'front' ? item.frontDesignPath || '' : item.backDesignPath || '')
+    const configuredPrints = printConfigurations[itemIndex].prints
+    const files = configuredPrints?.length ? configuredPrints.map((print: any) => ({ side: print.side, path: print.designPath })) : (item.printSides === 'both' ? ['front', 'back'] : [item.printSides]).map(side => ({ side, path: side === 'front' ? item.frontDesignPath : item.backDesignPath }))
+    for (const file of files) {
+      const side = file.side, path = String(file.path || '')
       if (!new RegExp(`^${userData.user.id}/${side}/[0-9a-f-]{36}\\.(png|jpg|webp)$`, 'i').test(path)) return json({ error: 'El diseño no pertenece a esta compra.' }, 400)
       const fileInfo = await headPrivateDesign(path)
       if (!fileInfo || !fileInfo.size || fileInfo.size > 3 * 1024 * 1024) return json({ error: 'No pudimos encontrar el diseño optimizado.' }, 409)
     }
   }
+  const { data: storeSettings, error: settingsError } = await admin.from('storefront_settings').select('quality_review_fee_clp,front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
+  if (settingsError) return json({ error: 'No pudimos validar el valor de revisión técnica.' }, 503)
+  const qualityReviewFee = Number.isSafeInteger(storeSettings?.quality_review_fee_clp) && storeSettings.quality_review_fee_clp >= 0 && storeSettings.quality_review_fee_clp <= 1000000 ? storeSettings.quality_review_fee_clp : 4990
   let subtotal = 0
-  const prepared = items.map((item: any,index:number) => { const modelCode = item.modelCode === 'kids' ? 'kid' : item.modelCode; const variant=selectedVariants[index].variant!; const model=Array.isArray(variants?.find((row:any)=>row.id===variant.id)?.product_models)?variants?.find((row:any)=>row.id===variant.id)?.product_models[0]:variants?.find((row:any)=>row.id===variant.id)?.product_models; const design = item.catalogDesignSlug ? designs.get(item.catalogDesignSlug) : null; const qualityReview = Boolean(item.qualityReview) && !(design && !item.catalogDesignCustomerImage); const unit = variant.priceClp + (item.printSides === 'both' ? 3990 : 0) + (qualityReview ? 4990 : 0); const line = unit * item.quantity; subtotal += line; const label = modelCode === 'tote' ? 'Tote bag' : modelCode==='body'?'Body bebé':`Polera ${model?.name||modelCode}`; return { product_variant_id: variant.id, catalog_design_id: design?.id || null, catalog_artwork_path: design && !item.catalogDesignCustomerImage ? designProductArtworks(design)[modelProductSlug(item.modelCode)] : null, name_snapshot: design?.name ? `${label} · ${design.name}` : `${label} ${modelCode==='body'?'personalizado':'personalizada'}`, sku_snapshot: variant.sku, color_hex: variant.color.toUpperCase(), quality_review: qualityReview, print_sides: item.printSides, front_design_path: design && !item.catalogDesignCustomerImage ? null : item.frontDesignPath || null, back_design_path: design && !item.catalogDesignCustomerImage ? null : item.backDesignPath || null, quantity: item.quantity, unit_price_clp: unit, line_total_clp: line } })
+  const prepared = items.map((item: any,index:number) => { const modelCode = item.modelCode === 'kids' ? 'kid' : item.modelCode; const variant=selectedVariants[index].variant!; const model=Array.isArray(variants?.find((row:any)=>row.id===variant.id)?.product_models)?variants?.find((row:any)=>row.id===variant.id)?.product_models[0]:variants?.find((row:any)=>row.id===variant.id)?.product_models; const design = item.catalogDesignSlug ? designs.get(item.catalogDesignSlug) : null; const qualityReview = Boolean(item.qualityReview) && !(design && !item.catalogDesignCustomerImage); const unit = variant.priceClp + (modelCode === 'tote' ? 0 : printPrice(printConfigurations[index], item.printSides, storeSettings)) + (qualityReview ? qualityReviewFee : 0); const line = unit * item.quantity; subtotal += line; const label = modelCode === 'tote' ? 'Tote bag' : modelCode==='body'?'Body bebé':`Polera ${model?.name||modelCode}`; return { product_variant_id: variant.id, catalog_design_id: design?.id || null, catalog_artwork_path: design && !item.catalogDesignCustomerImage ? designProductArtworks(design)[modelProductSlug(item.modelCode)] : null, name_snapshot: design?.name ? `${label} · ${design.name}` : `${label} ${modelCode==='body'?'personalizado':'personalizada'}`, sku_snapshot: variant.sku, color_hex: variant.color.toUpperCase(), quality_review: qualityReview, print_sides: item.printSides, print_configuration: normalizePrintConfiguration(item.printConfiguration,item.printSides), front_design_path: design && !item.catalogDesignCustomerImage ? null : item.frontDesignPath || null, back_design_path: design && !item.catalogDesignCustomerImage ? null : item.backDesignPath || null, quantity: item.quantity, unit_price_clp: unit, line_total_clp: line } })
   const quantity = items.reduce((sum: number, item: any) => sum + item.quantity, 0), shipping = shippingFor(fulfillment, body.shippingAddress?.region || '', quantity)
   if (body.shippingQuoteClp != null && Number(body.shippingQuoteClp) !== shipping) return json({ error: 'El valor del despacho cambió. Vuelve a calcularlo.' }, 409)
   const couponCode = String(body.couponCode || '').trim().toUpperCase(); let coupon: any = null; let discount = 0
@@ -90,7 +104,7 @@ Deno.serve(async request => {
   const total = subtotal + shipping - discount, now = new Date().toISOString(), address = { fulfillment, customer: { first_name: String(customer.firstName).trim(), last_name: String(customer.lastName).trim(), email: String(customer.email).trim(), phone: String(customer.phone).trim() }, ...(fulfillment === 'delivery' ? { region: String(body.shippingAddress.region).trim(), commune: String(body.shippingAddress.commune).trim(), address: String(body.shippingAddress.address).trim(), address_extra: String(body.shippingAddress.addressExtra || '').trim(), delivery_notes: String(body.shippingAddress.notes || '').trim() } : {}) }
   const draftOrderId = Number.isSafeInteger(Number(body?.draftOrderId)) ? Number(body.draftOrderId) : null
   let order: any = null
-  const priceSnapshot = { provider: paymentMethod === 'transfer' ? 'bank_transfer' : paymentMethod === 'draft' ? 'checkout_draft' : 'mercado_pago', purchase_type: purchaseType, flow_type: flowType, flow_types: flowTypes, shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null }
+  const priceSnapshot = { provider: paymentMethod === 'transfer' ? 'bank_transfer' : paymentMethod === 'draft' ? 'checkout_draft' : 'mercado_pago', purchase_type: purchaseType, flow_type: flowType, flow_types: flowTypes, quality_review_fee_clp: qualityReviewFee, shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null }
   const orderEmailDetails = { items: prepared, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, coupon_code: coupon?.code || undefined, total_clp: total, shipping_address: address, price_snapshot: priceSnapshot }
   if (draftOrderId) {
     const { data: existing, error: existingError } = await admin.from('orders').select('id,total_clp,status,price_snapshot').eq('id', draftOrderId).eq('user_id', userData.user.id).in('status', ['draft', 'submitted']).maybeSingle()

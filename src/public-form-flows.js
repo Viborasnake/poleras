@@ -3,7 +3,7 @@ import {petPhotoError} from './pet-personalization.js';
 
 function section(node){const wrapper=document.createElement('section');wrapper.className='public-form-block';wrapper.append(node);return wrapper;}
 function groupBefore(node){const group=document.createElement('div');group.className='public-form-disclosure';node.before(group);return group;}
-function reviewBefore(button,container){const review=document.createElement('section');review.className='public-form-review';const heading=document.createElement('h3');heading.textContent='Revisa antes de continuar';const list=document.createElement('dl');list.className='public-form-review-list';review.append(heading,list);if(button.parentElement===container)button.before(review);else container.append(review);return {review,list};}
+function reviewBefore(button,container){const review=document.createElement('section');review.className='public-form-review';const heading=document.createElement('h3');heading.tabIndex=-1;heading.textContent='Revisa antes de continuar';const list=document.createElement('dl');list.className='public-form-review-list';review.append(heading,list);if(button.parentElement===container)button.before(review);else container.append(review);return {review,list};}
 function setReview(list,rows){list.replaceChildren();for(const [label,value] of rows){const row=document.createElement('div'),term=document.createElement('dt'),description=document.createElement('dd');term.textContent=label;description.textContent=String(value||'Sin información adicional');row.append(term,description);list.append(row)}}
 function mount({group,steps,...rest}){steps.forEach(step=>group.append(step.node));return mountFormDisclosure({container:group,steps,...rest});}
 
@@ -16,7 +16,7 @@ export function mountIdeaFlow({container,button,state,disclosure,purchaseMethod}
   {id:'idea',title:'Tu idea',node:ideaNode,value:()=>idea.value.trim(),summary:()=>conciseSummary(idea.value.trim()),valid:()=>idea.value.trim().length>=10,error:'Cuéntanos tu idea con al menos 10 caracteres.'},
   {id:'references',title:purchaseMethod==='whatsapp'?'Referencias por WhatsApp':'Referencias opcionales',node:refsNode,value:()=>purchaseMethod==='whatsapp'?'whatsapp':JSON.stringify(state.references.map(file=>[file.name,file.file?.size,file.file?.lastModified])),summary:()=>purchaseMethod==='whatsapp'?'Las adjuntarás en WhatsApp':state.references.length?`${state.references.length} referencia(s): ${state.references.map(file=>file.name).join(', ')}`:'Sin referencias',valid:()=>!state.referencesBusy&&state.references.length<=5},
   {id:'contact',title:'Contacto',node:contactNode},
- ],finalButton:button,review,prefix:'idea-flow',busy:()=>Boolean(state.referencesBusy||state.publicRequestBusy),onChange:()=>setReview(list,[['Tu idea',idea.value.trim()],['Referencias',purchaseMethod==='whatsapp'?'Pendientes de adjuntar en WhatsApp':`${state.references.length} archivo(s)`],['Contacto',fieldSummary(contactNode,{limit:Infinity})],['Siguiente paso','El equipo revisará tu solicitud y te contactará con una propuesta.']])});
+ ],finalButton:button,review,reviewOnFinal:true,prefix:'idea-flow',busy:()=>Boolean(state.referencesBusy||state.publicRequestBusy),onChange:result=>{button.textContent=result.complete?(purchaseMethod==='whatsapp'?'Solicitar por WhatsApp':'Enviar mi idea'):'Revisar solicitud';setReview(list,[['Tu idea',idea.value.trim()],['Referencias',purchaseMethod==='whatsapp'?'Pendientes de adjuntar en WhatsApp':`${state.references.length} archivo(s)`],['Contacto',fieldSummary(contactNode,{limit:Infinity})],['Siguiente paso','El equipo revisará tu solicitud y te contactará con una propuesta.']])}});
 }
 
 export function mountPetFlow({container,button,draft,step,disclosure,purchaseMethod}){
@@ -24,7 +24,7 @@ export function mountPetFlow({container,button,draft,step,disclosure,purchaseMet
  if(step===2){
   const photo=container.querySelector('[data-pet-photo-block]'),notes=container.querySelector('[data-pet-notes-block]'),group=groupBefore(photo);
   return mount({group,state:disclosure,steps:[
-   {id:'photo',title:purchaseMethod==='whatsapp'?'Foto por WhatsApp':'Foto de tu mascota',node:photo,value:()=>purchaseMethod==='whatsapp'?'whatsapp':JSON.stringify([draft.file?.name,draft.file?.size,draft.file?.lastModified]),summary:()=>purchaseMethod==='whatsapp'?'La adjuntarás en WhatsApp':draft.file?.name||'Foto pendiente',valid:()=>purchaseMethod==='whatsapp'||!draft.optimizing&&!petPhotoError(draft.file),error:'Sube una foto válida y espera a que termine de optimizarse.'},
+   {id:'photo',title:purchaseMethod==='whatsapp'?'Foto por WhatsApp':'Fotos de tu personalización',node:photo,value:()=>purchaseMethod==='whatsapp'?'whatsapp':JSON.stringify((draft.files?.length?draft.files:draft.file?[draft.file]:[]).map(file=>[file.name,file.size,file.lastModified])),summary:()=>purchaseMethod==='whatsapp'?'Las adjuntarás en WhatsApp':(draft.files?.length?draft.files:draft.file?[draft.file]:[]).map(file=>file.name).join(', ')||'Foto pendiente',valid:()=>purchaseMethod==='whatsapp'||!draft.optimizing&&!petPhotoError(draft.files?.length?draft.files:draft.file),error:'Sube una foto válida y espera a que termine de optimizarse.'},
    {id:'notes',title:'Nombre e indicaciones opcionales',node:notes},
   ],finalButton:button,prefix:'pet-photo-flow',busy:()=>Boolean(draft.optimizing||draft.busy)});
  }

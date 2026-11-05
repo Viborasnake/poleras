@@ -26,7 +26,7 @@ test('mantiene el mensaje específico para correo ya registrado', () => {
 test('traduce la configuración que impide iniciar una solicitud como invitado', () => {
   assert.equal(
     authErrorMessage({ message: 'Anonymous sign-ins are disabled' }),
-    'El envío de ideas no está disponible en este momento. Escríbenos por WhatsApp para continuar.'
+    'El acceso como invitado no está disponible. Inicia sesión o crea una cuenta para continuar.'
   );
 });
 

@@ -27,12 +27,12 @@ async function send(references,productSelection,extra={}) {
   };
   let handler;
   vm.runInNewContext(code, {
-    Deno:{env:{get:key=>key==='SUPABASE_URL'?'https://example.test':key==='SUPABASE_SECRET_KEY'?'test-secret':undefined},serve:fn=>handler=fn},
-    designProductArtworks,modelProductSlug,allowedColorsForModel,createClient:()=>admin, headPrivateDesign:async()=>({size:1234}), sendOrderEmail:async()=>({sent:false}), Response, console,
+    Deno:{env:{get:key=>key==='SUPABASE_URL'?'https://example.test':key==='SUPABASE_SECRET_KEY'||key==='TURNSTILE_SECRET_KEY'?'test-secret':undefined},serve:fn=>handler=fn},
+    designProductArtworks,modelProductSlug,allowedColorsForModel,createClient:()=>admin, headPrivateDesign:async()=>({size:1234}), sendOrderEmail:async()=>({sent:false}), verifyTurnstile:async token=>token==='valid-token', Response, console,
   });
   const response=await handler(new Request('https://example.test', {method:'POST',headers:{Authorization:'Bearer test'},body:JSON.stringify({
     requestId:'33333333-3333-4333-8333-333333333333', catalogDesignSlug:'pet-design',idea:'Mantener su mancha sobre el ojo.',
-    customer:{firstName:'Test',email:'test@example.com',phone:'123456789'},references,productSelection,...extra,
+    customer:{firstName:'Test',email:'test@example.com',phone:'123456789'},references,productSelection,captchaToken:'valid-token',...extra,
   })}));
   return {response,saved};
 }
@@ -45,6 +45,11 @@ test('servidor rechaza personalización sin foto antes de crear pedido',async()=
 test('servidor rechaza una foto de otro usuario',async()=>{
   const {response,saved}=await send([{name:'mascota.jpg',path:photoPath.replace(userId,'44444444-4444-4444-8444-444444444444')}]);
   assert.equal(response.status,400);
+  assert.equal(saved.orders,undefined);
+});
+test('servidor rechaza una solicitud sin CAPTCHA válido',async()=>{
+  const {response,saved}=await send([{name:'mascota.jpg',path:photoPath}],undefined,{captchaToken:'invalid'});
+  assert.equal(response.status,403);
   assert.equal(saved.orders,undefined);
 });
 test('admin recibe diseño, foto privada e indicaciones en el mismo pedido',async()=>{

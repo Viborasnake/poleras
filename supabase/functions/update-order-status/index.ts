@@ -52,7 +52,7 @@ Deno.serve(async request => {
   if (!orderId || (confirmingPayment && revokingPayment) || (!confirmingPayment && !revokingPayment && ![...deliveryWorkflow, ...pickupWorkflow].includes(status as any))) return json({ error: 'Estado de pedido inválido.' }, 400)
 
   const { data: order, error: orderError } = await admin.from('orders')
-    .select('id,user_id,status,source,request_type,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,payments(provider,status),order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides)')
+    .select('id,user_id,status,source,request_type,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,payments(provider,status),order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides,print_configuration)')
     .eq('id', orderId)
     .single()
   if (orderError || !order) return json({ error: 'No encontramos el pedido.' }, 404)

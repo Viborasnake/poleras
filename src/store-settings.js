@@ -1,3 +1,5 @@
+import {DEFAULT_PRINT_PRICES,normalizePrintPrices} from '../supabase/functions/_shared/print-pricing.js';
+
 export const defaultStoreSettings=Object.freeze({
   storefront_layout:'classic',
   whatsapp_number:'56965217926',
@@ -5,6 +7,8 @@ export const defaultStoreSettings=Object.freeze({
   catalog_purchase_method:'cart',
   personalized_purchase_method:'cart',
   hero_catalog_design_ids:[],
+  quality_review_fee_clp:4990,
+  ...DEFAULT_PRINT_PRICES,
   announcement_enabled:true,
   announcement_text:'🛍️ ¡Compra por WhatsApp disponible!',
   announcement_origin_text:'Hecho a tu pinta, en 🇨🇱 Chile.'
@@ -15,6 +19,7 @@ export function normalizeStoreSettings(value={}){
   const email=String(value.support_email??'').trim().toLowerCase();
   const text=String(value.announcement_text??defaultStoreSettings.announcement_text).trim();
   const originText=String(value.announcement_origin_text??defaultStoreSettings.announcement_origin_text).trim();
+  const reviewFee=value.quality_review_fee_clp==null?defaultStoreSettings.quality_review_fee_clp:Number(value.quality_review_fee_clp);
   const heroCatalogDesignIds=[...new Set((Array.isArray(value.hero_catalog_design_ids)?value.hero_catalog_design_ids:[])
     .map(Number)
     .filter(id=>Number.isSafeInteger(id)&&id>0))].slice(0,3);
@@ -25,6 +30,8 @@ export function normalizeStoreSettings(value={}){
     catalog_purchase_method:value.catalog_purchase_method==='whatsapp'?'whatsapp':'cart',
     personalized_purchase_method:value.personalized_purchase_method==='whatsapp'?'whatsapp':'cart',
     hero_catalog_design_ids:heroCatalogDesignIds,
+    quality_review_fee_clp:reviewFee,
+    ...normalizePrintPrices(value),
     announcement_enabled:value.announcement_enabled!==false,
     announcement_text:text,
     announcement_origin_text:originText
@@ -38,10 +45,12 @@ export function validateStoreSettings(settings){
   if(settings.announcement_origin_text.length>100)return 'El segundo texto del aviso puede tener hasta 100 caracteres.';
   if(settings.announcement_enabled&&!settings.announcement_text)return 'Escribe el aviso o desactívalo.';
   if(settings.hero_catalog_design_ids.length&&settings.hero_catalog_design_ids.length!==3)return 'Elige exactamente tres mockups o deja la selección automática.';
+  if(!Number.isSafeInteger(settings.quality_review_fee_clp)||settings.quality_review_fee_clp<0||settings.quality_review_fee_clp>1000000)return 'El valor de revisión técnica debe ser un monto entero entre $0 y $1.000.000.';
+  if(Object.keys(DEFAULT_PRINT_PRICES).some(key=>!Number.isSafeInteger(settings[key])||settings[key]<0||settings[key]>1000000))return 'Los precios de estampado deben estar entre $0 y $1.000.000.';
   return '';
 }
 
-export const storeSettingsColumns='storefront_layout,whatsapp_number,support_email,catalog_purchase_method,personalized_purchase_method,hero_catalog_design_ids,announcement_enabled,announcement_text,announcement_origin_text';
+export const storeSettingsColumns='storefront_layout,whatsapp_number,support_email,catalog_purchase_method,personalized_purchase_method,hero_catalog_design_ids,announcement_enabled,announcement_text,announcement_origin_text,quality_review_fee_clp,front_large_clp,front_pocket_clp,back_large_clp,arm_clp';
 
 export async function fetchStoreSettings(client,{signal}={}){
   const read=columns=>{
@@ -51,8 +60,12 @@ export async function fetchStoreSettings(client,{signal}={}){
   let {data,error}=await read(storeSettingsColumns);
   // A rolling deployment may reach a database that does not have the new column yet.
   // Retain its real contact and purchase settings while falling back to classic.
-  if(error&&['42703','PGRST204'].includes(error.code)&&error.message?.includes('storefront_layout')){
-    ({data,error}=await read(storeSettingsColumns.replace('storefront_layout,','')));
+  if(error&&['42703','PGRST204'].includes(error.code)){
+    let columns=storeSettingsColumns;
+    if(/front_large_clp|front_pocket_clp|back_large_clp|arm_clp/.test(error.message||''))columns=columns.replace(',front_large_clp,front_pocket_clp,back_large_clp,arm_clp','');
+    if(/storefront_layout/.test(error.message||''))columns=columns.replace('storefront_layout,','');
+    if(/quality_review_fee_clp/.test(error.message||''))columns=columns.replace(',quality_review_fee_clp','');
+    ({data,error}=await read(columns));
   }
   if(error)throw error;
   return normalizeStoreSettings(data);

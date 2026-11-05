@@ -21,6 +21,8 @@ test('price stays deterministic for each print choice', () => {
   assert.deepEqual(orderTotal(14990, 'front'), { base: 14990, print: 0, extras: 0, total: 14990 });
   assert.deepEqual(orderTotal(14990, 'back'), { base: 14990, print: 0, extras: 0, total: 14990 });
   assert.deepEqual(orderTotal(14990, 'both', 1000), { base: 14990, print: 3990, extras: 1000, total: 19980 });
+  assert.deepEqual(orderTotal(14990, 'both', 0, 3), { base: 14990, print: 7980, extras: 0, total: 22970 });
+  assert.throws(() => orderTotal(14990, 'front', 0, 5));
   assert.throws(() => orderTotal(14990, 'sleeve'));
 });
 test('a team quality adjustment is explicit and added exactly once', () => {

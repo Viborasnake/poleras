@@ -1,3 +1,4 @@
+import {beginUploadFeedback} from './upload-feedback.js';
 export const IMAGE_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp']);
 
 // Las fotos editoriales se muestran a gran tamaño en pantallas densas. Conserva
@@ -31,10 +32,15 @@ async function wasmWebpBlob(imageData, quality) {
 export async function optimizeImage(file, { policy = CUSTOMER_IMAGE_POLICY, baseName = file?.name } = {}) {
   const error = imageFileError(file, policy);
   if (error) throw new Error(error);
-  const url = URL.createObjectURL(file), image = new Image();
+  const feedback=beginUploadFeedback(file.name);
+  let url;
   try {
+    url = URL.createObjectURL(file);
+    const image = new Image();
+    await new Promise(resolve=>typeof requestAnimationFrame==='function'?requestAnimationFrame(()=>resolve()):resolve());
     image.src = url;
     await image.decode();
+    feedback.update('Optimizando imagen');
     let scale = Math.min(1, policy.maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
     let best = null;
     const minDimension=Math.max(1,Number(policy.minDimension)||1);
@@ -70,5 +76,5 @@ export async function optimizeImage(file, { policy = CUSTOMER_IMAGE_POLICY, base
       scale=nextScale;
     }
     throw new Error(best ? `No pudimos reducir la imagen bajo ${Math.round(policy.targetBytes / 1024)} KB (mínimo ${minDimension} px). Prueba con una imagen más simple o recortada.` : 'Este navegador no pudo codificar la imagen en un formato compatible.');
-  } finally { URL.revokeObjectURL(url); }
+  } finally { if(url)URL.revokeObjectURL(url);feedback.done(); }
 }
