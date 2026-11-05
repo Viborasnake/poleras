@@ -1,4 +1,4 @@
-const PLACEMENTS = new Set(['center', 'upper_back', 'chest_left', 'chest_right', 'sleeve_left', 'sleeve_right'])
+const PLACEMENTS = new Set(['center', 'upper_back', 'chest_left', 'chest_right', 'sleeve_left', 'sleeve_right', 'sleeve_both'])
 const SIZES = new Set(['pocket', 'small', 'medium', 'large'])
 export const PRINT_MAX_LAYERS = 4
 
@@ -10,6 +10,7 @@ export const PRINT_PLACEMENT_LABEL = Object.freeze({
   chest_right: 'Pecho derecho',
   sleeve_left: 'Manga izquierda',
   sleeve_right: 'Manga derecha',
+  sleeve_both: 'Ambos brazos',
 })
 export const PRINT_SIZE_LABEL = Object.freeze({ pocket: 'Bolsillo', small: 'Pequeño', medium: 'Mediano', large: 'Grande' })
 

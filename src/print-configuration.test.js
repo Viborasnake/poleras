@@ -19,6 +19,11 @@ test('print configuration has production-readable labels', () => {
   assert.equal(printConfigurationLabel(value,'front'),'Frente: Manga derecha · Bolsillo · posición ajustada')
 })
 
+test('both arms are a valid single configuration with a production-readable label', () => {
+  const value={front:normalizePrintSideConfiguration({placement:'sleeve_both',size:'pocket'},'front')}
+  assert.equal(printConfigurationLabel(value,'front'),'Frente: Ambos brazos · Bolsillo')
+})
+
 test('additive composition keeps independent back, pocket and sleeve artwork', () => {
   const value=normalizePrintConfiguration({prints:[
     {id:'primary-back',side:'back',placement:'center',size:'large',fileName:'espalda.webp',designPath:'user/back/a.webp'},
