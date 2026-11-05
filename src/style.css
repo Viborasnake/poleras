@@ -1242,6 +1242,7 @@ body.theme-dark #studio .catalog-purchase-mode-options button{border-color:var(-
 .print-adjustment-group{min-width:0;margin:0;padding:0;border:0}
 .print-adjustment-group legend{margin-bottom:9px;color:var(--ds-color-ink);font:700 11px 'Space Grotesk',sans-serif}
 .print-placement-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.print-placement-options.three-options{grid-template-columns:repeat(3,minmax(0,1fr))}
 .print-placement-options button{display:grid;grid-template-columns:26px minmax(0,1fr);align-items:center;gap:9px;min-height:50px;padding:9px 10px;border:1px solid var(--ds-border-control);border-radius:9px;background:var(--ds-surface-raised);color:var(--ds-text-primary);text-align:left}
 .print-placement-options button>span{position:relative;display:block;box-sizing:border-box;width:18px;height:25px;margin-left:4px;border:1.5px solid currentColor;border-radius:4px 4px 7px 7px;opacity:.72}
 .print-placement-options button>span::before,.print-placement-options button>span::after{content:"";position:absolute;top:1px;box-sizing:border-box;width:6px;height:10px;border:1.5px solid currentColor}
@@ -1263,6 +1264,7 @@ body.theme-dark #studio .catalog-purchase-mode-options button{border-color:var(-
 .print-adjustment-footer p{max-width:330px;margin:0;color:var(--ds-text-secondary);font-size:8px;line-height:1.5}
 .print-adjustment-footer .text-link{flex:0 0 auto;padding:0;border:0;background:transparent;color:var(--ds-color-link);font-size:8px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:520px){
+ .print-placement-options.three-options{grid-template-columns:1fr}
  .print-adjustments>summary small{white-space:normal}
  .print-size-options{grid-template-columns:repeat(2,1fr)}
  .print-movement-group{grid-template-columns:1fr;align-items:start}
@@ -1271,6 +1273,11 @@ body.theme-dark #studio .catalog-purchase-mode-options button{border-color:var(-
  .print-movement-group output{max-width:none;text-align:left}
  .print-adjustment-footer{display:grid}.print-adjustment-footer .text-link{justify-self:start}
 }
+body.theme-dark #studio .print-composition,body.theme-dark #studio .print-layer-row,body.theme-dark #studio .print-adjustments,body.theme-dark #studio .print-placement-options button{border-color:color-mix(in srgb,var(--ds-text-inverse) 25%,transparent);background:color-mix(in srgb,var(--ds-text-inverse) 7%,var(--ds-brand-primary));color:var(--ds-text-inverse)}
+body.theme-dark #studio .print-composition small,body.theme-dark #studio .print-layer-row>button:first-child>small,body.theme-dark #studio .additional-upload-heading small,body.theme-dark #studio .print-adjustment-footer p,body.theme-dark #studio .print-movement-group output{color:color-mix(in srgb,var(--ds-text-inverse) 72%,transparent)}
+body.theme-dark #studio .add-print-layer{border-color:color-mix(in srgb,var(--ds-text-inverse) 40%,transparent);background:transparent;color:var(--ds-text-inverse)}
+body.theme-dark #studio .add-print-layer span,body.theme-dark #studio .print-layer-remove,body.theme-dark #studio .print-adjustments>summary b{color:var(--ds-brand-accent)}
+body.theme-dark #studio .print-layer-row.selected,body.theme-dark #studio .print-placement-options button.selected{border-color:var(--ds-brand-accent);background:color-mix(in srgb,var(--ds-brand-accent) 22%,var(--ds-brand-primary));box-shadow:0 2px 0 var(--ds-brand-accent)}
 .upload-zone>span:has(img){width:54px;height:54px;display:grid;place-items:center;overflow:hidden;border-radius:7px;background:#fff}
 .upload-zone>span img{width:100%;height:100%;object-fit:cover}
 .upload-zone>span:has(.upload-icon){display:grid;place-items:center;width:44px;height:44px;border:1px solid #cbbfe7;border-radius:50%;background:#fff;color:var(--ds-color-link);box-shadow:0 3px 0 #cbbfe7}

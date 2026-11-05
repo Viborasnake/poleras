@@ -11,4 +11,6 @@ test('front format and optional arm and back use their configured rates', () => 
     {side:'front',placement:'sleeve_right',size:'pocket'},
     {side:'back',placement:'center',size:'large'},
   ]},'both',rates),15500)
+  assert.equal(printPrice({prints:[{side:'front',placement:'sleeve_both',size:'pocket'}]},'front',rates),6400)
+  assert.equal(printPrice({prints:[]},'front',rates),0)
 })
