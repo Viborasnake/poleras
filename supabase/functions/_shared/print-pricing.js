@@ -14,12 +14,12 @@ export function normalizePrintPrices(value = {}) {
 
 export function printPrice(configuration, printSides = 'front', prices = DEFAULT_PRINT_PRICES) {
   const rates = normalizePrintPrices(prices)
-  const prints = configuration?.prints?.length ? configuration.prints :
+  const prints = Array.isArray(configuration?.prints) ? configuration.prints :
     (printSides === 'both' ? ['front', 'back'] : [printSides === 'back' ? 'back' : 'front']).map(side => ({ side, ...configuration?.[side] }))
   return prints.reduce((total, print) => {
     const key = /sleeve_/.test(print.placement || '') ? 'arm_clp' :
       print.side === 'back' ? 'back_large_clp' :
       print.size === 'pocket' || /chest_/.test(print.placement || '') ? 'front_pocket_clp' : 'front_large_clp'
-    return total + rates[key]
+    return total + rates[key] * (print.placement === 'sleeve_both' ? 2 : 1)
   }, 0)
 }
