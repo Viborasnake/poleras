@@ -23,7 +23,7 @@ import { collections as fallbackCollections, categories as fallbackCategories, c
 import { catalogCollectionDialogPath, catalogCollectionPath, catalogDesignDialogPath, catalogDesignPath, catalogProductPath } from './catalog-routes.js';
 import { shareLink } from './share.js';
 import { createIntroTurn } from './intro-turn.js';
-import { DETAIL_BLOCK_ORDER, preserveStudioView, replaceStudioControl } from './studio-sequence.js';
+import { DETAIL_BLOCK_ORDER, preserveStudioView, replaceStudioControl, studioDetailIncludesPrintPlacement } from './studio-sequence.js';
 import { createDisclosureState, reconcileDisclosure, confirmDisclosure, mountDisclosure, focusDisclosure } from './progressive-disclosure.js';
 import {mountIdeaFlow,mountPetFlow,mountWhatsAppFlow,mountCheckoutFlow} from './public-form-flows.js';
 import { previewKey, needsGeneratedPreview } from './catalog-preview-cache.js';
@@ -1564,8 +1564,8 @@ function detailDisclosureSteps(){
   {id:'model',title:family==='tote'?'Formato':'Modelo',selector:'.model-block',value:state.kind,summary:products[state.kind].name,valid:models.some(([id])=>id===state.kind),single:models.length===1},
   {id:'size',title:['kids','body'].includes(state.kind)?'Edad':'Talla',selector:'.size-block',value:`${modelProductSlug(state.kind)}:${state.size}`,summary:sizeLabel(state.kind,state.size),valid:sizes.includes(state.size),single:sizes.length===1},
   {id:'color',title:state.kind==='tote'?'Tela':'Color',selector:'.color-block',value:state.color,summary:colors.find(([value])=>value===state.color)?.[1]||'Sin disponibilidad',valid:colors.some(([value])=>value===state.color),single:colors.length===1},
-  {id:'side',title:state.kind==='tote'?'Diseño de tu tote bag':state.kind==='body'?'Diseño de tu body':'Crea tu polera',instruction:state.catalogDesign?'Elige dónde estampar el diseño.':currentPurchaseMethod()==='whatsapp'?'Añade las ubicaciones. Adjuntarás las imágenes en WhatsApp.':state.kind==='tote'?'Adjunta la imagen para el frente.':'Añade una ubicación, adjunta su imagen y ajusta el diseño. Puedes combinar varias.',preserveSelection:true,selector:'.print-placement-block',value:JSON.stringify(currentPrintConfiguration()),summary:printCount()?printConfigurationLabel(currentPrintConfiguration(),printChoice()):'Sin estampados aún',valid:printCount()>0&&sides.includes(printChoice())&&(state.catalogDesign||currentPurchaseMethod()==='whatsapp'||(hasRequiredFiles()&&!state.checking&&!state.additionalPrints.some(item=>item.checking))),single:sides.length===1&&Boolean(state.catalogDesign)},
  ];
+ if(studioDetailIncludesPrintPlacement(state.catalogDesignSlug))definitions.push({id:'side',title:state.kind==='tote'?'Diseño de tu tote bag':state.kind==='body'?'Diseño de tu body':'Crea tu polera',instruction:currentPurchaseMethod()==='whatsapp'?'Añade las ubicaciones. Adjuntarás las imágenes en WhatsApp.':state.kind==='tote'?'Adjunta la imagen para el frente.':'Añade una ubicación, adjunta su imagen y ajusta el diseño. Puedes combinar varias.',preserveSelection:true,selector:'.print-placement-block',value:JSON.stringify(currentPrintConfiguration()),summary:printCount()?printConfigurationLabel(currentPrintConfiguration(),printChoice()):'Sin estampados aún',valid:printCount()>0&&sides.includes(printChoice())&&(currentPurchaseMethod()==='whatsapp'||(hasRequiredFiles()&&!state.checking&&!state.additionalPrints.some(item=>item.checking))),single:false});
  if(catalogDesignAllowsBasePurchase(source))definitions.unshift({id:'purchaseMode',title:'Versión del diseño',selector:'.catalog-purchase-mode',value:state.catalogDesignPurchaseMode,summary:state.catalogDesignPurchaseMode==='base'?'Comprar tal cual':'Personalizar con tus fotos',valid:['base','personalized'].includes(state.catalogDesignPurchaseMode),single:false});
  return definitions;
 }
@@ -1589,6 +1589,7 @@ function detailsCanContinue(){
 }
 function mountStudioDetails(container){
  ensureDetailsDisclosure();
+ if(!studioDetailIncludesPrintPlacement(state.catalogDesignSlug))container.querySelector('.print-placement-block')?.remove();
  const grid=container.querySelector('.details-grid');
  if(grid){while(grid.firstChild)grid.before(grid.firstChild);grid.remove();}
  const group=document.createElement('div');group.className='studio-detail-disclosure';
@@ -1605,7 +1606,7 @@ function mountStudioDetails(container){
  if(!['product','model','size','color'].every(id=>Object.hasOwn(detailsDisclosure.confirmed,id))){
   price.querySelector('strong').textContent=priceLabel(productPrice(state.kind,null));
   price.querySelector('small').textContent='Confirma producto, modelo, talla y color para ver el precio de tu selección.';
- }else if(!Object.hasOwn(detailsDisclosure.confirmed,'side')){
+ }else if(studioDetailIncludesPrintPlacement(state.catalogDesignSlug)&&!Object.hasOwn(detailsDisclosure.confirmed,'side')){
   const variant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;
   const current=variant?orderTotal(variant.priceClp,printChoice(),0,printCount(),state.kind==='tote'?null:currentPrintConfiguration(),PRINT_PRICES):null;
   price.querySelector('strong').textContent=current?money(current.total):'Precio por confirmar';price.querySelector('small').textContent=current?`Producto ${money(current.base)} · Estampado ${money(current.print)}`:'Elige la ubicación para confirmar el estampado.';
@@ -1971,7 +1972,7 @@ document.querySelector('#design-form').onsubmit=e=>{
   }).then(()=>renderStep()).catch(error=>{status.textContent=error.message}).finally(()=>{draft.busy=false;studio.removeAttribute('aria-busy');controls.forEach((control,index)=>control.disabled=disabled[index])});
   return;
  }
- if(state.step===1){if(!detailsCanContinue()){detailsDisclosure.focus=ensureDetailsDisclosure().pending;renderStep();return toast('Completa la ubicación y los archivos pendientes para continuar.','error')}if(!confirmDetail('side')){detailsDisclosure.focus='side';renderStep();return toast('Completa la ubicación y los archivos pendientes para continuar.','error')}persistDraft();const whatsappPurchase=currentPurchaseMethod()==='whatsapp';if(!resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant)return toast('Elige una talla y color disponibles para este diseño.','error');if(!whatsappPurchase&&!hasRequiredFiles())return toast('Carga el archivo pendiente de cada estampado para continuar.');state.qualityAccepted=true;state.qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:Boolean(failingSides().length)});state.step=2;activateSide(includedSides()[0]);return renderStep()}
+ if(state.step===1){const customPlacement=studioDetailIncludesPrintPlacement(state.catalogDesignSlug);if(!detailsCanContinue()){detailsDisclosure.focus=ensureDetailsDisclosure().pending;renderStep();return toast(customPlacement?'Completa la ubicación y los archivos pendientes para continuar.':'Completa las opciones pendientes para continuar.','error')}if(customPlacement&&!confirmDetail('side')){detailsDisclosure.focus='side';renderStep();return toast('Completa la ubicación y los archivos pendientes para continuar.','error')}persistDraft();const whatsappPurchase=currentPurchaseMethod()==='whatsapp';if(!resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant)return toast('Elige una talla y color disponibles para este diseño.','error');if(customPlacement&&!whatsappPurchase&&!hasRequiredFiles())return toast('Carga el archivo pendiente de cada estampado para continuar.');state.qualityAccepted=true;state.qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:Boolean(failingSides().length)});state.step=2;activateSide(includedSides()[0]);return renderStep()}
  if(state.step===2){if(currentPurchaseMethod()==='whatsapp'){void openWhatsAppForCurrentSelection();return}addCurrentToCart();return}
  const summaryFirstName=document.querySelector('#summary-first-name'),summaryLastName=document.querySelector('#summary-last-name'),summaryEmail=document.querySelector('#summary-email'),summaryPhone=document.querySelector('#summary-phone');
  if(state.editingContact){for(const field of [summaryFirstName,summaryLastName,summaryEmail,summaryPhone])if(!field?.checkValidity())return field?.reportValidity();state.firstName=summaryFirstName.value.trim();state.lastName=summaryLastName.value.trim();state.email=summaryEmail.value.trim();state.phone=fullChilePhone(summaryPhone.value)}

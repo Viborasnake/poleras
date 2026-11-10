@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DETAIL_BLOCK_ORDER,preserveStudioView,replaceStudioControl} from './studio-sequence.js';
+import {DETAIL_BLOCK_ORDER,preserveStudioView,replaceStudioControl,studioDetailIncludesPrintPlacement} from './studio-sequence.js';
 
 test('detalle conserva el orden comercial solicitado',()=>{
  assert.deepEqual(DETAIL_BLOCK_ORDER,['product-family-block','model-block','size-block','color-block','print-placement-block']);
+});
+
+test('el constructor de estampados aparece solo al traer un diseño propio',()=>{
+ assert.equal(studioDetailIncludesPrintPlacement(null),true);
+ assert.equal(studioDetailIncludesPrintPlacement('ola-japonesa'),false);
 });
 
 test('preserva scroll y foco sin forzar desplazamiento global',()=>{
