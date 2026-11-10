@@ -7,6 +7,8 @@ import { createGarmentCut } from './garment-cuts.js';
 import { createBodyGeometry, addBodyDetails } from './body-geometry.js';
 import { garmentOpenings, foldedGarmentEdges } from './garment-edges.js';
 import { automaticPrintScale, visibleAlphaBounds, visibleAlphaEdgeSamples } from './artwork-fit.js';
+import {garmentPrintLayers,createPrintLayerCollection} from './garment-print-layers.js';
+import {sleevePrintFrame,facingDecalGeometry} from './garment-print-placement.js';
 
 let modelPromise;
 
@@ -291,140 +293,93 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     return cuts[kind];
   }
 
-  const printMaterial = new THREE.MeshStandardMaterial({
-    transparent: true, roughness: .98, metalness: 0,
-    depthWrite: false, side: THREE.FrontSide
-  });
-  let print, currentImage = '', generation = 0, printOnBack = false;
-  const ray = new THREE.Raycaster();
   const localCameraPosition = new THREE.Vector3();
+  const prints=createPrintLayerCollection({
+    build:buildPrint,
+    attach:({mesh})=>group.add(mesh),
+    dispose:({mesh})=>{group.remove(mesh);mesh.geometry.dispose();mesh.material.map?.dispose();mesh.material.dispose();},
+    onError:error=>container.dispatchEvent(new CustomEvent('preview-error',{detail:error})),
+  });
+
+  async function buildPrint(layer,next){
+    const shirt=cuts[next.kind];
+    const texture=await new THREE.TextureLoader().loadAsync(layer.image);
+    let decal,material;
+    try{
+      const fitted=fittedArtworkImage(texture.image,next.catalogPreview ? .08 : hero ? .25 : next.catalogDesign ? .15 : .08);
+      texture.image=fitted.image;texture.needsUpdate=true;texture.colorSpace=THREE.SRGBColorSpace;
+      texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+      const aspect=fitted.aspect,back=layer.side==='back',sleeve=layer.placement.startsWith('sleeve_');
+      const safeScale=automaticPrintScale(aspect),area=garmentPrintArea(next.kind);
+      const maxScale=next.catalogPreview?2:next.catalogDesign?1.7:1.6;
+      let scale=Math.min(Number(layer.scale)||1,maxScale),flat=Boolean(next.catalogPreview||hero);
+      const point=printPlacementCoordinates(layer.placement,area.y+(1-safeScale)*.35-(flat?0:.12),layer.offsetX,layer.offsetY);
+      const frame=sleeve?sleevePrintFrame(shirt.geometry,layer.placement,layer.offsetX,layer.offsetY):{
+        origin:new THREE.Vector3(point.x,point.y,0),normal:new THREE.Vector3(0,0,back?-1:1),
+        right:new THREE.Vector3(back?-1:1,0,0),up:new THREE.Vector3(0,1,0),width:area.width,height:area.height,depth:1.45,
+      };
+      if(sleeve){flat=false;scale=Math.min(1.35,scale/.55);}
+      const baseWidth=Math.min(frame.width,frame.height*aspect)*(sleeve?1:safeScale);
+      // Geometry and projection share garment-local coordinates. Rotating the
+      // viewer while a file loads must not rotate the decal a second time.
+      const surface=new THREE.Mesh(shirt.geometry,shirt.material);surface.updateMatrixWorld(true);
+      const ray=new THREE.Raycaster();
+      const cast=(x=0,y=0)=>{
+        const origin=frame.origin.clone().addScaledVector(frame.right,x).addScaledVector(frame.up,y).addScaledVector(frame.normal,3);
+        ray.set(origin,frame.normal.clone().negate());return ray.intersectObject(surface,false)[0];
+      };
+      const centerHit=cast();
+      if(sleeve&&!centerHit)throw new Error('No pudimos proyectar el diseño sobre la manga.');
+      const center=centerHit?centerHit.point.clone():frame.origin.clone().addScaledVector(frame.normal,.4);
+      const threshold=sleeve ? .15 : next.kind==='over' ? .05 : next.catalogDesign ? .32 : layer.placement.startsWith('chest_') ? .22 : .52;
+      if(!flat){
+        const edges=artworkEdgeSamples(fitted.image);
+        const fits=value=>edges.every(({u,v})=>{
+          const hit=cast((u-.5)*baseWidth*value,(.5-v)*baseWidth*value/aspect);
+          return hit&&hit.face.normal.dot(frame.normal)>=threshold&&Math.abs(hit.point.clone().sub(center).dot(frame.normal))<(sleeve?frame.depth*.5:.48);
+        });
+        if(edges.length&&!fits(scale)){
+          let low=sleeve ? .18 : .3,high=scale;
+          if(fits(low)){
+            for(let attempt=0;attempt<7;attempt++){const middle=(low+high)/2;if(fits(middle))low=middle;else high=middle;}
+            scale=Math.max(sleeve ? .18 : .3,low-.02);
+          }else if(sleeve){scale=.18;}
+          else {flat=true;scale=Math.min(scale,1);}
+        }
+      }
+      const width=baseWidth*scale,height=width/aspect;
+      const orientation=new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(frame.right,frame.up,frame.normal));
+      if(flat)decal=new THREE.PlaneGeometry(width,height);
+      else{
+        decal=new DecalGeometry(surface,center,orientation,new THREE.Vector3(width,height,frame.depth));
+        if(sleeve)facingDecalGeometry(decal,frame.normal,threshold);
+        else if(next.kind!=='over')keepForwardFacingDecal(decal,back,threshold);
+        settleDecalOnFabric(decal);
+        if(!decal.attributes.position.count)throw new Error('No pudimos aplicar el estampado a la tela.');
+      }
+      material=new THREE.MeshStandardMaterial({map:texture,transparent:true,roughness:.98,metalness:0,depthWrite:false,depthTest:!flat,side:THREE.FrontSide});
+      const mesh=new THREE.Mesh(decal,material);mesh.name=`Estampado ${layer.id}`;
+      mesh.userData={printLayerId:layer.id,placement:layer.placement,normal:frame.normal,sleeve};
+      if(flat){mesh.position.copy(center).addScaledVector(frame.normal,.08);mesh.rotation.copy(orientation);mesh.renderOrder=2;}
+      return {mesh};
+    }catch(error){decal?.dispose();material?.dispose();texture.dispose();throw error;}
+  }
 
   async function update(next) {
     const version=++updateVersion;
-    renderer.domElement.setAttribute('aria-label', `${next.kind === 'body' ? 'Body de bebé' : 'Polera'} 3D. Arrastra para ver frente, costados y espalda.`);
+    renderer.domElement.setAttribute('aria-label',`${next.kind==='body'?'Body de bebé':'Polera'} 3D. Arrastra para ver frente, costados y espalda.`);
     cloth.color.set(next.color);
-    // Less fill allows the loose cotton's curved panels to read on white too.
-    ambient.intensity = next.kind === 'over' ? 1.05 : 1.55;
-    fill.intensity = next.kind === 'over' ? .5 : .85;
-    const shirt = await getCut(next.kind);
+    ambient.intensity=next.kind==='over'?1.05:1.55;fill.intensity=next.kind==='over' ? .5 : .85;
+    const shirt=await getCut(next.kind);
     if(disposed||version!==updateVersion)return;
     shirt.material.color.set(next.color);
-    Object.values(cuts).forEach(cut => { cut.visible = cut === shirt; });
-    shirt.children.forEach(hem => hem.material.color.set(next.color).multiplyScalar(hem.userData.fabricShade ?? .94));
-    const url = next.image || '';
-    const back = next.printSide === 'back';
-    printOnBack = back;
-    const requestedScale = next.printScale || 1;
-    const maxScale = next.catalogPreview ? 2 : next.catalogDesign ? 1.7 : 1.6;
-    const printScale = Math.min(requestedScale, Math.max(.55, maxScale));
-    const placement = next.printPlacement || 'center';
-    const offsetX = Number(next.printOffsetX) || 0, offsetY = Number(next.printOffsetY) || 0;
-    const fitMode = next.catalogPreview ? 'catalog-fit-v2' : hero ? 'hero-safe-fit-v1' : next.catalogDesign ? 'catalog-studio-decal-v2' : 'safe-fit-v4';
-    const key = url ? url + '|' + next.kind + '|' + (back ? 'back' : 'front') + '|' + printScale.toFixed(2) + '|' + placement + '|' + offsetX + '|' + offsetY + '|' + fitMode : '';
-    if (key === currentImage) return;
-    const previousImage = currentImage;
-    currentImage = key;
-    const token = ++generation;
-    if (!url) {
-      if (print) { group.remove(print); print.geometry.dispose(); print = undefined; }
-      printMaterial.map?.dispose();
-      printMaterial.map = null;
-      return;
-    }
-    try {
-      const texture = await new THREE.TextureLoader().loadAsync(url);
-      if (generation !== token) { texture.dispose(); return; }
-      const fitted = fittedArtworkImage(texture.image, next.catalogPreview ? .08 : hero ? .25 : next.catalogDesign ? .15 : .08);
-      texture.image = fitted.image;
-      texture.needsUpdate = true;
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-      const aspect = fitted.aspect;
-      const safeScale = automaticPrintScale(aspect);
-      const printArea = garmentPrintArea(next.kind);
-      const baseWidth = Math.min(printArea.width, printArea.height * aspect) * safeScale;
-      let useFlatPreview = next.catalogPreview || hero;
-      const basePlacementY = printArea.y + (1 - safeScale) * .35 - (useFlatPreview ? 0 : .12);
-      const placementPoint = printPlacementCoordinates(placement, basePlacementY, offsetX, offsetY), placementX = placementPoint.x, placementY = placementPoint.y;
-      const specialPlacement = placement.startsWith('sleeve_') || placement.startsWith('chest_');
-      const facingThreshold = next.kind === 'over' || placement.startsWith('sleeve_') ? .05 : next.catalogDesign ? .32 : specialPlacement ? .22 : .52;
-      group.updateMatrixWorld(true);
-      const rayDirection = new THREE.Vector3(0, 0, back ? 1 : -1).transformDirection(group.matrixWorld);
-      const castOnShirt = (x, y) => {
-        ray.set(new THREE.Vector3(x, y, back ? -3 : 3).applyMatrix4(group.matrixWorld), rayDirection);
-        return ray.intersectObject(shirt, false)[0];
-      };
-      const centerHit = castOnShirt(placementX, placementY);
-      const targetZ = centerHit ? group.worldToLocal(centerHit.point.clone()).z : back ? -.4 : .4;
-      let fittedScale = printScale;
-      if (!useFlatPreview) {
-        const edges = artworkEdgeSamples(fitted.image);
-        const fits = scale => {
-          const width = baseWidth * scale, height = width / aspect;
-          return edges.every(({ u, v }) => {
-            const hit = castOnShirt(placementX + (u - .5) * width, placementY + (.5 - v) * height);
-            return hit && isPrintableFacing(hit.face.normal.z, back, facingThreshold)
-              && Math.abs(group.worldToLocal(hit.point.clone()).z - targetZ) < .48;
-          });
-        };
-        if (edges.length && !fits(fittedScale)) {
-          let lower = .3, upper = fittedScale;
-          if (fits(lower)) {
-            for (let attempt = 0; attempt < 7; attempt += 1) {
-              const middle = (lower + upper) / 2;
-              if (fits(middle)) lower = middle;
-              else upper = middle;
-            }
-            fittedScale = Math.max(.3, lower - .02);
-          } else {
-            // A mesh with no continuous printable surface still needs a complete preview.
-            useFlatPreview = true;
-            fittedScale = Math.min(printScale, 1);
-          }
-        }
-      }
-      const width = baseWidth * fittedScale;
-      const height = width / aspect;
-      // Hero y catálogo son vistas frontales editoriales: preservan el PNG completo.
-      // Dentro del estudio todos los motivos, incluidos los de catálogo, se
-      // proyectan sobre la malla para acompañar los pliegues y no despegarse
-      // de los costados al girar la polera.
-      // Los diseños de colección necesitan conservar más de su contorno al
-      // cruzar el pecho. Un umbral menos restrictivo mantiene los bordes sin
-      // convertirlos en una lámina plana: los vértices siguen sobre la tela.
-      const rawDecal = new DecalGeometry(
-        shirt,
-        new THREE.Vector3(placementX, placementY, targetZ),
-        new THREE.Euler(0, back ? Math.PI : 0, 0),
-        new THREE.Vector3(width, height, 1.45),
-      );
-      // The imported oversize mesh has deep folds whose normals point away from
-      // the camera even though they are still part of the front panel. Filtering
-      // those triangles creates the vertical gaps seen in the artwork. Keep the
-      // complete decal on this model; the depth box and the garment surface keep
-      // it attached to the cloth. Other cuts retain the stricter edge filter.
-      const decal = useFlatPreview
-        ? new THREE.PlaneGeometry(width, height)
-        : settleDecalOnFabric(next.kind === 'over'
-          ? rawDecal
-          : keepForwardFacingDecal(rawDecal, back, facingThreshold));
-      if (print) { group.remove(print); print.geometry.dispose(); print = undefined; }
-      printMaterial.map?.dispose();
-      printMaterial.map = texture;
-      printMaterial.depthTest = !useFlatPreview;
-      printMaterial.needsUpdate = true;
-      print = new THREE.Mesh(decal, printMaterial);
-      if (useFlatPreview) {
-        print.position.set(placementX, placementY, targetZ + (back ? -.08 : .08));
-        print.rotation.y = back ? Math.PI : 0;
-        print.renderOrder = 2;
-      }
-      group.add(print);
-      renderer.domElement.setAttribute('aria-label', `${next.kind === 'body' ? 'Body de bebé' : 'Polera'} 3D con tu diseño aplicado a la tela. Arrastra para girar.`);
-    } catch (error) {
-      if (generation === token) currentImage = previousImage;
-      container.dispatchEvent(new CustomEvent('preview-error', { detail: error }));
-    }
+    Object.values(cuts).forEach(cut=>{cut.visible=cut===shirt;});
+    shirt.children.forEach(hem=>hem.material.color.set(next.color).multiplyScalar(hem.userData.fabricShade??.94));
+    await prints.update(garmentPrintLayers(next),{kind:next.kind,catalogPreview:Boolean(next.catalogPreview),catalogDesign:Boolean(next.catalogDesign)});
+    if(disposed||version!==updateVersion)return;
+    const count=[...prints.entries.values()].filter(entry=>entry.resource).length;
+    renderer.domElement.dataset.printCount=String(count);
+    renderer.domElement.setAttribute('aria-label',`${next.kind==='body'?'Body de bebé':'Polera'} 3D con ${count} estampados aplicados a la tela. Arrastra para girar.`);
   }
   function resize() {
     const width = container.clientWidth, height = container.clientHeight;
@@ -446,14 +401,13 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const dialog = container.closest('dialog');
     if (dialog && !dialog.open) return;
     controls.update();
-    if (print) {
-      group.updateMatrixWorld(true);
-      camera.getWorldPosition(localCameraPosition);
-      group.worldToLocal(localCameraPosition);
-      const facing = (localCameraPosition.z / Math.max(localCameraPosition.length(), .0001)) * (printOnBack ? -1 : 1);
-      const opacity = printVisibilityForFacing(facing);
-      printMaterial.opacity = opacity;
-      print.visible = opacity > .001;
+    group.updateMatrixWorld(true);
+    camera.getWorldPosition(localCameraPosition);group.worldToLocal(localCameraPosition);
+    const direction=localCameraPosition.clone().normalize();
+    for(const entry of prints.entries.values())if(entry.resource){
+      const mesh=entry.resource.mesh;
+      const opacity=mesh.userData.sleeve?1:printVisibilityForFacing(direction.dot(mesh.userData.normal));
+      mesh.material.opacity=opacity;mesh.visible=opacity>.001;
     }
     renderer.render(scene, camera);
     if(initialSceneReady&&!firstFrameShown){
@@ -475,14 +429,11 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     dispose() {
       disposed=true;
       ++updateVersion;
-      ++generation;
+      prints.dispose();
       renderer.setAnimationLoop(null);
       resizeObserver.disconnect();
       visibilityObserver.disconnect();
       controls.dispose();
-      if (print) print.geometry.dispose();
-      printMaterial.map?.dispose();
-      printMaterial.dispose();
       Object.values(cuts).forEach(cut => {
         cut.geometry.dispose();
         cut.children.forEach(hem => { hem.geometry.dispose(); hem.material.dispose(); });
@@ -494,7 +445,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       renderer.domElement.remove();
     },
     turn(angle = 0) { group.rotation.y = angle; },
-    face(side) { camera.position.set(0, .05, side === 'back' ? -initial.z : initial.z); controls.target.set(0, 0, 0); controls.update(); },
+    face(side,placement) { const arm=placement==='sleeve_left'?-1:placement==='sleeve_right'?1:0;group.rotation.y=0;camera.position.set(arm*distance*.85,.05,arm?distance*.53:side==='back'?-initial.z:initial.z);controls.target.set(0,0,0);controls.update(); },
     reset() { camera.position.set(0, .05, initial.z); controls.target.set(0, 0, 0); controls.update(); },
     zoomBy(amount = 0) {
       const offset = camera.position.clone().sub(controls.target);

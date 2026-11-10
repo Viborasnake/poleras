@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {studioPreviewState} from './studio-preview.js';
 
+test('cambiar de ubicación o añadir una vacía conserva todos los archivos del visor',()=>{
+ const state={mode:'ready',printSide:'front',printSides:['front','back'],images:{front:'front.png',back:'back.png'},additionalPrints:[{id:'arm',side:'front',image:'arm.png',configuration:{placement:'sleeve_both',size:'pocket'}},{id:'pocket',side:'front',image:'',configuration:{placement:'chest_left',size:'pocket'}}]};
+ for(const activePrintId of [null,'arm','pocket']){
+  const preview=studioPreviewState({...state,activePrintId},'placeholder');
+  assert.deepEqual(preview.printLayers.map(item=>item.image),['front.png','back.png','arm.png']);
+  assert.equal(preview.printLayers[2].placement,'sleeve_both');
+ }
+});
+
 for (const subject of ['pets', 'people']) {
  test(`conserva el estampado de catálogo al personalizar ${subject}`, () => {
   const state = {mode:'ready',catalogDesign:'Diseño elegido',catalogDesignCustomerImage:true,customerPhotoSubject:subject,printSide:'front',images:{front:'/arte.webp'},petRequest:{url:'/foto-cliente.jpg'}};

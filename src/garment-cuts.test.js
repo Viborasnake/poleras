@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
 import { createGarmentCut } from './garment-cuts.js';
+import {createBodyGeometry} from './body-geometry.js';
+import {DecalGeometry} from 'three/addons/geometries/DecalGeometry.js';
+import {sleevePrintFrame,facingDecalGeometry} from './garment-print-placement.js';
 
 // Read only the mesh buffers from the real asset: no browser or texture loader
 // is required for these topology and proportion regressions.
@@ -107,6 +110,24 @@ function torsoDepth(geometry, low, high) {
 }
 
 const base = loadBaseGeometry();
+
+for(const kind of ['basic','woman','kids','body'])test(`${kind}: la manga se proyecta hacia el exterior y queda sobre su tela`,()=>{
+ const geometry=kind==='basic'?base.clone():kind==='body'?createBodyGeometry():createGarmentCut(base,kind);
+ const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));mesh.updateMatrixWorld(true);
+ for(const placement of ['sleeve_left','sleeve_right']){
+  const frame=sleevePrintFrame(geometry,placement),sign=placement==='sleeve_left'?-1:1;
+  assert.ok(frame.normal.x*sign>.9,'La proyección apunta a la manga, no al frente.');
+  const ray=new THREE.Raycaster(frame.origin.clone().addScaledVector(frame.normal,3),frame.normal.clone().negate());
+  const hit=ray.intersectObject(mesh,false)[0];assert.ok(hit,'Encuentra la superficie de manga.');
+  assert.ok(hit.point.x*sign>Math.abs(frame.origin.x)*.9,'La posición queda fuera del torso.');
+  const orientation=new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(frame.right,frame.up,frame.normal));
+  const decal=facingDecalGeometry(new DecalGeometry(mesh,hit.point,orientation,new THREE.Vector3(frame.width,frame.height,frame.depth)),frame.normal);
+  assert.ok(decal.attributes.position.count>0,'El estampado contiene triángulos de tela.');
+  decal.computeBoundingBox();const center=decal.boundingBox.getCenter(new THREE.Vector3());assert.ok(center.x*sign>.6);
+  decal.dispose();
+ }
+ geometry.dispose();mesh.material.dispose();
+});
 const originalPositions = base.attributes.position.array.slice();
 const originalUVs = base.attributes.uv.array.slice();
 const originalIndices = base.index.array.slice();
