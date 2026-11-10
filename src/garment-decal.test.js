@@ -1,6 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isPrintableFacing, printPlacementCoordinates, printVisibilityForFacing, responsiveCameraDistance } from './garment.js';
+import * as THREE from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {sleevePrintFrame} from './garment-print-placement.js';
+
+test('ubica mangas de mallas cerradas sin depender de bordes abiertos',()=>{
+ const parts=[new THREE.BoxGeometry(1.3,2.65,.4),new THREE.BoxGeometry(.4,.8,.3).translate(-.9,.6,0),new THREE.BoxGeometry(.4,.8,.3).translate(.9,.6,0)];
+ const geometry=mergeGeometries(parts),mesh=new THREE.Mesh(geometry);mesh.updateMatrixWorld(true);
+ for(const placement of ['sleeve_left','sleeve_right']){
+  const frame=sleevePrintFrame(geometry,placement);
+  const ray=new THREE.Raycaster(frame.origin.clone().addScaledVector(frame.normal,3),frame.normal.clone().negate());
+  const hit=ray.intersectObject(mesh,false)[0];assert.ok(hit);assert.ok(Math.abs(hit.point.x)>.7);
+  assert.ok(frame.width>0&&frame.height>0);
+ }
+ parts.forEach(part=>part.dispose());geometry.dispose();mesh.material.dispose();
+});
 
 test('el estampado frontal no se proyecta sobre paneles laterales',()=>{
   assert.equal(isPrintableFacing(.92),true);

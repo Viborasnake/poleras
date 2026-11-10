@@ -682,16 +682,14 @@ const primaryCtas=[...document.querySelectorAll('.nav-cta[data-start],.hero-copy
 primaryCtas.forEach(cta=>{cta.classList.add('primary-idea-cta');cta.dataset.start='ready';cta.innerHTML=primaryCtaMarkup});
 ideaLink?.classList.add('primary-idea-cta');
 function previewState(){
- const extra=activeAdditionalPrint();
- if(!extra)return studioPreviewState(state,DEFAULT_PLACEHOLDER_IMAGE);
- return studioPreviewState({...state,printSide:extra.side,images:{...state.images,[extra.side]:extra.image},assessments:{...state.assessments,[extra.side]:extra.assessment},printConfigurations:{...state.printConfigurations,[extra.side]:extra.configuration}},DEFAULT_PLACEHOLDER_IMAGE)
+ return studioPreviewState(state,DEFAULT_PLACEHOLDER_IMAGE);
 }
 function updateFullscreenZoomStatus(){const status=document.querySelector('#fullscreen-zoom-status'),value=fullscreenViewer?.zoomPercent?.();if(status&&Number.isFinite(value))status.value=`${value}%`}
 function disposeFullscreenViewer(){fullscreenViewerVersion++;fullscreenViewer?.dispose();fullscreenViewer=null;document.querySelector('#fullscreen-viewer-canvas')?.replaceChildren()}
 function closeFullscreenViewer(){if(fullscreenViewerDialog?.open)fullscreenViewerDialog.close();else disposeFullscreenViewer()}
 async function openFullscreenViewer(){
  const renderState=previewState();
- if(!renderState.image)return;
+ if(!renderState.image&&!renderState.printLayers?.length)return;
  const host=document.querySelector('#fullscreen-viewer-canvas');
  const wantedKind=state.kind==='tote'?'tote':'shirt';
  disposeFullscreenViewer();
@@ -703,7 +701,7 @@ async function openFullscreenViewer(){
   const created=wantedKind==='tote'?await module.createToteViewer(host,renderState,{minDistance:2.8}):await module.createViewer(host,renderState,{cameraDistance:5.8,minDistance:3.15});
   if(version!==fullscreenViewerVersion||!fullscreenViewerDialog.open){created.dispose();return}
   fullscreenViewer=created;
-  created.face(state.printSide);
+  created.face(state.printSide,activePrintConfiguration().placement);
   created.resize();
   updateFullscreenZoomStatus();
  }catch(error){
@@ -724,7 +722,8 @@ function syncPreview(){
  const sideImage=activeAdditionalPrint()?.image||state.images?.[state.printSide]||'';
  const catalogPreviewReady=Boolean(catalogDesignLocked()&&sideImage);
  const showSample=Boolean(!petPlaceholder&&state.isDefault&&!state.catalogDesign&&!sideImage);
- const isForging=!petPlaceholder&&!sideImage&&!showSample&&!catalogPreviewReady,showMockup=Boolean(petPlaceholder||sideImage||showSample),renderState=petPlaceholder?previewState():isForging?{...state,image:'',assessment:null,isDefault:false}:previewState();
+ const renderState=previewState(),hasArtwork=Boolean(renderState.printLayers?.length||renderState.image);
+ const isForging=!petPlaceholder&&!hasArtwork&&!showSample&&!catalogPreviewReady,showMockup=Boolean(petPlaceholder||hasArtwork||showSample);
  const livePreview=document.querySelector('#live-preview');livePreview.hidden=!(isForging||showMockup);livePreview.classList.toggle('is-forging',isForging);
  let story=livePreview.querySelector('.studio-personalization-story');
  const personalizedDesign=state.catalogDesignCustomerImage&&selectedCatalogDesign();
@@ -1406,7 +1405,7 @@ const hasRequiredFiles=()=>includedSides().every(side=>Boolean(state.images[side
 const failingSides=()=>[...includedSides().map(side=>state.assessments[side]),...state.additionalPrints.map(item=>item.assessment)].filter(assessment=>assessment&&!assessment.qualifies);
 function activateSide(side){if(!includedSides().includes(side))return;state.activePrintId=null;state.printSide=side;state.image=state.images[side]||'';state.assessment=state.assessments[side]||null;state.isDefault=!state.images.front&&!state.images.back&&!state.additionalPrints.some(item=>item.image);const config=activePrintConfiguration();state.printScale=Number(config.scale)||PRINT_SIZE_SCALE[config.size]}
 function activateAdditionalPrint(id){const item=state.additionalPrints.find(candidate=>candidate.id===id);if(!item)return;state.activePrintId=item.id;state.printSide=item.side;state.image=item.image||'';state.assessment=item.assessment||null;state.isDefault=false;state.printScale=Number(item.configuration.scale)||PRINT_SIZE_SCALE[item.configuration.size]}
-function faceSelectedSide(){viewer?.face(state.printSide);viewerPromise?.then(()=>viewer?.face(state.printSide))}
+function faceSelectedSide(){const placement=activePrintConfiguration().placement;viewer?.face(state.printSide,placement);viewerPromise?.then(()=>viewer?.face(state.printSide,placement))}
 function moveCatalogDesignTo(side){
  const source=state.images.front?'front':'back';
  if(source===side)return;
@@ -1874,7 +1873,7 @@ async function upload(file,side=state.printSide,fromCatalog=false){
 async function uploadAdditionalPrint(file,id){
  const item=state.additionalPrints.find(candidate=>candidate.id===id);if(!file||!item)return false;
  const validation=imageFileError(file,CUSTOMER_IMAGE_POLICY);if(validation){toast(validation);return false}
- openPrintLayerId=id;const versionKey=`extra:${id}`,token=uploadVersions[versionKey]=(uploadVersions[versionKey]||0)+1;let url='';item.checking=true;activateAdditionalPrint(id);renderStep();viewer?.face(item.side);
+ openPrintLayerId=id;const versionKey=`extra:${id}`,token=uploadVersions[versionKey]=(uploadVersions[versionKey]||0)+1;let url='';item.checking=true;activateAdditionalPrint(id);renderStep();faceSelectedSide();
  try{
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   const optimized=await optimizeImage(file,{policy:CUSTOMER_IMAGE_POLICY,baseName:file.name});file=optimized.file;url=URL.createObjectURL(file);
