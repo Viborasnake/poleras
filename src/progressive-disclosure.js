@@ -40,12 +40,13 @@ function trackDisclosureFocusModality(){
  document.addEventListener('keydown',()=>{disclosureFocusFromKeyboard=true},{capture:true});
  document.addEventListener('pointerdown',()=>{disclosureFocusFromKeyboard=false},{capture:true});
 }
-export function focusDisclosure(element,{align='nearest'}={}){
+export function focusDisclosure(element,{align='nearest',scroll=true}={}){
  if(!element)return;
  trackDisclosureFocusModality();
  element.toggleAttribute?.('data-disclosure-silent-focus',!disclosureFocusFromKeyboard);
  element.addEventListener?.('blur',()=>element.removeAttribute?.('data-disclosure-silent-focus'),{once:true});
  element.focus({preventScroll:true});
+ if(!scroll)return;
  const bounds=element.getBoundingClientRect();
  const studio=element.closest('#studio');
  const scroller=studio?.classList.contains('is-request-mode')?studio.querySelector('.studio-body'):element.closest('.studio-controls');

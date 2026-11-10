@@ -23,7 +23,7 @@ import { collections as fallbackCollections, categories as fallbackCategories, c
 import { catalogCollectionDialogPath, catalogCollectionPath, catalogDesignDialogPath, catalogDesignPath, catalogProductPath } from './catalog-routes.js';
 import { shareLink } from './share.js';
 import { createIntroTurn } from './intro-turn.js';
-import { DETAIL_BLOCK_ORDER, preserveStudioView } from './studio-sequence.js';
+import { DETAIL_BLOCK_ORDER, preserveStudioView, replaceStudioControl } from './studio-sequence.js';
 import { createDisclosureState, reconcileDisclosure, confirmDisclosure, mountDisclosure, focusDisclosure } from './progressive-disclosure.js';
 import {mountIdeaFlow,mountPetFlow,mountWhatsAppFlow,mountCheckoutFlow} from './public-form-flows.js';
 import { previewKey, needsGeneratedPreview } from './catalog-preview-cache.js';
@@ -1617,11 +1617,13 @@ function mountStudioDetails(container){
  return result;
 }
 function renderStep(){
+ const previousDetailPanelId=studio.querySelector('.studio-detail-disclosure .is-active>.ds-disclosure-panel')?.id;
  const previousField=activePublicFlow&&document.activeElement?.closest('#step-content')&&document.activeElement.matches('input,textarea,select')?document.activeElement:null;
  const previousFocus=previousField?{id:previousField.id,petValue:previousField.dataset.petValue,start:previousField.selectionStart,end:previousField.selectionEnd,scroll:studio.querySelector('.studio-controls')?.scrollTop||0}:null;
  const restorePublicFocus=()=>{if(!previousFocus||!activePublicFlow)return;const target=previousFocus.id?document.getElementById(previousFocus.id):document.querySelector(`[data-pet-value="${CSS.escape(previousFocus.petValue||'')}"]`);if(!target||target.matches(':disabled')||target.closest('[hidden]'))return;const scroller=studio.querySelector('.studio-controls');if(scroller)scroller.scrollTop=previousFocus.scroll;target.focus({preventScroll:true});try{if(previousFocus.start!==null)target.setSelectionRange(previousFocus.start,previousFocus.end)}catch{}};
  activePublicFlow?.destroy();activePublicFlow=null;
- const studioScroller=studio.querySelector('.studio-controls');
+ const studioBody=studio.querySelector('.studio-body');
+ const studioScroller=['auto','scroll'].includes(getComputedStyle(studioBody).overflowY)?studioBody:studio.querySelector('.studio-controls');
  const preserveScroll=state.step===1&&studioScroller?studioScroller.scrollTop:0;
  const focused=document.activeElement;
  const focusedLayer=focused?.closest('[data-print-layer-panel]')?.dataset.printLayerPanel;
@@ -1728,9 +1730,13 @@ function renderStep(){
   const positions=[...blocks].map(block=>DETAIL_BLOCK_ORDER.indexOf([...block.classList].find(name=>DETAIL_BLOCK_ORDER.includes(name))));
   if(positions.some((value,index)=>value!==index))console.warn('El orden del detalle no coincide con la secuencia comercial.',positions);
   const lookup=key=>stepContent.querySelector(`[data-product-family="${CSS.escape(key)}"],[data-product="${CSS.escape(key)}"],[data-size="${CSS.escape(key)}"],[data-color="${CSS.escape(key)}"],[data-print-sides="${CSS.escape(key)}"]`);
-  preserveStudioView({scrollTop:preserveScroll,activeKey:preserveFocus,find:lookup,setScroll:value=>{if(studioScroller)studioScroller.scrollTop=value}});
+  preserveStudioView({scrollTop:preserveScroll,activeKey:preserveFocus,find:lookup});
  }
- if(state.step===1)mountStudioDetails(stepContent);
+ if(state.step===1){
+  mountStudioDetails(stepContent);
+  const activePanel=stepContent.querySelector('.studio-detail-disclosure .is-active>.ds-disclosure-panel');
+  if(activePanel&&activePanel.id===previousDetailPanelId)activePanel.style.animation='none';
+ }
  if(state.step===1&&state.kind==='tote')stepContent.querySelector('.size-block .sizes')?.classList.add('named-tote-sizes');
  if(state.step===1&&state.catalogDesign){
   if(state.kind==='tote'){
@@ -1751,9 +1757,9 @@ function renderStep(){
  if(state.step===3){const notice=document.querySelector('#step-content .notice');if(notice)notice.insertAdjacentHTML('beforebegin',`<section class="checkout-coupon"><label for="checkout-coupon">Cupón de descuento</label><div><input id="checkout-coupon" value="${safe(state.couponCode)}" placeholder="Ingresa tu código"><button type="button" id="apply-coupon">Aplicar</button></div><small id="checkout-coupon-status" ${state.couponLabel?'data-tone="success"':''}>${safe(state.couponLabel||'El descuento se validará antes del pago.')}</small></section>`)}
  applyDesignSystemClasses(document.querySelector('#step-content'));
  ['summary-email','summary-first-name','summary-last-name','summary-phone'].forEach(id=>{const input=document.querySelector(`#${id}`);if(!input)return;if(!input.placeholder)input.placeholder='tu@email.com';const wrapper=document.createElement('div');wrapper.className='clearable-input';input.before(wrapper);wrapper.append(input);const clear=document.createElement('button');clear.type='button';clear.className='clear-input';clear.setAttribute('aria-label',`Borrar ${id.includes('phone')?'teléfono':id.includes('last-name')?'apellido':id.includes('name')?'nombre':'email'}`);clear.innerHTML='<span aria-hidden="true"></span>';clear.onclick=()=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()};wrapper.append(clear)});
- const focusOpenPrintLayer=()=>focusDisclosure(stepContent.querySelector('.print-layer-card[open]>summary'));
- stepContent.querySelectorAll('[data-add-primary-print]').forEach(button=>button.onclick=()=>{addPrimaryPrint(button.dataset.addPrimaryPrint);focusOpenPrintLayer()});
- stepContent.querySelectorAll('[data-add-print-layer]').forEach(button=>button.addEventListener('click',()=>{addAdditionalPrint(button.dataset.addPrintLayer);focusOpenPrintLayer()}));
+ const addPrintInPlace=(button,update)=>replaceStudioControl({control:button,scroller:studioScroller,update,findReplacement:()=>stepContent.querySelector('.print-layer-card[open]>summary'),focus:element=>focusDisclosure(element,{scroll:false})});
+ stepContent.querySelectorAll('[data-add-primary-print]').forEach(button=>button.onclick=()=>addPrintInPlace(button,()=>addPrimaryPrint(button.dataset.addPrimaryPrint)));
+ stepContent.querySelectorAll('[data-add-print-layer]').forEach(button=>button.addEventListener('click',()=>addPrintInPlace(button,()=>addAdditionalPrint(button.dataset.addPrintLayer))));
  if(focusedLayer&&printFocusAttribute)stepContent.querySelector(`[data-print-layer-panel="${CSS.escape(focusedLayer)}"] [${printFocusAttribute}="${CSS.escape(printFocusValue)}"]`)?.focus({preventScroll:true});
  stepContent.querySelectorAll('[data-print-layer-panel]').forEach(panel=>panel.ontoggle=()=>{
   if(!panel.isConnected)return;
@@ -1836,6 +1842,8 @@ function renderStep(){
  restorePublicFocus();syncScaleControl();syncPreview();
  if(checkoutScrollSnapshot){const {scroller,top}=checkoutScrollSnapshot;checkoutScrollSnapshot=null;requestAnimationFrame(()=>{if(scroller)scroller.scrollTop=top;const quote=document.querySelector('.shipping-quote');quote?.classList.add('is-new');quote?.scrollIntoView({block:'nearest'});setTimeout(()=>quote?.classList.remove('is-new'),1400)})}
  normalizeTextSymbols(document.querySelector('#step-content')||document);
+ // Restore only after the disclosure has moved its nodes and hidden other steps.
+ if(state.step===1&&studioScroller)studioScroller.scrollTop=preserveScroll;
 }
 async function addReferenceFiles(fileList){
  const incoming=[...(fileList||[])];if(!incoming.length)return;
