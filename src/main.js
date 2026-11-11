@@ -769,6 +769,7 @@ trustStrip.setAttribute('aria-label','Beneficios de comprar en droska SHIRT');
 trustStrip.innerHTML=`<ul><li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M39 8C23 9 12 17 10 34c12 2 23-5 29-26Z"/><path d="M8 41c7-11 14-18 25-25"/></svg><span><strong>Diseños originales</strong><small>Creaciones exclusivas Droska.</small></span></li><li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 12h23v22H6zM29 21h7l6 7v6H29z"/><circle cx="14" cy="36" r="4"/><circle cx="36" cy="36" r="4"/></svg><span><strong>Despachos a todo Chile</strong><small>Rápido y seguro.</small></span></li><li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5c5 4 10 6 16 7v11c0 10-6 17-16 21C14 40 8 33 8 23V12c6-1 11-3 16-7Z"/><path d="m17 24 5 5 10-11"/></svg><span><strong>Compra segura</strong><small>Tus datos siempre protegidos.</small></span></li></ul>`;
 catalogSection.before(trustStrip);
 let dropExplore=null;
+const dropExploreDesktop=window.matchMedia('(min-width:1001px)');
 if(useDropWall){
 document.querySelector('.drop-intro').after(catalogSection);
 catalogSection.after(trustStrip);
@@ -789,6 +790,7 @@ dropExplore.addEventListener('click',event=>{
  const collection=collections.find(item=>item.id===design?.collection);
  if(design&&collection)openCatalogDesign(design,collection);
 });
+dropExploreDesktop.addEventListener('change',positionDropExplore);
 
 document.querySelector('.ticker').remove();
 document.body.classList.add('drop-wall-enabled');
@@ -924,6 +926,7 @@ function renderCatalog(){
   catalogSection.querySelector('.catalog-reset').hidden=!scope.length;
   catalogSection.querySelector('.catalog-actions').innerHTML=catalogFiltersMarkup({view:catalogView,mode:catalogFilterMode,category:selectedCatalogCategory,columns:catalogGridColumns,categories:visibleCategories});
   const grid=catalogSection.querySelector('.catalog-grid');
+  if(dropExplore?.parentElement===grid)catalogSection.after(dropExplore);
   if(useDropWall&&!isDesignView){
    grid.innerHTML=renderDropCollectionSections(shownCollections,productDesigns);
   }else{
@@ -1010,9 +1013,16 @@ function renderCatalog(){
       }
     });
   }
-  if(useDropWall){renderDropExplore(shownDesigns,isDesignView);dropHeroSearch?.refresh()}
+  if(useDropWall){positionDropExplore();renderDropExplore(shownDesigns,isDesignView);dropHeroSearch?.refresh()}
   renderFooterCatalog();
   (isDesignView?shownDesigns.map(item=>item.design):shownDesigns.map(item=>item.design)).forEach(design=>{if(design&&!design.featuredPhoto)showCatalogMockup(design.id)});
+}
+function positionDropExplore(){
+ if(!dropExplore)return;
+ const grid=catalogSection.querySelector('.catalog-grid');
+ const firstFeatured=grid.querySelector('.drop-collection-section .drop-collection--featured')?.closest('.drop-collection-section');
+ if(dropExploreDesktop.matches&&catalogView==='collections'&&firstFeatured)firstFeatured.after(dropExplore);
+ else catalogSection.after(dropExplore);
 }
 function renderDropExplore(entries,isDesignView){
  dropExplore.hidden=isDesignView||!entries.length;

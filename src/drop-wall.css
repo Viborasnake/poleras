@@ -251,6 +251,7 @@ body.drop-wall-enabled.theme-dark{--drop-page:var(--ds-dark-page,#000);--drop-in
 
 /* A compact discovery strip complements the main collection wall. */
 :where(.drop-wall-enabled) .drop-explore{width:min(1320px,90%);margin:0 auto;padding:0 0 48px;color:var(--drop-ink)}
+.drop-wall-enabled .drop-collection-sections>.drop-explore{width:100%;margin:0}
 :where(.drop-wall-enabled) .drop-explore[hidden]{display:none}
 :where(.drop-wall-enabled) .drop-explore-heading{display:flex;align-items:center;gap:22px;margin-bottom:18px}
 :where(.drop-wall-enabled) .drop-explore-heading h2{margin:0;font:700 24px/1.2 var(--ds-font-display);letter-spacing:-.8px}
