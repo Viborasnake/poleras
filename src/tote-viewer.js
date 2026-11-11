@@ -258,7 +258,8 @@ export async function createToteViewer(container, state, { minDistance } = {}) {
     const url = next.image || '';
     const side = next.printSide === 'back' ? 'back' : 'front';
     printSide = side;
-    const imageKey = `${url}|${size}|${side}|${next.printScale || 1}`;
+    const layout=next.catalogDesign?next.catalogPrintLayout:null;
+    const imageKey = `${url}|${size}|${side}|${next.printScale || 1}|${layout?.size}|${layout?.x}|${layout?.y}`;
     if (imageKey === currentImage) return;
     const previousImage = currentImage;
     currentImage = imageKey;
@@ -281,8 +282,8 @@ export async function createToteViewer(container, state, { minDistance } = {}) {
       const vertices = print.geometry.attributes.position;
       const uv = print.geometry.attributes.uv;
       for (let i = 0; i < vertices.count; i++) {
-        const x = (uv.getX(i) - .5) * width;
-        const y = (uv.getY(i) - .5) * height + TOTE_PRINT_CENTER_Y * scale;
+        const x = (uv.getX(i) - .5) * width * (layout?.size??1)+(layout?.x??0);
+        const y = (uv.getY(i) - .5) * height * (layout?.size??1) + TOTE_PRINT_CENTER_Y * scale+(layout?.y??0);
         vertices.setXYZ(i,x,y,totePrintSurface(x,y,scale,side));
       }
       vertices.needsUpdate = true;

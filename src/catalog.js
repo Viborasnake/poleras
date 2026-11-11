@@ -2,6 +2,7 @@ import {designProductMockups} from './catalog-product-mockups.js';
 import {designForProduct,designProductArtworks} from './catalog-product-artworks.js';
 import {fallbackCatalogProducts} from './product-navigation.js';
 import {designProductColorMap} from '../supabase/functions/_shared/catalog-product-colors.js';
+import {normalizeCatalogPrintLayout} from './catalog-print-layout.js';
 
 export const collections = [
   {id:'papa',label:'Para Papá',category:'general'},
@@ -153,6 +154,7 @@ export function catalogFromRows(collectionRows=[],designRows=[],categoryRows=nul
       customerPhotoSubject:row.customer_photo_subject==='people'?'people':'pets',
       allowedColors:normalizeAllowedColors(row.allowed_colors),
       allowedProductColors:designProductColorMap(row,Object.keys(productArtworks)),
+      printLayouts:Object.fromEntries(Object.entries(row.print_layouts||{}).map(([slug,layout])=>[slug,normalizeCatalogPrintLayout(layout)])),
       surface:local.surface||'pink',
       sampleColor:normalizeSampleColor(row.sample_color||local.sampleColor),
     }];
@@ -173,7 +175,7 @@ export async function loadCatalog(client){
       client.from('catalog_collections').select('id,product_type_id,category_id,slug,name,active,is_featured,is_new_collection,home_design_limit,sort_order,catalog_product_types(slug)').eq('active',true).order('sort_order').order('name'),
       // La pieza más reciente abre cada colección: además de respetar el orden
       // editorial, permite que la portada refleje la última polera publicada.
-      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,product_artworks,product_mockups,mockup_path,mockup_focus_x,mockup_focus_y,mockup_hover_path,mockup_hover_focus_x,mockup_hover_focus_y,personalization_arrow_x,personalization_arrow_y,sample_color,allowed_colors,allowed_product_colors,accepts_customer_image,customer_photo_subject,is_featured,active,created_at').eq('active',true).order('created_at',{ascending:false}),
+      client.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,product_artworks,product_mockups,print_layouts,mockup_path,mockup_focus_x,mockup_focus_y,mockup_hover_path,mockup_hover_focus_x,mockup_hover_focus_y,personalization_arrow_x,personalization_arrow_y,sample_color,allowed_colors,allowed_product_colors,accepts_customer_image,customer_photo_subject,is_featured,active,created_at').eq('active',true).order('created_at',{ascending:false}),
     ]);
     if(categoryResult.error)throw categoryResult.error;
     if(collectionResult.error)throw collectionResult.error;

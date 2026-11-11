@@ -1,4 +1,5 @@
 import {studioPreviewState} from './studio-preview.js';
+import {catalogPrintLayoutFor} from './catalog-print-layout.js';
 import {mountHomeSnow} from './home-snow.js';
 import {mountDropHeroSearch} from './drop-hero-search.js';
 import {planDropWall} from './drop-wall-layout.js';
@@ -682,7 +683,9 @@ const primaryCtas=[...document.querySelectorAll('.nav-cta[data-start],.hero-copy
 primaryCtas.forEach(cta=>{cta.classList.add('primary-idea-cta');cta.dataset.start='ready';cta.innerHTML=primaryCtaMarkup});
 ideaLink?.classList.add('primary-idea-cta');
 function previewState(){
- return studioPreviewState(state,DEFAULT_PLACEHOLDER_IMAGE);
+ const preview=studioPreviewState(state,DEFAULT_PLACEHOLDER_IMAGE);
+ if(state.catalogDesignSlug){const design=catalogDesigns.find(item=>item.id===state.catalogDesignSlug);preview.catalogPrintLayout=catalogPrintLayoutFor(design,modelProductSlug(state.kind));}
+ return preview;
 }
 function updateFullscreenZoomStatus(){const status=document.querySelector('#fullscreen-zoom-status'),value=fullscreenViewer?.zoomPercent?.();if(status&&Number.isFinite(value))status.value=`${value}%`}
 function disposeFullscreenViewer(){fullscreenViewerVersion++;fullscreenViewer?.dispose();fullscreenViewer=null;document.querySelector('#fullscreen-viewer-canvas')?.replaceChildren()}
@@ -1155,7 +1158,7 @@ async function prepareCatalogMockups(){
    const artwork=await loadCatalogArtwork(productDesign);
    const canvas=document.createElement('canvas');canvas.width=1800;canvas.height=2160;
    drawContainedArtwork(canvas.getContext('2d'),artwork,canvas.width,canvas.height);
-   await activeViewer.update({...preview,kind:productSlug==='totebags'?'tote':'basic',size:'M',color:previewColor,image:canvas.toDataURL('image/png')});
+   await activeViewer.update({...preview,kind:productSlug==='totebags'?'tote':'basic',size:'M',color:previewColor,image:canvas.toDataURL('image/png'),catalogDesign:true,catalogPrintLayout:catalogPrintLayoutFor(design,productSlug)});
    catalogMockups.set(design.id,activeViewer.snapshot());
    catalogMockupKeys.set(design.id,key);
    showCatalogMockup(design.id);

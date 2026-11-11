@@ -312,8 +312,10 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       const aspect=fitted.aspect,back=layer.side==='back',sleeve=layer.placement.startsWith('sleeve_');
       const safeScale=automaticPrintScale(aspect),area=garmentPrintArea(next.kind);
       const maxScale=next.catalogPreview?2:next.catalogDesign?1.7:1.6;
-      let scale=Math.min(Number(layer.scale)||1,maxScale),flat=Boolean(next.catalogPreview||hero);
-      const point=printPlacementCoordinates(layer.placement,area.y+(1-safeScale)*.35-(flat?0:.12),layer.offsetX,layer.offsetY);
+      const layout=next.catalogDesign?next.catalogPrintLayout:null;
+      let scale=Math.min(Number(layer.scale)||1,maxScale)*(layout?.size??1),flat=Boolean(next.catalogPreview||hero);
+      const point=printPlacementCoordinates(layer.placement,area.y+(1-safeScale)*.35-(flat?0:.12)+(layout?.y??0),layer.offsetX,layer.offsetY);
+      point.x+=layout?.x??0;
       const frame=sleeve?sleevePrintFrame(shirt.geometry,layer.placement,layer.offsetX,layer.offsetY):{
         origin:new THREE.Vector3(point.x,point.y,0),normal:new THREE.Vector3(0,0,back?-1:1),
         right:new THREE.Vector3(back?-1:1,0,0),up:new THREE.Vector3(0,1,0),width:area.width,height:area.height,depth:1.45,
@@ -375,7 +377,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     shirt.material.color.set(next.color);
     Object.values(cuts).forEach(cut=>{cut.visible=cut===shirt;});
     shirt.children.forEach(hem=>hem.material.color.set(next.color).multiplyScalar(hem.userData.fabricShade??.94));
-    await prints.update(garmentPrintLayers(next),{kind:next.kind,catalogPreview:Boolean(next.catalogPreview),catalogDesign:Boolean(next.catalogDesign)});
+    await prints.update(garmentPrintLayers(next),{kind:next.kind,catalogPreview:Boolean(next.catalogPreview),catalogDesign:Boolean(next.catalogDesign),catalogPrintLayout:next.catalogPrintLayout});
     if(disposed||version!==updateVersion)return;
     const count=[...prints.entries.values()].filter(entry=>entry.resource).length;
     renderer.domElement.dataset.printCount=String(count);

@@ -14,7 +14,7 @@ test('refresh reuses previews but artwork, color and product changes invalidate 
   const key=previewKey(design,'poleras','/original.png');
   const cache=new Map([[design.id,key]]);
   assert.equal(needsGeneratedPreview(design,key,cache),false);
-  for(const changed of [previewKey(design,'poleras','/new.png'),previewKey({...design,sampleColor:'#000000'},'poleras','/original.png'),previewKey(design,'totebags','/original.png')]){
+  for(const changed of [previewKey(design,'poleras','/new.png'),previewKey({...design,sampleColor:'#000000'},'poleras','/original.png'),previewKey(design,'totebags','/original.png'),previewKey({...design,printLayouts:{poleras:{size:.8,x:0,y:.2}}},'poleras','/original.png')]){
     assert.equal(needsGeneratedPreview(design,changed,cache),true);
   }
 });
