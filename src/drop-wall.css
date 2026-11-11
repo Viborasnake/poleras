@@ -899,8 +899,16 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
 .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-labels{
  right:70px;
 }
+.drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-labels{
+ flex-direction:column;
+ align-items:flex-start;
+ gap:8px;
+}
 .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-design-price{
  max-width:calc(100% - 86px);
+}
+.drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-design-price{
+ top:108px;
 }
 .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-design-description p{
  top:50%;
@@ -951,4 +959,38 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
  .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .catalog-product-badge[data-tooltip]:is(:hover,:focus-visible)::after{
   transform:translate(0,-50%);
  }
+}
+
+/* Keep the product controls clear of the title and place sharing beside the CTA. */
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption{
+ left:16px;
+ right:16px;
+ bottom:16px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption>span:first-child{
+ display:block;
+ padding-right:60px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption>.drop-arrow{
+ width:calc(100% - 60px);
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools{
+ right:16px;
+ bottom:16px;
+ left:auto;
+ width:48px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools .catalog-share{
+ width:48px;
+ height:48px;
+ min-height:48px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools .catalog-product-badges{
+ position:absolute;
+ right:2px;
+ bottom:calc(100% + 8px);
+}
+@media(max-width:640px){
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption{left:14px;right:14px;bottom:14px}
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools{right:14px;bottom:14px}
 }
