@@ -484,7 +484,7 @@ El halo decorativo del encabezado Drop Wall se extiende al ancho del viewport, c
 
 El skeleton de carga anticipa la portada seleccionada: Drop Wall muestra la introducción, el buscador, los filtros y la grilla con destacada, cards verticales y comodín; la portada clásica conserva su propia composición. La última selección se recuerda solo para dibujar la espera inicial, sin sustituir la configuración de Administración. Ambas variantes respetan modo claro/oscuro y movimiento reducido; las formas son decorativas y se anuncia un único estado de carga.
 
-La decoración navideña del home usa nieve tenue con movimiento vertical y deriva suave: 32 partículas en escritorio y 16 en móvil. La capa no recibe eventos y se oculta mientras carga la portada o hay un diálogo abierto. El control «Pausar nieve» permite detenerla y recuerda la preferencia en este navegador; con movimiento reducido no se muestra ni anima. Se pausa también en pestañas ocultas.
+La decoración navideña del home usa nieve tenue con movimiento vertical y deriva suave: 32 partículas en escritorio y 16 en móvil. La capa no recibe eventos y se oculta mientras carga la portada o hay un diálogo abierto. Con movimiento reducido no se muestra ni anima. Se pausa también en pestañas ocultas.
 
 En el panel lateral de los diálogos unitarios, el orden es colección, nombre, descripción visible y selector con etiqueta «Elige el producto». Las acciones se apoyan al pie con un separador sutil; compartir es secundario. El orden del DOM coincide con la lectura visual y se conserva al cambiar producto. Los diálogos con varios diseños mantienen sus descripciones plegadas y su composición anterior.
 
