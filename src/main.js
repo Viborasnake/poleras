@@ -1033,8 +1033,8 @@ function renderDropExplore(entries,isDesignView){
  dropExplore.hidden=isDesignView||!entries.length;
  if(dropExplore.hidden)return;
  const seen=new Set(),picks=[];
- for(const entry of entries){if(!seen.has(entry.collection.id)){picks.push(entry);seen.add(entry.collection.id)}if(picks.length===6)break}
- for(const entry of entries){if(picks.length===6)break;if(!picks.some(item=>item.design.id===entry.design.id))picks.push(entry)}
+ for(const entry of entries){if(!seen.has(entry.collection.id)){picks.push(entry);seen.add(entry.collection.id)}if(picks.length===12)break}
+ for(const entry of entries){if(picks.length===12)break;if(!picks.some(item=>item.design.id===entry.design.id))picks.push(entry)}
  dropExplore.querySelector('.drop-explore-track').innerHTML=picks.map(({design,collection})=>{
   const preview=catalogPreviewDesign(design,collection.productSlug);
   const image=preview.featuredPhoto||artworkUrl(preview);
