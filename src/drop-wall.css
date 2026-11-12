@@ -22,6 +22,8 @@ body.drop-wall-enabled.theme-dark{--drop-page:var(--ds-dark-page,#000);--drop-in
 .drop-wall-enabled .catalog-view-controls{padding:0;border:0;background:none;box-shadow:none}
 .drop-wall-enabled .catalog-category-group{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
 .drop-wall-enabled .catalog-filter-label{display:none}
+.drop-wall-enabled .catalog-product-group .catalog-filter-label{display:block;flex:none;color:var(--drop-muted)}
+.drop-wall-enabled .catalog-product-filters{display:flex;flex-wrap:wrap;gap:8px}
 .drop-wall-enabled .catalog-category-filters{display:flex;flex-wrap:nowrap;overflow-x:auto;min-width:0;gap:8px;padding:3px;scrollbar-width:thin}
 .drop-wall-enabled .catalog-category-filters button{white-space:nowrap;min-height:44px;flex-shrink:0}
 .drop-wall-enabled .catalog-view-switcher{flex-shrink:0}
@@ -75,6 +77,7 @@ body.drop-wall-enabled.theme-dark{--drop-page:var(--ds-dark-page,#000);--drop-in
 .drop-wall-enabled .catalog-view-controls{display:block;width:100%;min-width:0;max-width:100%}
 .drop-wall-enabled .catalog-functional-filters{width:100%;max-width:100%;min-width:0}
 .drop-wall-enabled .catalog-actions{min-width:0}
+@media(max-width:640px){.drop-wall-enabled .catalog-product-group{align-items:flex-start;flex-direction:column;gap:8px}}
 
 /* Pinterest-like cards: every collection control lives inside the photograph. */
 .drop-wall-enabled .drop-collection .drop-caption{bottom:82px;align-items:end}
@@ -837,13 +840,14 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
  color:var(--ds-text-primary);
 }
 @media(max-width:640px){
- .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption{padding:12px 14px 70px}
+ .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-collection-link{height:100%}
+ .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption{padding:12px 14px 120px}
  .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption strong{margin-top:5px;font-size:30px}
  .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption::after{display:none}
  .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-featured-description{margin-top:9px;font-size:12px;line-height:1.35}
- .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-arrow{left:14px;bottom:10px;min-width:132px;height:44px;padding-inline:15px 13px;gap:11px}
+ .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption>.drop-arrow{display:flex;flex-direction:row;align-items:center;justify-content:space-between;left:14px;right:14px;bottom:66px;width:auto;min-width:0;height:44px;padding:0 15px;gap:11px}
  .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-arrow::before{font-size:12px}
- .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-collection-tools{right:14px;bottom:10px;gap:8px}
+ .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-collection-tools{left:14px;right:14px;bottom:10px;gap:8px}
 }
 
 /* Secondary cards use a vertical utility rail; the named CTA owns the lower edge. */
@@ -899,8 +903,16 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
 .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-labels{
  right:70px;
 }
+.drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-labels{
+ flex-direction:column;
+ align-items:flex-start;
+ gap:8px;
+}
 .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-design-price{
  max-width:calc(100% - 86px);
+}
+.drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-design-price{
+ top:108px;
 }
 .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-design-description p{
  top:50%;
@@ -951,4 +963,102 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
  .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]) .catalog-product-badge[data-tooltip]:is(:hover,:focus-visible)::after{
   transform:translate(0,-50%);
  }
+}
+
+/* SVG controls stay crisp on narrow screens; text glyphs vary too much between browsers. */
+.drop-wall-enabled .drop-arrow{font-size:0}
+.drop-wall-enabled .drop-arrow::before{content:none!important}
+.drop-wall-enabled .drop-arrow-label{display:block;flex:0 0 auto;white-space:nowrap;font:700 14px/1 var(--ds-font-body);letter-spacing:.01em}
+.drop-wall-enabled .drop-arrow-icon{display:block;flex:0 0 auto;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.drop-wall-enabled .drop-collection-tools .catalog-product-badge .product-family-icon,.drop-wall-enabled .drop-featured-products .catalog-product-badge .product-family-icon{width:22px;height:20px;stroke-width:2.5}
+@media(max-width:640px){
+ .drop-wall-enabled .drop-arrow-label{font-size:12px}
+ .drop-wall-enabled .drop-arrow-icon{width:21px;height:21px}
+ .drop-wall-enabled .drop-collection-tools .catalog-product-badge .product-family-icon,.drop-wall-enabled .drop-featured-products .catalog-product-badge .product-family-icon{width:22px;height:20px}
+}
+
+/* The design wall reserves one rail for product and detail controls, and a
+   separate slot beside the CTA for sharing. The title stays clear of both. */
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption{
+ left:16px;
+ right:16px;
+ bottom:16px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption>span:first-child{
+ display:block;
+ padding-right:60px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption>.drop-arrow{
+ width:calc(100% - 60px);
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools{
+ right:16px;
+ bottom:16px;
+ left:auto;
+ width:48px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools .catalog-share{
+ width:48px;
+ height:48px;
+ min-height:48px;
+}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools .catalog-product-badges{
+ position:absolute;
+ right:2px;
+ bottom:calc(100% + 8px);
+}
+@media(max-width:640px){
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption{left:14px;right:14px;bottom:14px}
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-collection-tools{right:14px;bottom:14px}
+}
+
+/* A precise pointer reveals the editorial overlays; focus reveals the same
+   controls for keyboard navigation. Touch devices keep the controls visible. */
+@media(min-width:1001px) and (hover:hover) and (pointer:fine){
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption{
+  padding-bottom:0;
+  transition:padding-bottom var(--ds-duration-fast) ease;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]):is(:hover,:focus-within) .drop-caption{
+  padding-bottom:60px;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption>span:first-child{
+  padding-right:0;
+  transition:padding-right var(--ds-duration-fast) ease;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]):is(:hover,:focus-within) .drop-caption>span:first-child{
+  padding-right:60px;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption>.drop-arrow{
+  position:absolute;
+  left:0;
+  bottom:0;
+  margin-top:0;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption small{
+  max-height:0;
+  margin-bottom:0;
+  overflow:hidden;
+  opacity:0;
+  transition:max-height var(--ds-duration-fast) ease,margin-bottom var(--ds-duration-fast) ease,opacity var(--ds-duration-fast) ease;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]):is(:hover,:focus-within) .drop-caption small{
+  max-height:40px;
+  margin-bottom:7px;
+  opacity:1;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) :is(.drop-labels,.drop-design-price,.catalog-pet-story,.drop-caption>.drop-arrow,.drop-collection-tools){
+  opacity:0;
+  transition:opacity var(--ds-duration-fast) ease;
+ }
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-collection-tools>*{pointer-events:none}
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]):is(:hover,:focus-within) :is(.drop-labels,.drop-design-price,.catalog-pet-story,.drop-caption>.drop-arrow,.drop-collection-tools){opacity:1}
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]):is(:hover,:focus-within) .drop-collection-tools{pointer-events:none}
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]):is(:hover,:focus-within) .drop-collection-tools>*{pointer-events:auto}
+}
+@media(min-width:1001px) and (hover:hover) and (pointer:fine) and (prefers-reduced-motion:reduce){
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption,
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption>span:first-child,
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption small,
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) :is(.drop-labels,.drop-design-price,.catalog-pet-story,.drop-caption>.drop-arrow,.drop-collection-tools){transition:none}
 }
