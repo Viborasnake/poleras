@@ -1,4 +1,4 @@
-import {catalogFiltersMarkup,catalogProductToggleMarkup} from './catalog-filters.js';
+import {catalogFiltersMarkup} from './catalog-filters.js';
 import {mountFormDisclosure} from './form-disclosure.js';
 import {createDisclosureState,confirmDisclosure,mountDisclosure,focusDisclosure} from './progressive-disclosure.js';
 import './design-system.css';
@@ -208,10 +208,10 @@ const catalogFilterDemo=document.querySelector('[data-catalog-filter-demo]');
 if(catalogFilterDemo){
  const products=[{slug:'poleras',name:'Poleras'},{slug:'bodys',name:'Bodys'},{slug:'totebags',name:'Totebags'}];
  const selection={view:'collections',mode:'collections',category:'all',product:'poleras'};
- const drawFilters=()=>{catalogFilterDemo.innerHTML=`${catalogFiltersMarkup({...selection,prefix:'ds-catalog',categories:[{id:'anime',label:'Anime'},{id:'mascotas',label:'Mascotas'},{id:'fauna',label:'Fauna'}]})}<div class="ds-catalog-card-product-demo"><strong>Producto dentro de la card</strong>${catalogProductToggleMarkup({products,selected:selection.product,cardKey:'design:demo'})}</div>`};
+ const drawFilters=()=>{catalogFilterDemo.innerHTML=catalogFiltersMarkup({...selection,prefix:'ds-catalog',products,categories:[{id:'anime',label:'Anime'},{id:'mascotas',label:'Mascotas'},{id:'fauna',label:'Fauna'}]})};
  catalogFilterDemo.addEventListener('click',event=>{
   const button=event.target.closest('button');if(!button)return;
-  for(const [attribute,key] of [['catalogView','view'],['category','category'],['cardProduct','product']])if(button.dataset[attribute]){selection[key]=button.dataset[attribute];if(key==='view')selection.mode=selection.view;drawFilters();catalogFilterDemo.querySelector(`[data-${attribute.replace(/[A-Z]/g,char=>'-'+char.toLowerCase())}="${button.dataset[attribute]}"]`)?.focus();break}
+  for(const [attribute,key] of [['catalogView','view'],['category','category'],['catalogProduct','product']])if(button.dataset[attribute]){selection[key]=button.dataset[attribute];if(key==='view')selection.mode=selection.view;drawFilters();catalogFilterDemo.querySelector(`[data-${attribute.replace(/[A-Z]/g,char=>'-'+char.toLowerCase())}="${button.dataset[attribute]}"]`)?.focus();break}
  });
  drawFilters();
 }
