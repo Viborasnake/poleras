@@ -14,6 +14,7 @@ test('el selector superior conserva Colecciones y Diseños y el filtro de produc
  assert.match(html,/data-catalog-product="poleras" aria-pressed="false"/);
  assert.match(html,/data-catalog-product="bodys" aria-pressed="true"/);
  assert.match(html,/data-catalog-product="totebags" aria-pressed="false"/);
+ for(const slug of ['poleras','bodys','totebags'])assert.match(html,new RegExp(`data-catalog-product="${slug}"[^>]*><span class="catalog-selected-mark"[^>]*>✓</span><svg class="product-family-icon"`));
  assert.ok(html.indexOf('catalog-product-group')>html.indexOf('catalog-theme-filter'));
 });
 

@@ -357,3 +357,5 @@
 }
 
 .ds-filter-pill:disabled{background:var(--ds-surface-disabled);border-color:var(--ds-border-subtle);color:var(--ds-text-disabled);box-shadow:none;cursor:default}
+
+.ds-catalog-filters .catalog-product-filters .product-family-icon{display:block;flex:none;width:22px;height:20px}

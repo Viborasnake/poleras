@@ -1062,3 +1062,19 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
  .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption small,
  .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) :is(.drop-labels,.drop-design-price,.catalog-pet-story,.drop-caption>.drop-arrow,.drop-collection-tools){transition:none}
 }
+
+/* Sharing lives in the design dialog, so the photograph gives its CTA the full width. */
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption>span:first-child{padding-right:0}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card .drop-caption>.drop-arrow{width:100%}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption{right:16px}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-labels{right:16px}
+.drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-design-price{max-width:calc(100% - 32px)}
+.drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption{padding-bottom:70px}
+.drop-wall-enabled .drop-collection--featured[data-collection-id] .drop-featured-overline,.drop-wall-enabled .drop-collection--featured[data-collection-id] .drop-caption strong,.drop-wall-enabled .drop-collection--featured[data-collection-id] .drop-featured-description{padding-right:0}
+@media(max-width:640px){
+ .drop-wall-enabled .catalog-grid.drop-design-wall>.drop-design-card:not(.drop-collection--featured[data-collection-id]) .drop-caption{right:14px}
+ .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption{padding-bottom:70px}
+ .drop-wall-enabled .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption>.drop-arrow{bottom:14px}
+}
+
+.drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-design-price{top:56px}
