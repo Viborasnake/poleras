@@ -974,6 +974,10 @@ function wireSuppliers(){root.querySelectorAll('[data-supplier-form]').forEach(f
 function supplierProductCalculation(product){const products=new Map((adminData.supplierProducts||[]).map(item=>[String(item.id),item])),lines=(adminData.supplierComponents||[]).filter(line=>String(line.principal_product_id)===String(product.id));return principalCalculation(product,lines,id=>products.get(String(id))||null)}
 function supplierProductVariants(product){
  const linked=linkedSupplierVariants(product,adminData.variants,adminData.supplierVariantLinks);
+ if(supplierProductCategory(product)?.slug==='tote-bag'){
+  const compatible=compatibleVariants(product),compatibleIds=new Set(compatible.map(variant=>String(variant.id)));
+  return linked.length?linked.filter(variant=>compatibleIds.has(String(variant.id))):compatible;
+ }
  return linked.length?linked:compatibleVariants(product);
 }
 function supplierProductCategory(product){return (adminData.supplierCategories||[]).find(category=>String(category.id)===String(product.category_id))}

@@ -199,7 +199,7 @@ La receta mantiene total acumulado y resúmenes de sus componentes. Cada línea 
 
 Crear un componente desde una receta conserva sus cantidades en un borrador de retorno. Cancelar vuelve a la receta; guardar restaura sus líneas y agrega el componente nuevo sin confirmarlo automáticamente. El retorno usa el almacenamiento de sesión existente para este proceso y no anuncia persistencia remota de la receta hasta guardarla. Los errores conservan las líneas y permiten reintentar. El banco `/samples/supplier-forms.html` ejecuta el módulo completo con cliente de datos y almacenamiento en memoria.
 
-La tabla de precios usa los vínculos persistidos entre insumos y variantes como fuente de verdad. Guardar y publicar confirma el precio y actualiza todas las variantes vinculadas en una sola transacción; una recarga debe conservar el mismo valor en el modal y en «Precio en tienda». Si existe un dato histórico distinto, el estado se muestra como «Desincronizado» hasta corregirlo.
+La tabla de precios usa los vínculos persistidos entre insumos y variantes como fuente de verdad. Guardar y publicar confirma el precio y actualiza todas las variantes vinculadas en una sola transacción; una recarga debe conservar el mismo valor en el modal y en «Precio en tienda». En Tote Bag, el insumo con color y talla reconocibles se vincula automáticamente solo a la variante activa de esa combinación al publicar. El contador previo muestra esa variante compatible, nunca variantes de otras prendas. Si existe un dato histórico distinto, el estado se muestra como «Desincronizado» hasta corregirlo.
 
 ## 6. Implementación y mantenimiento
 
