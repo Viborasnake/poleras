@@ -610,6 +610,7 @@
 .admin-sidebar nav a b{background:var(--ds-brand-secondary);color:var(--ds-text-inverse)}
 .admin-sidebar-note{background:var(--ds-surface-subtle)}
 .admin-catalog-nav{display:grid;gap:2px}
+.admin-sidebar{overflow-y:auto}
 .admin-catalog-children{display:grid;gap:2px;margin:1px 0 7px 22px;padding-left:10px;border-left:2px solid var(--ds-border-subtle)}
 .admin-sidebar nav .admin-catalog-child{min-height:42px;padding:8px 10px;color:var(--ds-text-secondary);font-size:13px}
 .admin-sidebar nav .admin-catalog-child svg{width:18px;height:18px}

@@ -191,6 +191,8 @@ Editar un pedido abre resúmenes independientes, sin repetir el alta. Los bloque
 
 ### Administración: insumos y recetas
 
+El menú de Productos agrupa Categorías → Colecciones → Tallas → Diseños → Insumos → Precios en ese orden. Tallas muestra cada medida por producto y modelo con su insumo, precio y estado de publicación; las acciones llevan a la gestión de insumos. El menú lateral conserva desplazamiento vertical cuando su contenido supera la altura disponible.
+
 Gestionar insumos confirma Acción → Principal/secundario → Insumo existente cuando se edita. Crear y Categorías resuelven ese último bloque sin exigir selección. La búsqueda mantiene su contador y una selección filtrada deja de ser válida; elegir un resultado se confirma con Continuar. Categorías conserva su edición breve por fila.
 
 El formulario del insumo recorre Categoría/identidad → Compra/costo → Dimensiones/producción aplicables → Estado → Revisión. Solo participan en la validación los campos del tipo actual: unidad, pack, DTF o principal. Dimensiones que no corresponden se muestran como dato resuelto «No aplica». El costo efectivo aparece en Compra y en el resumen previo al guardado; no tapa acciones. Cambiar tipo conserva valores de campos compatibles y exige revisar sus dependencias. Los datos precargados se confirman.
