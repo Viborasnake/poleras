@@ -1,5 +1,6 @@
 import {PRINT_EXTRAS_CLP,QUALITY_ADJUSTMENT_CLP,orderTotal} from './print-check.js';
 import {effectiveQualityReview} from './quality-review.js';
+import {isCatalogPrintIncluded} from '../supabase/functions/_shared/catalog-personalization.js';
 import {normalizePrintConfiguration,printConfigurationCount} from '../supabase/functions/_shared/print-configuration.js';
 
 function normalizedPrintSides(item={}){
@@ -18,7 +19,7 @@ export function cartPriceBreakdown(item={},currentBase=null,reviewFee=QUALITY_AD
  const storedBase=Math.max(0,Number(item.basePrice)||Number(item.price||0)-previousPrintExtra-previousReview);
  const base=Number.isSafeInteger(currentBase)&&currentBase>=0?currentBase:storedBase;
  const qualityReview=effectiveQualityReview(item);
- const pricing=orderTotal(base,printSides,qualityReview?qualityReviewFee:0,printCount,item.modelCode==='tote'||/tote/i.test(item.kind||'')?null:normalizePrintConfiguration(item.printConfiguration,printSides),printPrices);
+ const pricing=orderTotal(base,printSides,qualityReview?qualityReviewFee:0,printCount,item.modelCode==='tote'||/tote/i.test(item.kind||'')?null:normalizePrintConfiguration(item.printConfiguration,printSides),printPrices,isCatalogPrintIncluded(item,printSides,printCount));
  return {
   base,
   printSides,

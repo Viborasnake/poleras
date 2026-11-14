@@ -1,7 +1,7 @@
 import { printPrice } from '../_shared/print-pricing.js'
 import {designProductArtworks,modelProductSlug} from '../_shared/catalog-product-artworks.js'
 import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant} from '../_shared/variant-selection.js'
-import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage} from '../_shared/catalog-personalization.js'
+import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage,isCatalogPrintIncluded} from '../_shared/catalog-personalization.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { normalizePrintConfiguration, printConfigurationCount } from '../_shared/print-configuration.js'
 
@@ -99,8 +99,8 @@ Deno.serve(async request => {
     const variant=selectedVariants[index].variant!
     const modelRow=variants?.find((row:any)=>row.id===variant.id)
     const model=Array.isArray(modelRow?.product_models)?modelRow.product_models[0]:modelRow?.product_models
-    const printExtra = item.modelCode === 'tote' ? 0 : printPrice(normalizePrintConfiguration(item.printConfiguration,item.printSides),item.printSides,storeSettings)
-    const qualityExtra = item.qualityReview ? qualityReviewFee : 0
+    const printExtra = item.modelCode === 'tote' || isCatalogPrintIncluded(item,item.printSides,printConfigurationCount(item.printConfiguration,item.printSides)) ? 0 : printPrice(normalizePrintConfiguration(item.printConfiguration,item.printSides),item.printSides,storeSettings)
+    const qualityExtra = item.qualityReview && !(item.catalogDesignSlug && !item.catalogDesignCustomerImage) ? qualityReviewFee : 0
     const unitPrice = variant.priceClp + printExtra + qualityExtra
     const lineTotal = unitPrice * item.quantity
     subtotal += lineTotal

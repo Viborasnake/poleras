@@ -1,7 +1,7 @@
 import { printPrice } from '../_shared/print-pricing.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { designProductArtworks, modelProductSlug } from '../_shared/catalog-product-artworks.js'
-import { catalogDesignRequiresCustomerImage } from '../_shared/catalog-personalization.js'
+import { catalogDesignRequiresCustomerImage,isCatalogPrintIncluded } from '../_shared/catalog-personalization.js'
 import { allowedColorsForModel } from '../_shared/catalog-product-colors.js'
 import { verifyTurnstile } from '../_shared/turnstile.ts'
 import { normalizePrintConfiguration, printConfigurationCount } from '../_shared/print-configuration.js'
@@ -97,7 +97,7 @@ Deno.serve(async request => {
     : design ? 'catalog_design' : 'own_artwork'
   const { data: storeSettings, error: settingsError } = await admin.from('storefront_settings').select('front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
   if (settingsError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
-  const printExtra = model.code === 'tote' ? 0 : printPrice(normalizePrintConfiguration(product.printConfiguration,printSides),printSides,storeSettings)
+  const printExtra = model.code === 'tote' || isCatalogPrintIncluded({catalogDesignSlug,catalogDesignCustomerImage:customerImage},printSides,printConfigurationCount(product.printConfiguration,printSides)) ? 0 : printPrice(normalizePrintConfiguration(product.printConfiguration,printSides),printSides,storeSettings)
   const total = Number(variant.price_clp) + printExtra
   const productLabel = model.code === 'tote' ? 'Tote bag' : model.code === 'body' ? 'Body bebé' : `Polera ${model.name}`
   const name = design?.name ? `${productLabel} · ${design.name}` : `${productLabel} personalizada`

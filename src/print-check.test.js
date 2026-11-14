@@ -29,3 +29,10 @@ test('a team quality adjustment is explicit and added exactly once', () => {
   assert.equal(QUALITY_ADJUSTMENT_CLP, 4990);
   assert.deepEqual(orderTotal(14990, 'front', QUALITY_ADJUSTMENT_CLP), { base: 14990, print: 0, extras: 4990, total: 19980 });
 });
+
+test('la impresión publicada está incluida, con validación del pedido',()=>{
+ const configuration={front:{placement:'center',size:'large'}};
+ assert.deepEqual(orderTotal(13990,'front',0,1,configuration,null,true),{base:13990,print:0,extras:0,total:13990});
+ assert.deepEqual(orderTotal(13990,'front',0,1,configuration),{base:13990,print:5990,extras:0,total:19980});
+ assert.throws(()=>orderTotal(13990,'front',0,5,configuration,null,true));
+});

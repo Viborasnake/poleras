@@ -1,6 +1,10 @@
 const acceptsCustomerImage=design=>Boolean(design?.accepts_customer_image??design?.acceptsCustomerImage);
 const customerPhotoSubject=design=>(design?.customer_photo_subject??design?.customerPhotoSubject)==='people'?'people':'pets';
 
+export function isCatalogPrintIncluded(item={},printSides='front',printCount=1){
+  return Boolean(item.catalogDesignSlug)&&!Boolean(item.catalogDesignCustomerImage)&&printSides==='front'&&printCount===1;
+}
+
 export function catalogDesignAllowsBasePurchase(design){
   return acceptsCustomerImage(design)&&customerPhotoSubject(design)==='people';
 }

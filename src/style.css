@@ -1224,9 +1224,9 @@ body.theme-dark #studio .catalog-purchase-mode-options button{border-color:var(-
 .print-choice strong{font:700 14px 'Space Grotesk',sans-serif}
 .print-choice span{font-size:11px;color:#665f56}
 .print-adjustments{margin-top:12px;padding:0;border:1px solid var(--ds-border-control);border-radius:12px;background:var(--ds-surface-subtle);overflow:hidden}
-.order-summary .order-summary-detail{align-items:flex-start;background:var(--ds-surface-subtle)}
+.order-summary .order-summary-detail{align-items:flex-start;background:var(--ds-surface-subtle);color:var(--ds-text-primary)}
 .order-summary .order-summary-detail span{padding-left:8px}
-.order-summary .order-summary-detail strong{max-width:65%;padding-right:8px;color:var(--ds-color-link);line-height:1.45}
+.order-summary .order-summary-detail strong{max-width:65%;padding-right:8px;color:var(--ds-text-primary);line-height:1.45}
 .print-adjustments>summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px;padding:13px 15px;cursor:pointer;list-style:none;color:var(--ds-color-ink)}
 .print-adjustments>summary::-webkit-details-marker{display:none}
 .print-adjustments>summary>span{display:grid;gap:3px;min-width:0}
