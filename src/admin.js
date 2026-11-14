@@ -172,7 +172,7 @@ async function ensureBaseCatalog(){
  return {collections:missingCollections.length,designs:missingDesigns.length};
 }
 
-const routes=[['resumen','home','Resumen'],['productos','box','Productos'],['categorias','tag','Categorías'],['colecciones','layers','Colecciones'],['tallas','tag','Tallas'],['disenos','image','Diseños'],['insumos','tag','Insumos'],['precios','receipt','Precios'],['pedidos','receipt','Pedidos'],['servicio-cliente','users','Servicio al cliente'],['cupones','tag','Cupones'],['clientes','users','Clientes'],['analitica','chart','Analítica'],['configuracion','settings','Configuración']];
+const routes=[['resumen','home','Resumen'],['productos','box','Productos'],['categorias','tag','Categorías'],['colecciones','layers','Colecciones'],['disenos','image','Diseños'],['tallas','tag','Tallas'],['insumos','tag','Insumos'],['precios','receipt','Precios'],['pedidos','receipt','Pedidos'],['servicio-cliente','users','Servicio al cliente'],['cupones','tag','Cupones'],['clientes','users','Clientes'],['analitica','chart','Analítica'],['configuracion','settings','Configuración']];
 function currentRoute(){const route=location.hash.replace('#','');if(route==='proveedores'){history.replaceState(null,'','#insumos');return 'insumos'}return routes.some(([id])=>id===route)?route:'resumen'}
 function navMarkup(active){
  const catalogIds=new Set(['productos','categorias','colecciones','tallas','disenos','insumos','precios']);
@@ -311,25 +311,50 @@ function wireProducts(){
 }
 function sizesView(){
  const rows=productSizeRows(adminData);
+ const publishedCount=rows.filter(row=>row.published).length;
  const sections=adminData.productTypes.map(product=>{
   const sizes=rows.filter(row=>row.productSlug===product.slug);
-  const entries=sizes.map(row=>{
-   const supplies=row.suppliers.map(supplier=>`<div><strong>${safe(supplier.name)}</strong><small>${supplier.confirmed_price_clp?money(supplier.confirmed_price_clp):'Precio pendiente'}</small></div>`).join('')||'<span class="admin-muted">Sin insumo</span>';
-   const categoryIds=adminData.supplierCategories.filter(category=>{const family=SUPPLIER_SIZE_FAMILIES[category.slug];return family?.[0]===row.productSlug&&family[1]===row.modelCode}).map(category=>String(category.id));
-   const candidates=adminData.supplierProducts.filter(supplier=>categoryIds.includes(String(supplier.category_id))&&String(supplier.catalog_product_size_id)!==String(row.id)&&!supplier.confirmed_price_clp);
-   const canLink=(row.modelCode==='tote'||!row.suppliers.length)&&candidates.length>0;
-   return `<tr><td>${safe(row.model)}</td><td><strong>${safe(row.size)}</strong>${row.label!==row.size?`<small>${safe(row.label)}</small>`:''}</td><td>${supplies}</td><td><span class="status-pill ${row.published?'is-active':'is-hidden'}">${row.published?'Publicada':row.suppliers.length?'Sin precio publicado':'Sin insumo'}</span></td><td><div class="row-actions"><button type="button" class="admin-secondary" data-edit-size="${row.id}">Editar</button>${canLink?`<button type="button" class="admin-secondary" data-link-size="${row.id}">Asociar insumo</button>`:''}${!row.suppliers.length&&categoryIds.length?`<button type="button" class="admin-secondary" data-create-size-supplier="${row.id}">Crear insumo</button>`:''}<button type="button" class="admin-danger-link" data-delete-size="${row.id}" ${row.suppliers.length?'disabled title="Primero cambia los insumos asociados"':''}>Eliminar</button></div></td></tr>`;
+  const productHeading=`<tr class="supplier-theme-row size-product-row" data-size-product-row="${safe(product.slug)}" data-size-product-name="${safe(product.name)}"><th colspan="4"><span>${safe(product.name)}</span><small>${sizes.length} ${sizes.length===1?'talla':'tallas'} · ${sizes.filter(row=>row.published).length} publicadas</small></th><th><button type="button" class="admin-secondary" data-new-size="${product.id}" aria-label="Agregar talla a ${safe(product.name)}">Agregar talla</button></th></tr>`;
+  if(!sizes.length)return `${productHeading}<tr class="size-empty-row" data-size-empty-product="${safe(product.slug)}" data-size-product-name="${safe(product.name)}"><td colspan="5">Este producto aún no tiene tallas o medidas. Agrégalas aquí y después asocia sus insumos.</td></tr>`;
+  const modelOrder=PRODUCT_SIZE_MODELS[product.slug]?.map(([code])=>code)||[];
+  const modelCodes=[...new Set(sizes.map(row=>row.modelCode))].sort((a,b)=>{const indexA=modelOrder.indexOf(a),indexB=modelOrder.indexOf(b);return (indexA<0?999:indexA)-(indexB<0?999:indexB)||a.localeCompare(b,'es')});
+  const modelGroups=modelCodes.map(modelCode=>{
+   const modelSizes=sizes.filter(row=>row.modelCode===modelCode);
+   const modelName=modelSizes[0].model;
+   const heading=`<tr class="supplier-subcategory-row" data-size-model-row="${safe(product.slug)}" data-size-model-code="${safe(modelCode)}"><th colspan="5">${safe(modelName)}</th></tr>`;
+   const entries=modelSizes.map(row=>{
+    const supplies=row.suppliers.map(supplier=>`<span class="size-supplier">${safe(supplier.name)}</span>`).join('')||'<span class="admin-muted">Sin insumo</span>';
+    const prices=row.suppliers.map(supplier=>`<span class="size-supplier-price">${supplier.confirmed_price_clp?money(supplier.confirmed_price_clp):'Pendiente'}</span>`).join('')||'<span class="admin-muted">—</span>';
+    const categoryIds=adminData.supplierCategories.filter(category=>{const family=SUPPLIER_SIZE_FAMILIES[category.slug];return family?.[0]===row.productSlug&&family[1]===row.modelCode}).map(category=>String(category.id));
+    const candidates=adminData.supplierProducts.filter(supplier=>categoryIds.includes(String(supplier.category_id))&&String(supplier.catalog_product_size_id)!==String(row.id)&&!supplier.confirmed_price_clp);
+    const canLink=(row.modelCode==='tote'||!row.suppliers.length)&&candidates.length>0;
+    const state=row.published?'Publicada':row.suppliers.length?'Sin precio publicado':'Sin insumo';
+    const searchable=`${product.name} ${row.model} ${row.size} ${row.label} ${row.suppliers.map(supplier=>supplier.name).join(' ')} ${state}`;
+    return `<tr data-size-row="${row.id}" data-size-product="${safe(product.slug)}" data-size-model="${safe(modelCode)}" data-size-search="${safe(searchable)}"><td><strong>${safe(row.label)}</strong><small>${safe(row.size)} · ${safe(product.name)} · ${safe(row.model)}</small></td><td>${supplies}</td><td>${prices}</td><td><span class="status-pill ${row.published?'is-active':'is-hidden'}">${state}</span></td><td class="size-row-actions"><details class="supplier-row-menu"><summary>Acciones</summary><div class="supplier-row-menu-items"><button type="button" data-edit-size="${row.id}">Editar talla</button>${canLink?`<button type="button" data-link-size="${row.id}">Asociar insumo</button>`:''}${!row.suppliers.length&&categoryIds.length?`<button type="button" data-create-size-supplier="${row.id}">Crear insumo</button>`:''}<button type="button" class="admin-danger-link" data-delete-size="${row.id}" ${row.suppliers.length?'disabled title="Primero cambia los insumos asociados"':''}>Eliminar talla</button></div></details></td></tr>`;
+   }).join('');
+   return heading+entries;
   }).join('');
-  return `<section class="admin-panel" aria-labelledby="product-sizes-${safe(product.slug)}"><div class="admin-panel-head"><div><h2 id="product-sizes-${safe(product.slug)}">${safe(product.name)}</h2><p>${sizes.length} ${sizes.length===1?'talla o medida':'tallas o medidas'} · ${sizes.filter(row=>row.published).length} publicadas</p></div><button type="button" class="admin-secondary" data-new-size="${product.id}">${icon('plus')} Agregar talla</button></div>${entries?`<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Modelo</th><th>Talla o medida</th><th>Insumos</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${entries}</tbody></table></div>`:'<div class="admin-empty"><p>Este producto aún no tiene tallas o medidas. Agrégalas aquí y después asocia sus insumos.</p></div>'}</section>`;
+  return productHeading+modelGroups;
  }).join('');
  const sizeDialog=`<dialog class="admin-dialog" id="product-size-dialog"><form><div class="dialog-title"><div><span class="admin-eyebrow">PRODUCTO → TALLA</span><h2 data-size-title>Agregar talla</h2><p>La talla se define aquí. Después se asocia un insumo y se publica su precio.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><input type="hidden" name="id"><input type="hidden" name="product_type_id"><label>Producto<input name="product_name" readonly></label><label>Modelo<select name="model_code" required></select></label><label>Código de talla o medida<input name="size_code" required maxlength="40" placeholder="Ej. M, XXL, 4 años o 12-24 meses"><small>Este código aparecerá en la selección de compra.</small></label><label>Nombre visible<input name="label" required maxlength="80" placeholder="Ej. Mediana"></label><label>Orden<input name="sort_order" type="number" min="0" max="9999" value="0"></label><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Guardar talla</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`;
  const linkDialog=`<dialog class="admin-dialog" id="size-supplier-dialog"><form><div class="dialog-title"><div><span class="admin-eyebrow">TALLA → INSUMO</span><h2>Asociar insumo</h2><p data-link-description></p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><input type="hidden" name="size_id"><label>Insumo existente<select name="supplier_id" required></select></label><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Asociar insumo</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`;
- shell(`${pageHeading('PRODUCTOS','Tallas.','Define las tallas de cada producto y modelo. Después asocia un insumo y publica su precio.')}${sections}${sizeDialog}${linkDialog}`,'tallas');
+ const table=`<section class="admin-panel supplier-compact-panel size-catalog-panel" aria-labelledby="size-catalog-title"><div class="admin-panel-head"><div><h2 id="size-catalog-title">Tallas y medidas</h2><p>${rows.length} ${rows.length===1?'talla configurada':'tallas configuradas'} · ${publishedCount} publicadas · ${rows.length-publishedCount} pendientes</p></div><label class="supplier-table-search"><span>Buscar talla</span><input type="search" data-size-search-input placeholder="Producto, modelo, talla o insumo" autocomplete="off"></label></div><div class="admin-table-wrap"><table class="admin-table supplier-compact-table size-catalog-table"><thead><tr><th scope="col">Talla o medida</th><th scope="col">Insumos</th><th scope="col">Precio</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead><tbody>${sections}</tbody></table></div><p class="supplier-search-empty" data-size-search-empty role="status" aria-live="polite" hidden>No encontramos tallas que coincidan con la búsqueda.</p></section>`;
+ shell(`${pageHeading('PRODUCTOS','Tallas.','Define las tallas de cada producto y modelo. Después asocia un insumo y publica su precio.')}${table}${sizeDialog}${linkDialog}`,'tallas');
  wireSizes(rows);
 }
 function wireSizes(rows){
  const sizeDialog=root.querySelector('#product-size-dialog'),sizeForm=sizeDialog.querySelector('form'),sizeStatus=sizeForm.querySelector('.admin-form-status');
  const linkDialog=root.querySelector('#size-supplier-dialog'),linkForm=linkDialog.querySelector('form'),linkStatus=linkForm.querySelector('.admin-form-status');
+ const search=root.querySelector('[data-size-search-input]'),tbody=root.querySelector('.size-catalog-table tbody'),searchEmpty=root.querySelector('[data-size-search-empty]');
+ const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-CL');
+ search?.addEventListener('input',()=>{
+  const query=normalize(search.value).trim(),visible=new Set(),models=new Set();
+  tbody.querySelectorAll('[data-size-row]').forEach(row=>{const matches=!query||normalize(row.dataset.sizeSearch).includes(query);row.hidden=!matches;if(matches){visible.add(row.dataset.sizeProduct);models.add(`${row.dataset.sizeProduct}:${row.dataset.sizeModel}`)}});
+  tbody.querySelectorAll('[data-size-model-row]').forEach(row=>{row.hidden=!models.has(`${row.dataset.sizeModelRow}:${row.dataset.sizeModelCode}`)});
+  tbody.querySelectorAll('[data-size-empty-product]').forEach(row=>{row.hidden=Boolean(query)&&!normalize(row.dataset.sizeProductName).includes(query)});
+  tbody.querySelectorAll('[data-size-product-row]').forEach(row=>{row.hidden=!visible.has(row.dataset.sizeProductRow)&&!tbody.querySelector(`[data-size-empty-product="${CSS.escape(row.dataset.sizeProductRow)}"]:not([hidden])`)});
+  searchEmpty.hidden=!query||Boolean(visible.size)||Boolean(tbody.querySelector('[data-size-empty-product]:not([hidden])'));
+ });
  const openSize=(product,row=null)=>{
   sizeForm.reset();sizeStatus.textContent='';sizeForm.dataset.autoLabel='';
   sizeForm.elements.id.value=row?.id||'';sizeForm.elements.product_type_id.value=product.id;sizeForm.elements.product_name.value=product.name;

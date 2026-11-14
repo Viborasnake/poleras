@@ -191,7 +191,7 @@ Editar un pedido abre resúmenes independientes, sin repetir el alta. Los bloque
 
 ### Administración: insumos y recetas
 
-El menú de Productos agrupa Categorías → Colecciones → Tallas → Diseños → Insumos → Precios en ese orden. Tallas es el registro de medidas por producto y modelo: permite crearlas y editarlas antes de asociar un insumo. Cada fila muestra los insumos, su precio y estado de publicación. El menú lateral conserva desplazamiento vertical cuando su contenido supera la altura disponible.
+El menú de Productos agrupa Categorías → Colecciones → Diseños → Tallas → Insumos → Precios en ese orden. Tallas es el registro de medidas por producto y modelo: permite crearlas y editarlas antes de asociar un insumo. Se presenta en un único panel compacto como Precios e Insumos, con búsqueda visible, separadores de producto y modelo, y una acción para agregar talla en cada producto. Cada fila muestra los insumos, su precio y estado de publicación; las acciones de editar, asociar, crear insumo y eliminar están en un menú con nombre visible. Los grupos de producto tienen espacio de separación y el botón «Agregar talla» mantiene su texto centrado. En móvil la tabla se desplaza horizontalmente. El menú lateral conserva desplazamiento vertical cuando su contenido supera la altura disponible.
 
 Gestionar insumos confirma Acción → Principal/secundario → Insumo existente cuando se edita. Crear y Categorías resuelven ese último bloque sin exigir selección. La búsqueda mantiene su contador y una selección filtrada deja de ser válida; elegir un resultado se confirma con Continuar. Categorías conserva su edición breve por fila.
 
