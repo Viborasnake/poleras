@@ -2,7 +2,6 @@ import {bodyMonthSize} from '../supabase/functions/_shared/variant-selection.js'
 export {bodyMonthSize};
 
 const categoryModels={poleras:'basic','polera-mujer-basica':'woman','poleras-oversize':'over','poleras-ninos':'kid',bodys:'body','tote-bag':'tote'};
-const namedSizes={pequeña:'S',pequena:'S',mediana:'M',grande:'L','extra grande':'XL',extragrande:'XL','extra extra grande':'XXL','extraextragrande':'XXL',xxl:'XXL','2xl':'XXL'};
 
 export function linkedSupplierVariants(product,variants,links){
  const productId=String(product?.id??'');
@@ -21,11 +20,8 @@ export function compatibleSupplierVariants(product,variants,categorySlug=''){
  const modelCode=categoryModels[category];
  if(!modelCode)return [];
  const body=category==='bodys';
- const age=name.match(/^(\d+)\s*años?$/i)?.[1];
- const namedSize=namedSizes[name.toLocaleLowerCase('es-CL')]||'';
- const toteSize=/\bmediana\b/i.test(name)?'M':/\bgrande\b/i.test(name)?'L':'';
  const toteColor=/\bnegr[ao]\b/i.test(name)?'#202124':/\b(crud[ao]|beige|natural)\b/i.test(name)?'#d9c7a4':'';
- const size=tote?toteSize:body?bodyMonthSize(name):age?`${age} años`:namedSize;
+ const size=body?bodyMonthSize(product?.commercial_size):product?.commercial_size;
  if(!size||(tote&&!toteColor))return [];
  return (variants||[]).filter(variant=>{
   const model=Array.isArray(variant.product_models)?variant.product_models[0]:variant.product_models;

@@ -20,10 +20,10 @@ test('body supplier price is limited to its exact month range',()=>{
   {id:4,size:'0-3 meses',active:true,product_models:{code:'kid',active:true}},
  ];
  assert.equal(bodyMonthSize('3–6 meses'),'3-6 meses');
- assert.deepEqual(compatibleSupplierVariants({name:'0-3 meses',model_code:'body'},variants,'bodys').map(row=>row.id),[1]);
- assert.deepEqual(compatibleSupplierVariants({name:'3-6 meses'},variants,'bodys').map(row=>row.id),[2]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Proveedor A',commercial_size:'0-3 meses'},variants,'bodys').map(row=>row.id),[1]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Proveedor B',commercial_size:'3-6 meses'},variants,'bodys').map(row=>row.id),[2]);
  assert.deepEqual(compatibleSupplierVariants({name:'sin talla',model_code:'body'},variants,'bodys'),[]);
- assert.deepEqual(compatibleSupplierVariants({name:'6-12 meses'},variants,'bodys'),[]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Proveedor C',commercial_size:'6-12 meses'},variants,'bodys'),[]);
 });
 
 test('tote supplier matches only its active color and size',()=>{
@@ -33,8 +33,8 @@ test('tote supplier matches only its active color and size',()=>{
   {id:3,size:'L',color_hex:'#202124',active:true,product_models:{code:'tote',active:true}},
   {id:4,size:'M',color_hex:'#202124',active:true,product_models:{code:'basic',active:true}},
  ];
- assert.deepEqual(compatibleSupplierVariants({name:'Negra Mediana',model_code:null},variants,'tote-bag').map(row=>row.id),[2]);
- assert.deepEqual(compatibleSupplierVariants({name:'Cruda Mediana',model_code:'tote'},variants,'tote-bag').map(row=>row.id),[1]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Negra Mediana',commercial_size:'M'},variants,'tote-bag').map(row=>row.id),[2]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Cruda Mediana',commercial_size:'M'},variants,'tote-bag').map(row=>row.id),[1]);
  assert.deepEqual(compatibleSupplierVariants({name:'Tote sin talla',model_code:null},variants,'tote-bag'),[]);
 });
 
@@ -48,7 +48,7 @@ test('unisex XXL without links never falls back to every active variant',()=>{
  const product={id:40,name:'Extra Extra Grande',model_code:null};
  assert.deepEqual(compatibleSupplierVariants(product,variants,'poleras'),[]);
  assert.deepEqual(supplierVariantsForPrice(product,variants,[],'poleras'),[]);
- assert.deepEqual(compatibleSupplierVariants({name:'Mediana'},variants,'poleras').map(row=>row.id),[1]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Mediana',commercial_size:'M'},variants,'poleras').map(row=>row.id),[1]);
 });
 
 test('published XXL uses only its model and size, even if stored links are wrong',()=>{
@@ -57,7 +57,7 @@ test('published XXL uses only its model and size, even if stored links are wrong
   {id:2,size:'M',active:true,product_models:{code:'basic',active:true}},
   {id:3,size:'XXL',active:true,product_models:{code:'over',active:true}}
  ];
- const product={id:40,name:'Extra Extra Grande'};
+ const product={id:40,name:'Extra Extra Grande',commercial_size:'XXL'};
  const links=[{supplier_product_id:40,product_variant_id:1},{supplier_product_id:40,product_variant_id:2},{supplier_product_id:40,product_variant_id:3}];
  assert.deepEqual(supplierVariantsForPrice(product,variants,links,'poleras').map(row=>row.id),[1]);
 });
@@ -66,4 +66,13 @@ test('unknown clothing sizes have no inferred variants',()=>{
  const variants=[{id:1,size:'M',active:true,product_models:{code:'basic',active:true}}];
  assert.deepEqual(compatibleSupplierVariants({name:'Talla inventada'},variants,'poleras'),[]);
  assert.deepEqual(compatibleSupplierVariants({name:'Talla inventada'},variants,'otra-categoria'),[]);
+});
+
+test('the selected commercial size controls a new garment regardless of its supplier name',()=>{
+ const variants=[
+  {id:1,size:'XXL',active:true,product_models:{code:'basic',active:true}},
+  {id:2,size:'XXL',active:true,product_models:{code:'over',active:true}},
+  {id:3,size:'M',active:true,product_models:{code:'basic',active:true}}
+ ];
+ assert.deepEqual(compatibleSupplierVariants({name:'Polera de proveedor A',commercial_size:'XXL'},variants,'poleras').map(row=>row.id),[1]);
 });

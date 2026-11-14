@@ -28,7 +28,7 @@ import { orderTraceability } from './admin-order-traceability.js';
 import { orderTypeLabel } from './order-type.js';
 import { buildOrdersWorkbook } from './orders-export.js';
 import { renderSupplierProducts, principalCalculation, minimumPriceWithVat } from './admin-supplier-products.js';
-import { productSizeRows } from './admin-product-sizes.js';
+import { productSizeRows,PRODUCT_SIZE_MODELS,SUPPLIER_SIZE_FAMILIES } from './admin-product-sizes.js';
 import { CATALOG_ARTWORK_POLICY, CATALOG_IMAGE_POLICY, IMAGE_TYPES, optimizeImage } from './image-optimization.js';
 import {beginUploadFeedback} from './upload-feedback.js';
 import { matchesDesignFilters } from './admin-design-filters.js';
@@ -123,11 +123,12 @@ async function handlePasswordRecovery(){
 }
 
 async function readAdminData(){
- const [variants,orders,profiles,productTypes,categories,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories,supplierComponents,supplierVariantLinks,recentArchived]=await Promise.all([
+ const [variants,orders,profiles,productTypes,productSizes,categories,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories,supplierComponents,supplierVariantLinks,recentArchived]=await Promise.all([
   supabase.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(name,code,active)').order('sku'),
   supabase.from('orders').select(ADMIN_ORDER_SELECT).order('created_at',{ascending:false}).limit(100),
   supabase.from('profiles').select('id',{count:'exact',head:true}),
   supabase.from('catalog_product_types').select('id,slug,name,menu_description,purchase_method,active,sort_order,created_at').order('sort_order').order('name'),
+  supabase.from('catalog_product_sizes').select('id,product_type_id,model_code,size_code,label,sort_order,created_at').order('sort_order').order('size_code'),
   supabase.from('catalog_categories').select('id,slug,name,active,sort_order,created_at').order('sort_order').order('name'),
   supabase.from('catalog_collections').select('id,product_type_id,category_id,slug,name,active,is_featured,is_new_collection,home_design_limit,sort_order,created_at').order('sort_order').order('name'),
   supabase.from('catalog_designs').select('id,collection_id,slug,name,caption,artwork_path,product_artworks,product_mockups,print_layouts,mockup_path,mockup_focus_x,mockup_focus_y,mockup_hover_path,mockup_hover_focus_x,mockup_hover_focus_y,personalization_arrow_x,personalization_arrow_y,sample_color,allowed_colors,allowed_product_colors,accepts_customer_image,customer_photo_subject,is_featured,active,created_at').order('created_at',{ascending:false}),
@@ -143,11 +144,11 @@ async function readAdminData(){
   const fallback=await supabase.from('orders').select('id,user_id,source,coupon_code,status,currency,subtotal_clp,shipping_clp,discount_clp,total_clp,created_at,updated_at,submitted_at,shipping_address,price_snapshot,payment_instructions,payment_email_sent_at,payment_email_sent_by,payment_confirmed_at,payment_confirmed_by,payment_transfer_notice_at,edit_pending_approval,edit_pending_at,edit_pending_by,edit_pending_snapshot,order_edit_version,order_edit_email_sent_at,order_edit_email_sent_by,order_items(id,name_snapshot,sku_snapshot,print_sides,quantity,unit_price_clp,line_total_clp,quality_review,catalog_design_id,catalog_artwork_path,front_design_path,back_design_path),order_status_history(id,status,note,created_at),payments(id,provider,provider_reference,status,amount_clp,confirmed_at)').order('created_at',{ascending:false}).limit(100);
   orders.data=fallback.data;orders.error=fallback.error;
  }
- for(const result of [variants,orders,profiles,productTypes,categories,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories,supplierComponents,supplierVariantLinks,recentArchived])if(result.error)throw result.error;
+ for(const result of [variants,orders,profiles,productTypes,productSizes,categories,collections,designs,coupons,supplierCosts,supplierProducts,supplierCategories,supplierComponents,supplierVariantLinks,recentArchived])if(result.error)throw result.error;
   const localOrders=import.meta.env.DEV?readLocalOrders():[];
  const localArchived=localOrders.filter(order=>order.archived_at);
  const archivedRecent=[...localArchived,...(recentArchived.data||[])].sort((a,b)=>new Date(b.archived_at)-new Date(a.archived_at)).slice(0,ARCHIVE_PREVIEW_LIMIT);
- return {archivedRecent,archivedCount:(recentArchived.count||0)+localArchived.length,variants:variants.data||[],orders:[...localOrders,...(orders.data||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)),profileCount:profiles.count||0,productTypes:productTypes.data||[],categories:categories.data||[],collections:collections.data||[],designs:designs.data||[],coupons:coupons.data||[],supplierCosts:supplierCosts.data||[],supplierProducts:supplierProducts.data||[],supplierCategories:supplierCategories.data||[],supplierComponents:supplierComponents.data||[],supplierVariantLinks:supplierVariantLinks.data||[]};
+ return {archivedRecent,archivedCount:(recentArchived.count||0)+localArchived.length,variants:variants.data||[],orders:[...localOrders,...(orders.data||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)),profileCount:profiles.count||0,productTypes:productTypes.data||[],productSizes:productSizes.data||[],categories:categories.data||[],collections:collections.data||[],designs:designs.data||[],coupons:coupons.data||[],supplierCosts:supplierCosts.data||[],supplierProducts:supplierProducts.data||[],supplierCategories:supplierCategories.data||[],supplierComponents:supplierComponents.data||[],supplierVariantLinks:supplierVariantLinks.data||[]};
 }
 
 async function ensureBaseCatalog(){
@@ -306,18 +307,72 @@ function wireProducts(){
  root.querySelectorAll('[data-edit-product]').forEach(button=>button.onclick=()=>open(adminData.productTypes.find(product=>product.id===Number(button.dataset.editProduct))));
  dialog.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.querySelector('.dialog-cancel').onclick=()=>dialog.close();
  form.elements.name.oninput=()=>{if(!form.elements.id.value)form.elements.slug.value=slugify(form.elements.name.value)};
- form.onsubmit=async event=>{event.preventDefault();const button=event.submitter||form.querySelector('[type="submit"]'),status=form.querySelector('.admin-form-status'),values=adminFormData(form),id=Number(values.get('id'));const payload={name:String(values.get('name')).trim(),menu_description:String(values.get('menu_description')).trim(),sort_order:Number(values.get('sort_order'))||0,purchase_method:String(values.get('purchase_method')||'inherit'),active:values.get('active')==='on'};if(!id)payload.slug=slugify(values.get('slug'));if(!payload.name||!payload.menu_description||(!id&&!payload.slug)){status.textContent='Completa nombre, slug y descripción.';return}button.disabled=true;const query=id?supabase.from('catalog_product_types').update(payload).eq('id',id):supabase.from('catalog_product_types').insert(payload);const {error}=await query;button.disabled=false;if(error){status.textContent=error.code==='23505'?'Ya existe un producto con ese slug.':error.message;return}dialog.close();await refreshData(id?'Producto actualizado.':'Producto creado.',true)};
+ form.onsubmit=async event=>{event.preventDefault();const button=event.submitter||form.querySelector('[type="submit"]'),status=form.querySelector('.admin-form-status'),values=adminFormData(form),id=Number(values.get('id'));const payload={name:String(values.get('name')).trim(),menu_description:String(values.get('menu_description')).trim(),sort_order:Number(values.get('sort_order'))||0,purchase_method:String(values.get('purchase_method')||'inherit'),active:values.get('active')==='on'};if(!id)payload.slug=slugify(values.get('slug'));if(!payload.name||!payload.menu_description||(!id&&!payload.slug)){status.textContent='Completa nombre, slug y descripción.';return}button.disabled=true;const query=id?supabase.from('catalog_product_types').update(payload).eq('id',id):supabase.from('catalog_product_types').insert(payload);const {error}=await query;button.disabled=false;if(error){status.textContent=error.code==='23505'?'Ya existe un producto con ese slug.':error.message;return}dialog.close();await refreshData(id?'Producto actualizado.':'Producto creado.',true);if(!id)location.hash='#tallas'};
 }
 function sizesView(){
  const rows=productSizeRows(adminData);
  const sections=adminData.productTypes.map(product=>{
   const sizes=rows.filter(row=>row.productSlug===product.slug);
-  const sizeCount=new Set(sizes.map(row=>`${row.model}:${row.size}`)).size;
-  const publishedCount=new Set(sizes.filter(row=>row.published).map(row=>`${row.model}:${row.size}`)).size;
-  const entries=sizes.map(row=>`<tr><td><strong>${safe(row.model)}</strong></td><td><strong>${safe(row.size)}</strong></td><td>${safe(row.supplier.name)}</td><td>${row.supplier.confirmed_price_clp?money(row.supplier.confirmed_price_clp):'Pendiente'}</td><td><span class="status-pill ${row.published?'is-active':'is-hidden'}">${row.published?'Publicada':'Pendiente'}</span></td><td><a class="admin-secondary" href="#insumos" aria-label="Gestionar insumo ${safe(row.supplier.name)}">Ver insumo</a></td></tr>`).join('');
-  return `<section class="admin-panel" aria-labelledby="product-sizes-${safe(product.slug)}"><div class="admin-panel-head"><div><h2 id="product-sizes-${safe(product.slug)}">${safe(product.name)}</h2><p>${sizeCount} ${sizeCount===1?'talla o medida':'tallas o medidas'} · ${publishedCount} publicadas</p></div><a class="admin-secondary" href="#insumos">Gestionar insumos</a></div>${entries?`<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Modelo</th><th>Talla o medida</th><th>Insumo</th><th>Precio</th><th>Estado</th><th>Acción</th></tr></thead><tbody>${entries}</tbody></table></div>`:'<div class="admin-empty"><p>Este producto aún no tiene tallas o medidas asociadas a sus insumos.</p></div>'}</section>`;
+  const entries=sizes.map(row=>{
+   const supplies=row.suppliers.map(supplier=>`<div><strong>${safe(supplier.name)}</strong><small>${supplier.confirmed_price_clp?money(supplier.confirmed_price_clp):'Precio pendiente'}</small></div>`).join('')||'<span class="admin-muted">Sin insumo</span>';
+   const categoryIds=adminData.supplierCategories.filter(category=>{const family=SUPPLIER_SIZE_FAMILIES[category.slug];return family?.[0]===row.productSlug&&family[1]===row.modelCode}).map(category=>String(category.id));
+   const candidates=adminData.supplierProducts.filter(supplier=>categoryIds.includes(String(supplier.category_id))&&String(supplier.catalog_product_size_id)!==String(row.id)&&!supplier.confirmed_price_clp);
+   const canLink=(row.modelCode==='tote'||!row.suppliers.length)&&candidates.length>0;
+   return `<tr><td>${safe(row.model)}</td><td><strong>${safe(row.size)}</strong>${row.label!==row.size?`<small>${safe(row.label)}</small>`:''}</td><td>${supplies}</td><td><span class="status-pill ${row.published?'is-active':'is-hidden'}">${row.published?'Publicada':row.suppliers.length?'Sin precio publicado':'Sin insumo'}</span></td><td><div class="row-actions"><button type="button" class="admin-secondary" data-edit-size="${row.id}">Editar</button>${canLink?`<button type="button" class="admin-secondary" data-link-size="${row.id}">Asociar insumo</button>`:''}${!row.suppliers.length&&categoryIds.length?`<button type="button" class="admin-secondary" data-create-size-supplier="${row.id}">Crear insumo</button>`:''}<button type="button" class="admin-danger-link" data-delete-size="${row.id}" ${row.suppliers.length?'disabled title="Primero cambia los insumos asociados"':''}>Eliminar</button></div></td></tr>`;
+  }).join('');
+  return `<section class="admin-panel" aria-labelledby="product-sizes-${safe(product.slug)}"><div class="admin-panel-head"><div><h2 id="product-sizes-${safe(product.slug)}">${safe(product.name)}</h2><p>${sizes.length} ${sizes.length===1?'talla o medida':'tallas o medidas'} · ${sizes.filter(row=>row.published).length} publicadas</p></div><button type="button" class="admin-secondary" data-new-size="${product.id}">${icon('plus')} Agregar talla</button></div>${entries?`<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Modelo</th><th>Talla o medida</th><th>Insumos</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${entries}</tbody></table></div>`:'<div class="admin-empty"><p>Este producto aún no tiene tallas o medidas. Agrégalas aquí y después asocia sus insumos.</p></div>'}</section>`;
  }).join('');
- shell(`${pageHeading('PRODUCTOS','Tallas.','Revisa las tallas y medidas de cada producto junto a su insumo y precio.',`<a class="admin-primary" href="#insumos">${icon('plus')} Crear talla o medida</a>`)}${sections}`,'tallas');
+ const sizeDialog=`<dialog class="admin-dialog" id="product-size-dialog"><form><div class="dialog-title"><div><span class="admin-eyebrow">PRODUCTO → TALLA</span><h2 data-size-title>Agregar talla</h2><p>La talla se define aquí. Después se asocia un insumo y se publica su precio.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><input type="hidden" name="id"><input type="hidden" name="product_type_id"><label>Producto<input name="product_name" readonly></label><label>Modelo<select name="model_code" required></select></label><label>Código de talla o medida<input name="size_code" required maxlength="40" placeholder="Ej. M, XXL, 4 años o 12-24 meses"><small>Este código aparecerá en la selección de compra.</small></label><label>Nombre visible<input name="label" required maxlength="80" placeholder="Ej. Mediana"></label><label>Orden<input name="sort_order" type="number" min="0" max="9999" value="0"></label><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Guardar talla</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`;
+ const linkDialog=`<dialog class="admin-dialog" id="size-supplier-dialog"><form><div class="dialog-title"><div><span class="admin-eyebrow">TALLA → INSUMO</span><h2>Asociar insumo</h2><p data-link-description></p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><input type="hidden" name="size_id"><label>Insumo existente<select name="supplier_id" required></select></label><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Asociar insumo</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`;
+ shell(`${pageHeading('PRODUCTOS','Tallas.','Define las tallas de cada producto y modelo. Después asocia un insumo y publica su precio.')}${sections}${sizeDialog}${linkDialog}`,'tallas');
+ wireSizes(rows);
+}
+function wireSizes(rows){
+ const sizeDialog=root.querySelector('#product-size-dialog'),sizeForm=sizeDialog.querySelector('form'),sizeStatus=sizeForm.querySelector('.admin-form-status');
+ const linkDialog=root.querySelector('#size-supplier-dialog'),linkForm=linkDialog.querySelector('form'),linkStatus=linkForm.querySelector('.admin-form-status');
+ const openSize=(product,row=null)=>{
+  sizeForm.reset();sizeStatus.textContent='';sizeForm.dataset.autoLabel='';
+  sizeForm.elements.id.value=row?.id||'';sizeForm.elements.product_type_id.value=product.id;sizeForm.elements.product_name.value=product.name;
+  const models=PRODUCT_SIZE_MODELS[product.slug]||[['general','General']];
+  sizeForm.elements.model_code.innerHTML=models.map(([code,label])=>`<option value="${safe(code)}">${safe(label)}</option>`).join('');
+  sizeForm.elements.model_code.value=row?.modelCode||models[0][0];
+  sizeForm.elements.model_code.disabled=Boolean(row?.suppliers.length);
+  sizeForm.elements.size_code.value=row?.size||'';sizeForm.elements.size_code.readOnly=Boolean(row?.suppliers.length);
+  sizeForm.elements.label.value=row?.label||'';
+  sizeForm.elements.sort_order.value=row?.sortOrder??Math.max(0,...rows.filter(item=>item.productSlug===product.slug).map(item=>Number(item.sortOrder)||0))+10;
+  sizeForm.querySelector('[data-size-title]').textContent=row?'Editar talla':'Agregar talla';
+  sizeDialog.showModal();sizeForm.elements.size_code.focus();
+ };
+ root.querySelectorAll('[data-new-size]').forEach(button=>button.onclick=()=>openSize(adminData.productTypes.find(product=>String(product.id)===button.dataset.newSize)));
+ root.querySelectorAll('[data-edit-size]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===button.dataset.editSize),product=adminData.productTypes.find(item=>item.slug===row?.productSlug);if(row&&product)openSize(product,row)});
+ sizeDialog.querySelector('.dialog-close').onclick=()=>sizeDialog.close();sizeDialog.querySelector('.dialog-cancel').onclick=()=>sizeDialog.close();
+ sizeForm.elements.size_code.oninput=()=>{if(!sizeForm.elements.label.value.trim()||sizeForm.dataset.autoLabel===sizeForm.elements.label.value){sizeForm.elements.label.value=sizeForm.elements.size_code.value;sizeForm.dataset.autoLabel=sizeForm.elements.label.value}};
+ sizeForm.onsubmit=async event=>{
+  event.preventDefault();const button=event.submitter,status=sizeStatus,id=Number(sizeForm.elements.id.value),model=sizeForm.elements.model_code.value,code=String(sizeForm.elements.size_code.value).trim(),label=String(sizeForm.elements.label.value).trim(),productId=Number(sizeForm.elements.product_type_id.value);
+  const modelCode=model==='general'?'':model;
+  if(!code||!label){status.textContent='Completa el código y nombre de la talla.';return}
+  if(modelCode==='kid'&&!/^\d{1,2} años$/.test(code)){status.textContent='Para niños usa una edad, por ejemplo 4 años.';return}
+  if(modelCode==='body'&&!/^\d{1,2}-\d{1,2} meses$/.test(code)){status.textContent='Para Body usa un rango, por ejemplo 12-24 meses.';return}
+  if(modelCode==='tote'&&!['M','L'].includes(code)){status.textContent='Para Tote Bag usa M o L.';return}
+  if(['basic','woman','over'].includes(modelCode)&&!/^(?:XS|S|M|L|XL|XXL|[3-9]XL)$/.test(code)){status.textContent='Para poleras usa XS, S, M, L, XL, XXL o 3XL–9XL.';return}
+  button.disabled=true;const payload={product_type_id:productId,model_code:modelCode,size_code:code,label,sort_order:Number(sizeForm.elements.sort_order.value)||0,updated_at:new Date().toISOString()};
+  const result=id?await supabase.from('catalog_product_sizes').update(payload).eq('id',id):await supabase.from('catalog_product_sizes').insert(payload);
+  button.disabled=false;if(result.error){status.textContent=result.error.code==='23505'?'Esta talla ya existe para este producto y modelo.':result.error.message;return}
+  sizeDialog.close();await refreshData(id?'Talla actualizada.':'Talla agregada.',true);
+ };
+ root.querySelectorAll('[data-link-size]').forEach(button=>button.onclick=()=>{
+  const row=rows.find(item=>String(item.id)===button.dataset.linkSize);if(!row)return;
+  const categoryIds=adminData.supplierCategories.filter(category=>{const family=SUPPLIER_SIZE_FAMILIES[category.slug];return family?.[0]===row.productSlug&&family[1]===row.modelCode}).map(category=>String(category.id));
+  const candidates=adminData.supplierProducts.filter(supplier=>categoryIds.includes(String(supplier.category_id))&&String(supplier.catalog_product_size_id)!==String(row.id)&&!supplier.confirmed_price_clp);
+  linkForm.reset();linkStatus.textContent='';linkForm.elements.size_id.value=row.id;
+  linkForm.querySelector('[data-link-description]').textContent=`${row.productName} · ${row.model} · ${row.size}`;
+  linkForm.elements.supplier_id.innerHTML=`<option value="">Selecciona un insumo</option>${candidates.map(supplier=>`<option value="${supplier.id}">${safe(supplier.name)}</option>`).join('')}`;
+  linkDialog.showModal();linkForm.elements.supplier_id.focus();
+ });
+ linkDialog.querySelector('.dialog-close').onclick=()=>linkDialog.close();linkDialog.querySelector('.dialog-cancel').onclick=()=>linkDialog.close();
+ linkForm.onsubmit=async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;const {error}=await supabase.from('supplier_products').update({catalog_product_size_id:Number(linkForm.elements.size_id.value),updated_at:new Date().toISOString()}).eq('id',Number(linkForm.elements.supplier_id.value));button.disabled=false;if(error){linkStatus.textContent=error.message;return}linkDialog.close();await refreshData('Insumo asociado a la talla.',true)};
+ root.querySelectorAll('[data-delete-size]').forEach(button=>button.onclick=async()=>{const row=rows.find(item=>String(item.id)===button.dataset.deleteSize);if(!row||row.suppliers.length||!window.confirm(`¿Eliminar la talla ${row.size} de ${row.productName}?`))return;button.disabled=true;const {error}=await supabase.from('catalog_product_sizes').delete().eq('id',row.id);if(error){button.disabled=false;toast(error.message);return}await refreshData('Talla eliminada.',true)});
+ root.querySelectorAll('[data-create-size-supplier]').forEach(button=>button.onclick=()=>{try{sessionStorage.setItem('droska:pending-supplier-size',button.dataset.createSizeSupplier)}catch{}location.hash='#insumos'});
 }
 function collectionCounts(){const counts=new Map();for(const design of adminData.designs.filter(item=>item.active))counts.set(design.collection_id,(counts.get(design.collection_id)||0)+1);return counts}
 function homeOrderPanel(){
@@ -985,13 +1040,15 @@ function wireSuppliers(){root.querySelectorAll('[data-supplier-form]').forEach(f
 
 function supplierProductCalculation(product){const products=new Map((adminData.supplierProducts||[]).map(item=>[String(item.id),item])),lines=(adminData.supplierComponents||[]).filter(line=>String(line.principal_product_id)===String(product.id));return principalCalculation(product,lines,id=>products.get(String(id))||null)}
 function supplierProductVariants(product){
- return supplierVariantsForPrice(product,adminData.variants,adminData.supplierVariantLinks,supplierProductCategory(product)?.slug);
+ const size=adminData.productSizes.find(item=>String(item.id)===String(product.catalog_product_size_id));
+ return supplierVariantsForPrice({...product,commercial_size:size?.size_code},adminData.variants,adminData.supplierVariantLinks,supplierProductCategory(product)?.slug);
 }
 function supplierProductCategory(product){return (adminData.supplierCategories||[]).find(category=>String(category.id)===String(product.category_id))}
-function bodyPriceCreatesVariants(product){return supplierProductCategory(product)?.slug==='bodys'&&['0-3-meses','3-6-meses','6-12-meses','12-24-meses'].includes(product.slug)}
+function bodyPriceCreatesVariants(product){return supplierProductCategory(product)?.slug==='bodys'&&product.kind==='garment'&&Boolean(product.catalog_product_size_id)}
+function totePriceCreatesVariants(product){return supplierProductCategory(product)?.slug==='tote-bag'&&product.kind==='garment'&&Boolean(product.catalog_product_size_id)}
 function priceCreatesVariants(product){
  const category=supplierProductCategory(product)?.slug;
- return bodyPriceCreatesVariants(product)||(['poleras','polera-mujer-basica','poleras-oversize','poleras-ninos'].includes(category)&&product.kind==='garment');
+ return bodyPriceCreatesVariants(product)||totePriceCreatesVariants(product)||(['poleras','polera-mujer-basica','poleras-oversize','poleras-ninos'].includes(category)&&product.kind==='garment');
 }
 function supplierProductDisplayName(product){const name=String(product.name||'').trim()||'Insumo principal',category=String(supplierProductCategory(product)?.name||'').toLocaleLowerCase('es-CL');if(/body|bodys/.test(category)&&/^\d+\s*[-–]\s*\d+$/.test(name))return `Body bebé · ${name.replace('-', '–')} meses`;return name}
 function supplierProductTypeLabel(product){const category=supplierProductCategory(product);if(category?.name)return category.name;return ({garment:'Prenda',acrylic:'Acrílico',magnet:'Imán'})[product.kind]||'Producto'}
@@ -1021,7 +1078,8 @@ function variantModel(variant){return Array.isArray(variant?.product_models)?var
 function variantLabel(variant){const model=variantModel(variant);return `${model?.name||'Producto'} · talla ${variant.size||'Sin talla'} · ${variant.color_name||'Sin color'}`}
 function variantSummary(variants){if(!variants.length)return 'Sin variantes vinculadas';const sizes=[...new Set(variants.map(variant=>variant.size).filter(Boolean))];return `${variants.length} variante${variants.length===1?'':'s'} · talla${sizes.length===1?'':'s'} ${sizes.join(', ')}`}
 function compatibleVariants(product){
- return compatibleSupplierVariants(product,adminData.variants,supplierProductCategory(product)?.slug);
+ const size=adminData.productSizes.find(item=>String(item.id)===String(product.catalog_product_size_id));
+ return compatibleSupplierVariants({...product,commercial_size:size?.size_code},adminData.variants,supplierProductCategory(product)?.slug);
 }
 function pricesView(){
  const products=(adminData.supplierProducts||[]).filter(item=>['garment','acrylic','magnet'].includes(item.kind)),categories=adminData.supplierCategories||[],roots=categories.filter(category=>!category.parent_category_id),children=categories.filter(category=>category.parent_category_id)
@@ -1098,7 +1156,7 @@ function wirePriceTable(prepared,children){
   const initial=active.confirmed??(active.published||active.suggested),target=active.variants[0];
   status.textContent='';
   form.querySelector('[data-price-title]').textContent=supplierProductDisplayName(active.product);
-  form.querySelector('[data-price-description]').textContent=target?`Al guardar, este valor se aplicará automáticamente a las ${active.variants.length} variantes de esta talla.`:bodyPriceCreatesVariants(active.product)?'Al publicar, se crearán las opciones de esta talla en Blanco, Rojo, Azul oscuro, Café oscuro y Gris.':priceCreatesVariants(active.product)?'Al publicar, se crearán o reactivarán los colores de esta talla y quedarán vinculados automáticamente.':'No encontramos una talla publicada que corresponda a este insumo.';
+  form.querySelector('[data-price-description]').textContent=target?`Al guardar, este valor se aplicará automáticamente a las ${active.variants.length} variantes de esta talla.`:bodyPriceCreatesVariants(active.product)?'Al publicar, se crearán los colores activos de esta talla de Body.':totePriceCreatesVariants(active.product)?'Al publicar, se activará solo el color de Tote Bag correspondiente a esta talla.':priceCreatesVariants(active.product)?'Al publicar, se crearán o reactivarán los colores de esta talla y quedarán vinculados automáticamente.':'No encontramos una talla publicada que corresponda a este insumo.';
   input.value=initial;
   refresh();
   dialog.showModal();

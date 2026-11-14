@@ -1,32 +1,24 @@
-const productForCategory={
-  poleras:['poleras','Unisex'],
-  'polera-mujer-basica':['poleras','Mujer'],
-  'poleras-oversize':['poleras','Oversize'],
-  'poleras-ninos':['poleras','Niños'],
-  bodys:['bodys','Body bebé'],
-  'tote-bag':['totebags','Tote bag']
+export const PRODUCT_SIZE_MODELS={
+ poleras:[['basic','Unisex'],['woman','Mujer'],['over','Oversize'],['kid','Niños']],
+ bodys:[['body','Body bebé']],
+ totebags:[['tote','Tote bag']]
+};
+export const SUPPLIER_SIZE_FAMILIES={
+ poleras:['poleras','basic'],'polera-mujer-basica':['poleras','woman'],
+ 'poleras-oversize':['poleras','over'],'poleras-ninos':['poleras','kid'],
+ bodys:['bodys','body'],'tote-bag':['totebags','tote']
 };
 
-const sizeFromName=(name,category)=>{
-  const value=String(name||'').trim();
-  if(category==='tote-bag')return /\bmediana\b/i.test(value)?'M':/\bgrande\b/i.test(value)?'L':value;
-  if(category==='poleras-ninos')return value;
-  if(category==='bodys')return value;
-  return ({pequeña:'S',pequena:'S',mediana:'M',grande:'L','extra grande':'XL',extragrande:'XL','extra extra grande':'XXL',xxl:'XXL','2xl':'XXL'})[value.toLocaleLowerCase('es-CL')]||value;
-};
-
-export function productSizeRows({supplierProducts=[],supplierCategories=[],supplierVariantLinks=[],variants=[]}={}){
-  const categories=new Map(supplierCategories.map(category=>[String(category.id),category.slug]));
-  const variantsById=new Map(variants.map(variant=>[String(variant.id),variant]));
-  const linksBySupplier=new Map();
-  for(const link of supplierVariantLinks){
-    const key=String(link.supplier_product_id),variant=variantsById.get(String(link.product_variant_id));
-    if(variant){if(!linksBySupplier.has(key))linksBySupplier.set(key,[]);linksBySupplier.get(key).push(variant)}
-  }
-  return supplierProducts.flatMap(supplier=>{
-    const category=categories.get(String(supplier.category_id)),mapping=productForCategory[category];
-    if(!mapping||supplier.kind==='supply'||supplier.kind==='dtf')return [];
-    const linked=linksBySupplier.get(String(supplier.id))||[];
-    return [{productSlug:mapping[0],model:mapping[1],size:sizeFromName(supplier.name,category),supplier,linked,published:Boolean(supplier.active&&supplier.confirmed_price_clp>0&&supplier.price_confirmed_at&&linked.some(variant=>variant.active))}];
-  }).sort((a,b)=>a.productSlug.localeCompare(b.productSlug,'es')||a.model.localeCompare(b.model,'es')||Number(a.supplier.sort_order||0)-Number(b.supplier.sort_order||0)||a.size.localeCompare(b.size,'es'));
+export function productSizeRows({productSizes=[],productTypes=[],supplierProducts=[],supplierVariantLinks=[],variants=[]}={}){
+ const products=new Map(productTypes.map(product=>[String(product.id),product]));
+ const variantsById=new Map(variants.map(variant=>[String(variant.id),variant]));
+ const activeLinks=new Set(supplierVariantLinks.filter(link=>variantsById.get(String(link.product_variant_id))?.active).map(link=>String(link.supplier_product_id)));
+ return productSizes.map(size=>{
+  const product=products.get(String(size.product_type_id));
+  const suppliers=supplierProducts.filter(supplier=>String(supplier.catalog_product_size_id)===String(size.id));
+  return {id:size.id,productSlug:product?.slug||'',productName:product?.name||'Producto',modelCode:size.model_code,
+   model:PRODUCT_SIZE_MODELS[product?.slug]?.find(([code])=>code===size.model_code)?.[1]||'General',
+   size:size.size_code,label:size.label,sortOrder:size.sort_order,suppliers,
+   published:suppliers.some(supplier=>supplier.active&&supplier.confirmed_price_clp>0&&supplier.price_confirmed_at&&activeLinks.has(String(supplier.id)))};
+ }).sort((a,b)=>a.productName.localeCompare(b.productName,'es')||a.model.localeCompare(b.model,'es')||Number(a.sortOrder)-Number(b.sortOrder)||a.size.localeCompare(b.size,'es'));
 }
