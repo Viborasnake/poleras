@@ -9,6 +9,7 @@ import {mountAccountDataDisclosure} from './account-data-disclosure.js';
 import {designForProduct,designProductArtworks,modelProductSlug} from './catalog-product-artworks.js';
 import {normalizeVariantRows,allowedVariantRows,resolveExactVariant,normalizeVariantColor,bodyCommerceReady} from '../supabase/functions/_shared/variant-selection.js';
 import {minimumEligibleVariantPrice} from './variant-pricing.js';
+import {createProductSizeCatalog,productSizeLabel,sortProductSizes} from './product-size-labels.js';
 import './design-system.css';
 import './style.css';
 import './accessibility.css';
@@ -97,20 +98,13 @@ let checkoutScrollSnapshot=null;
 function syncFullName(){state.name=[state.firstName,state.lastName].filter(Boolean).join(' ')}
 function storeCustomerDetails(){syncFullName();saveForFifteenDays(CUSTOMER_DETAILS_KEY,{email:state.email,firstName:state.firstName,lastName:state.lastName,name:state.name,phone:state.phone,region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,deliveryNotes:state.deliveryNotes})}
 const garmentSizes=['S','M','L'];
-const garmentSizeOrder=['XS','S','M','L','XL','XXL'];
 const adultShirtKinds=new Set(['basic','over','woman']);
-const shirtSizeLabels={S:'Pequeña',M:'Mediana',L:'Grande'};
-const toteSizeLabels={S:'Pequeña',M:'Mediana',L:'Grande'};
-const sizeLabel=(kind,size)=>adultShirtKinds.has(kind)?shirtSizeLabels[size]||size:kind==='tote'?toteSizeLabels[size]||size:size;
-const sizeCollator=new Intl.Collator('es',{numeric:true,sensitivity:'base'});
-function sortAvailableSizes(kind,available){
- const values=[...available];
- if(!adultShirtKinds.has(kind))return values.sort(sizeCollator.compare);
- return values.sort((a,b)=>{
-  const aIndex=garmentSizeOrder.indexOf(a),bIndex=garmentSizeOrder.indexOf(b);
-  if(aIndex!==-1||bIndex!==-1)return (aIndex===-1?Infinity:aIndex)-(bIndex===-1?Infinity:bIndex);
-  return sizeCollator.compare(a,b);
- });
+let productSizeCatalog=createProductSizeCatalog();
+const sizeLabel=(kind,size)=>productSizeLabel(productSizeCatalog,kind,size);
+const sortAvailableSizes=(kind,available)=>sortProductSizes(productSizeCatalog,kind,available);
+function syncSizeGuideLabels(){
+ const kind=adultShirtKinds.has(state.kind)?state.kind:'basic';
+ document.querySelectorAll('#size-guide-modal [data-guide-size]').forEach(button=>{const label=button.querySelector('strong');if(label)label.textContent=sizeLabel(kind,button.dataset.guideSize)});
 }
 const products={basic:{name:'Básica',family:'men',price:14990,sizes:[...garmentSizes]},over:{name:'Oversize',family:'men',price:21990,sizes:[...garmentSizes]},woman:{name:'Básica mujer',family:'women',price:14990,sizes:[...garmentSizes]},kids:{name:'Niños',family:'kids',price:8990,sizes:[]},body:{name:'Body bebé',family:'body',price:null,sizes:[]},tote:{name:'Tote bag',family:'tote',price:8990,prices:{M:8990,L:9900},sizes:['M','L']}};
 const productFamilies=[
@@ -269,8 +263,13 @@ async function loadProductPrices(){
 }
 async function loadProductPricesOnce(){
  try{
-  const variantsResult=await supabase.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(code,name,active)').eq('active',true).eq('product_models.active',true);
+  const [variantsResult,sizesResult]=await Promise.all([
+   supabase.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(code,name,active)').eq('active',true).eq('product_models.active',true),
+   supabase.from('catalog_product_sizes').select('model_code,size_code,label,sort_order')
+  ]);
   if(variantsResult.error)throw variantsResult.error;
+  if(sizesResult.error)console.warn('No pudimos cargar los nombres de talla configurados:',sizesResult.error);
+  else{productSizeCatalog=createProductSizeCatalog(sizesResult.data||[]);syncSizeGuideLabels()}
   const data=normalizeVariantRows(variantsResult.data||[]);
   if(!data.length)throw new Error('No hay variantes publicadas.');
   variantRows=data;variantLoadStatus='ready';
@@ -1292,6 +1291,7 @@ catalogSection.querySelector('.catalog-reset').addEventListener('click',()=>{
 catalogSection.querySelector('.catalog-actions').addEventListener('click',event=>{
  const layoutButton=event.target.closest('[data-catalog-grid-columns]');if(layoutButton){catalogGridColumns=Number(layoutButton.dataset.catalogGridColumns)===4?4:3;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-catalog-grid-columns="${catalogGridColumns===3?4:3}"]`)?.focus());return}
   const viewButton=event.target.closest('[data-catalog-view]');if(viewButton){catalogFilterMode=viewButton.dataset.catalogView;catalogView=catalogFilterMode;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-catalog-view="${catalogFilterMode}"]`)?.focus());return}
+ const productButton=event.target.closest('[data-catalog-product]');if(productButton){selectedCatalogProduct=productButton.dataset.catalogProduct;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-catalog-product="${selectedCatalogProduct}"]`)?.focus());return}
  const button=event.target.closest('[data-category]');if(!button)return;
   selectedCatalogCategory=button.dataset.category;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-category="${selectedCatalogCategory}"]`)?.focus());
 });
@@ -1823,7 +1823,7 @@ function renderStep(){
  document.querySelectorAll('[data-product]').forEach(button=>button.onclick=()=>selectProductKind(button.dataset.product));
  document.querySelectorAll('[data-size]').forEach(b=>b.onclick=()=>{state.size=b.dataset.size;reconcileVariant(selectedCatalogDesign()?.sampleColor,true);confirmDetail('size');persistDraft();renderStep()});
  document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{state.color=b.dataset.color;reconcileVariant();confirmDetail('color');persistDraft();renderStep();viewer?.update(previewState())});
- const guide=document.querySelector('#size-guide-modal');const openGuide=document.querySelector('#open-size-guide');if(openGuide)openGuide.onclick=()=>guide.showModal();
+ const guide=document.querySelector('#size-guide-modal');const openGuide=document.querySelector('#open-size-guide');if(openGuide)openGuide.onclick=()=>{syncSizeGuideLabels();guide.showModal()};
  guide.querySelectorAll('[data-size-close]').forEach(button=>button.onclick=()=>guide.close());
  guide.querySelectorAll('[data-guide-size]').forEach(button=>button.onclick=()=>{state.size=button.dataset.guideSize;reconcileVariant(selectedCatalogDesign()?.sampleColor,true);guide.close();confirmDetail('size');persistDraft();renderStep();toast(`Talla ${sizeLabel(state.kind,state.size)} seleccionada.`)});
  document.querySelectorAll('[data-view-side]').forEach(b=>b.onclick=()=>{activateSide(b.dataset.viewSide);renderStep();faceSelectedSide()});
