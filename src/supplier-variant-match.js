@@ -14,19 +14,16 @@ export function linkedSupplierVariants(product,variants,links){
 }
 
 export function compatibleSupplierVariants(product,variants,categorySlug=''){
- const name=String(product?.name||'').trim();
  const category=String(categorySlug||'').toLocaleLowerCase('es-CL');
- const tote=category==='tote-bag';
  const modelCode=categoryModels[category];
  if(!modelCode)return [];
  const body=category==='bodys';
- const toteColor=/\bnegr[ao]\b/i.test(name)?'#202124':/\b(crud[ao]|beige|natural)\b/i.test(name)?'#d9c7a4':'';
  const size=body?bodyMonthSize(product?.commercial_size):product?.commercial_size;
- if(!size||(tote&&!toteColor))return [];
+ if(!size)return [];
  return (variants||[]).filter(variant=>{
   const model=Array.isArray(variant.product_models)?variant.product_models[0]:variant.product_models;
   const variantSize=body?bodyMonthSize(variant.size):variant.size;
-  return variant.active&&model?.active!==false&&model?.code===modelCode&&variantSize===size&&(!tote||String(variant.color_hex||'').toLowerCase()===toteColor);
+  return variant.active&&model?.active!==false&&model?.code===modelCode&&variantSize===size;
  });
 }
 

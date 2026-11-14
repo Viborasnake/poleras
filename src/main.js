@@ -100,7 +100,7 @@ const garmentSizes=['S','M','L'];
 const garmentSizeOrder=['XS','S','M','L','XL','XXL'];
 const adultShirtKinds=new Set(['basic','over','woman']);
 const shirtSizeLabels={S:'Pequeña',M:'Mediana',L:'Grande'};
-const toteSizeLabels={M:'Mediana',L:'Grande'};
+const toteSizeLabels={S:'Pequeña',M:'Mediana',L:'Grande'};
 const sizeLabel=(kind,size)=>adultShirtKinds.has(kind)?shirtSizeLabels[size]||size:kind==='tote'?toteSizeLabels[size]||size:size;
 const sizeCollator=new Intl.Collator('es',{numeric:true,sensitivity:'base'});
 function sortAvailableSizes(kind,available){

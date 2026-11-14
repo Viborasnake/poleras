@@ -26,15 +26,15 @@ test('body supplier price is limited to its exact month range',()=>{
  assert.deepEqual(compatibleSupplierVariants({name:'Proveedor C',commercial_size:'6-12 meses'},variants,'bodys'),[]);
 });
 
-test('tote supplier matches only its active color and size',()=>{
+test('tote supplier matches every active color of its configured size',()=>{
  const variants=[
   {id:1,size:'M',color_hex:'#D9C7A4',active:true,product_models:{code:'tote',active:true}},
   {id:2,size:'M',color_hex:'#202124',active:true,product_models:{code:'tote',active:true}},
   {id:3,size:'L',color_hex:'#202124',active:true,product_models:{code:'tote',active:true}},
   {id:4,size:'M',color_hex:'#202124',active:true,product_models:{code:'basic',active:true}},
  ];
- assert.deepEqual(compatibleSupplierVariants({name:'Negra Mediana',commercial_size:'M'},variants,'tote-bag').map(row=>row.id),[2]);
- assert.deepEqual(compatibleSupplierVariants({name:'Cruda Mediana',commercial_size:'M'},variants,'tote-bag').map(row=>row.id),[1]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Mediana',commercial_size:'M'},variants,'tote-bag').map(row=>row.id),[1,2]);
+ assert.deepEqual(compatibleSupplierVariants({name:'Nombre cualquiera',commercial_size:'M'},variants,'tote-bag').map(row=>row.id),[1,2]);
  assert.deepEqual(compatibleSupplierVariants({name:'Tote sin talla',model_code:null},variants,'tote-bag'),[]);
 });
 

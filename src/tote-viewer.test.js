@@ -1,19 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createToteGeometry,toteSurface,totePrintSurface,toteCameraDistance,totePrintDimensions,TOTE_CAMERA_TARGET_Y,TOTE_PRINT_CENTER_Y } from './tote-viewer.js';
+import { createToteGeometry,toteSurface,totePrintSurface,toteCameraDistance,totePrintDimensions,toteScale,TOTE_CAMERA_TARGET_Y,TOTE_PRINT_CENTER_Y } from './tote-viewer.js';
 
-test('la tote L conserva la forma y escala por encima de M', () => {
+test('la tote S, M y L conservan la forma con escalas distintas', () => {
+  const small = createToteGeometry('S');
   const medium = createToteGeometry('M');
   const large = createToteGeometry('L');
   medium.computeBoundingBox();
   large.computeBoundingBox();
   const mediumWidth = medium.boundingBox.max.x - medium.boundingBox.min.x;
   const largeWidth = large.boundingBox.max.x - large.boundingBox.min.x;
+  const smallWidth = small.boundingBox.max.x - small.boundingBox.min.x;
   const mediumHeight = medium.boundingBox.max.y - medium.boundingBox.min.y;
   const largeHeight = large.boundingBox.max.y - large.boundingBox.min.y;
+  const smallHeight = small.boundingBox.max.y - small.boundingBox.min.y;
+  assert.ok(smallWidth < mediumWidth);
+  assert.ok(smallHeight < mediumHeight);
   assert.ok(largeWidth > mediumWidth);
   assert.ok(largeHeight > mediumHeight);
   assert.ok(large.boundingBox.min.z < 0 && large.boundingBox.max.z > 0);
+  small.dispose();
   medium.dispose();
   large.dispose();
 });
@@ -34,8 +40,8 @@ test('la base y los lados ganan volumen sin romper la continuidad del panel',()=
  geometry.dispose();
 });
 
-test('arte y tela comparten la superficie en M y L, delante y detrás',()=>{
- for(const scale of [1,1.1])for(const side of ['front','back'])for(const x of [-.35,0,.35])for(const y of [-.45,TOTE_PRINT_CENTER_Y,.25]){
+test('arte y tela comparten la superficie en S, M y L, delante y detrás',()=>{
+ for(const scale of [.9,1,1.1])for(const side of ['front','back'])for(const x of [-.35,0,.35])for(const y of [-.45,TOTE_PRINT_CENTER_Y,.25]){
   const localZ=totePrintSurface(x*scale,y*scale,scale,side);
   const clothZ=toteSurface(side==='back'?-x:x,y);
   assert.ok(Math.abs(localZ-clothZ-.0012)<1e-10);
@@ -44,8 +50,8 @@ test('arte y tela comparten la superficie en M y L, delante y detrás',()=>{
 
 test('encuadre prioriza estampado y conserva bolsa completa mediante zoom',()=>{
  assert.equal(TOTE_CAMERA_TARGET_Y,TOTE_PRINT_CENTER_Y);
- for(const aspect of [1.5,.8,.6,.45])for(const size of ['M','L']){
-  const distance=toteCameraDistance(aspect,size),scale=size==='L'?1.1:1;
+ for(const aspect of [1.5,.8,.6,.45])for(const size of ['S','M','L']){
+  const distance=toteCameraDistance(aspect,size),scale=toteScale(size);
   const halfHeight=distance*Math.tan(33*Math.PI/360);
   assert.ok(halfHeight*aspect>1.5*scale/2,'Whole body width should fit.');
   assert.ok(halfHeight>.88*scale,'Print and bag body should fit vertically.');
@@ -55,9 +61,9 @@ test('encuadre prioriza estampado y conserva bolsa completa mediante zoom',()=>{
 });
 
 
-test('el estampado cuadrado ocupa más cara y conserva márgenes en ambas tallas',()=>{
- for(const size of ['M','L']){
-  const scale=size==='L'?1.1:1;
+test('el estampado cuadrado ocupa más cara y conserva márgenes en las tres tallas',()=>{
+ for(const size of ['S','M','L']){
+  const scale=toteScale(size);
   for(const aspect of [.25,.8,1,1.2,4]){
    const {width,height}=totePrintDimensions(aspect,size);
    assert.ok(Math.abs(width/height-aspect)<1e-10,'No deforma el arte.');

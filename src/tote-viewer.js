@@ -40,9 +40,10 @@ export function toteSurface(x, y) {
 
 export const TOTE_PRINT_CENTER_Y=-.11;
 export const TOTE_CAMERA_TARGET_Y=TOTE_PRINT_CENTER_Y;
+export const toteScale=size=>size==='S'?.9:size==='L'?1.1:1;
 
 export function totePrintDimensions(aspect=1,size='M'){
-  const scale=size==='L'?1.1:1;
+  const scale=toteScale(size);
   const safeAspect=Number.isFinite(aspect)&&aspect>0?aspect:1;
   const width=Math.min(1.27*scale,1.35*scale*safeAspect);
   return {width,height:width/safeAspect};
@@ -51,7 +52,7 @@ export function totePrintDimensions(aspect=1,size='M'){
 const TOTE_FOV=33;
 export function toteCameraDistance(aspect=1,size='M'){
   const safeAspect=Math.max(.45,Number(aspect)||1);
-  const scale=size==='L'?1.1:1;
+  const scale=toteScale(size);
   const bodyWidth=1.5*scale;
   const horizontalFit=bodyWidth*1.06/(2*Math.tan(THREE.MathUtils.degToRad(TOTE_FOV)/2)*safeAspect);
   return Math.max(4.15,horizontalFit);
@@ -94,7 +95,8 @@ export function createToteGeometry(size = 'M') {
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  if (size === 'L') geometry.scale(1.1, 1.1, 1);
+  const scale=toteScale(size);
+  if (scale!==1) geometry.scale(scale, scale, 1);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
@@ -156,7 +158,7 @@ function canvasWeave() {
 export async function createToteViewer(container, state, { minDistance } = {}) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(TOTE_FOV, 1, .1, 100);
-  let currentSize=state.size==='L'?'L':'M';
+  let currentSize=['S','M','L'].includes(state.size)?state.size:'M';
   let homeDistance=toteCameraDistance(1,currentSize);
   camera.position.set(0,TOTE_CAMERA_TARGET_Y,homeDistance);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -239,7 +241,7 @@ export async function createToteViewer(container, state, { minDistance } = {}) {
     return bodies.get(size);
   }
   async function update(next) {
-    const size = next.size === 'L' ? 'L' : 'M';
+    const size = ['S','M','L'].includes(next.size) ? next.size : 'M';
     if(size!==currentSize){
       const offset=camera.position.clone().sub(controls.target).normalize();
       currentSize=size;
@@ -253,7 +255,7 @@ export async function createToteViewer(container, state, { minDistance } = {}) {
     seam.color.set(color).multiplyScalar(.8);
     const body = bodyFor(size);
     bodies.forEach(item => { item.visible = item === body; });
-    const scale = size === 'L' ? 1.1 : 1;
+    const scale = toteScale(size);
     handles.forEach(handle => { handle.scale.set(scale, scale, 1); });
     const url = next.image || '';
     const side = next.printSide === 'back' ? 'back' : 'front';

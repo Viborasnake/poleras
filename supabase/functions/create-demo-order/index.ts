@@ -64,7 +64,7 @@ Deno.serve(async request => {
   for (const item of items) {
     if (!allowedModels.has(item.modelCode) || !allowedSizeForModel(item.modelCode, item.size) || !allowedSides.has(item.printSides) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20 || !hexColor.test(item.color || '')) return json({ error: 'Uno de los productos no es válido.' }, 400)
     if (item.catalogDesignCustomerImage != null && typeof item.catalogDesignCustomerImage !== 'boolean') return json({ error: 'Uno de los productos no es válido.' }, 400)
-    if (item.modelCode === 'tote' && (!['M', 'L'].includes(item.size) || item.printSides !== 'front')) return json({ error: 'La tote bag debe usar talla M o L e impresión solo por el frente.' }, 400)
+    if (item.modelCode === 'tote' && (!['S', 'M', 'L'].includes(item.size) || item.printSides !== 'front')) return json({ error: 'La tote bag debe usar talla S, M o L e impresión solo por el frente.' }, 400)
   }
 
   const { data: previousPayment } = await admin.from('payments').select('order_id,amount_clp').eq('provider_reference', requestId).maybeSingle()
