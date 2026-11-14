@@ -12,7 +12,7 @@ const sizeFromName=(name,category)=>{
   if(category==='tote-bag')return /\bmediana\b/i.test(value)?'M':/\bgrande\b/i.test(value)?'L':value;
   if(category==='poleras-ninos')return value;
   if(category==='bodys')return value;
-  return ({pequeña:'S',pequena:'S',mediana:'M',grande:'L','extra grande':'XL',extragrande:'XL'})[value.toLocaleLowerCase('es-CL')]||value;
+  return ({pequeña:'S',pequena:'S',mediana:'M',grande:'L','extra grande':'XL',extragrande:'XL','extra extra grande':'XXL',xxl:'XXL','2xl':'XXL'})[value.toLocaleLowerCase('es-CL')]||value;
 };
 
 export function productSizeRows({supplierProducts=[],supplierCategories=[],supplierVariantLinks=[],variants=[]}={}){

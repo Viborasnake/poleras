@@ -203,6 +203,8 @@ Crear un componente desde una receta conserva sus cantidades en un borrador de r
 
 La tabla de precios usa los vínculos persistidos entre insumos y variantes como fuente de verdad. Guardar y publicar confirma el precio y actualiza todas las variantes vinculadas en una sola transacción; una recarga debe conservar el mismo valor en el modal y en «Precio en tienda». En Tote Bag, el insumo con color y talla reconocibles se vincula automáticamente solo a la variante activa de esa combinación al publicar. El contador previo muestra esa variante compatible, nunca variantes de otras prendas. Si existe un dato histórico distinto, el estado se muestra como «Desincronizado» hasta corregirlo.
 
+En Poleras, la categoría del insumo fija el modelo y su nombre fija una única talla. «Extra Extra Grande» corresponde a XXL. Una talla desconocida muestra cero variantes en Precios; nunca se infieren todas las variantes del catálogo. Los vínculos históricos se muestran solo cuando coinciden con el modelo y talla de ese insumo.
+
 ## 6. Implementación y mantenimiento
 
 La muestra `/samples/progressive-disclosure.html` fue aprobada visualmente como referencia de revelación progresiva. El patrón del estudio usa ahora el motor compartido `src/progressive-disclosure.js` y los primitives `.ds-disclosure-*` de `src/design-system.css`. El catálogo tiene un espécimen de composición y un ejemplo interactivo en Forms. La muestra comparativa sigue aislada del build de producción. Alcance original en [su evaluación](evaluations/progressive-disclosure.md).

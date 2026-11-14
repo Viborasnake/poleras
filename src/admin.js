@@ -18,7 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import {authWithCaptcha} from './auth-captcha.js';
 import { defaultStoreSettings, normalizeStoreSettings, validateStoreSettings, fetchStoreSettings } from './store-settings.js';
 import { collections as baseCollections, catalogDesigns as baseDesigns, artworkUrl, catalogAssetUrl, catalogMockupPhoto, normalizeMockupFocus, normalizeSampleColor } from './catalog.js';
-import {compatibleSupplierVariants,linkedSupplierVariants} from './supplier-variant-match.js';
+import {compatibleSupplierVariants,supplierVariantsForPrice} from './supplier-variant-match.js';
 import { orderSteps, nextOrderStatus, orderProgressIndex, orderStatusLabel, orderKanbanStage } from './order-status.js';
 import { shouldRepairPaymentGate } from './admin-payment-gate.js';
 import { orderPaymentState, paymentStateLabels } from './payment-state.js';
@@ -985,12 +985,7 @@ function wireSuppliers(){root.querySelectorAll('[data-supplier-form]').forEach(f
 
 function supplierProductCalculation(product){const products=new Map((adminData.supplierProducts||[]).map(item=>[String(item.id),item])),lines=(adminData.supplierComponents||[]).filter(line=>String(line.principal_product_id)===String(product.id));return principalCalculation(product,lines,id=>products.get(String(id))||null)}
 function supplierProductVariants(product){
- const linked=linkedSupplierVariants(product,adminData.variants,adminData.supplierVariantLinks);
- if(supplierProductCategory(product)?.slug==='tote-bag'){
-  const compatible=compatibleVariants(product),compatibleIds=new Set(compatible.map(variant=>String(variant.id)));
-  return linked.length?linked.filter(variant=>compatibleIds.has(String(variant.id))):compatible;
- }
- return linked.length?linked:compatibleVariants(product);
+ return supplierVariantsForPrice(product,adminData.variants,adminData.supplierVariantLinks,supplierProductCategory(product)?.slug);
 }
 function supplierProductCategory(product){return (adminData.supplierCategories||[]).find(category=>String(category.id)===String(product.category_id))}
 function bodyPriceCreatesVariants(product){return supplierProductCategory(product)?.slug==='bodys'&&['0-3-meses','3-6-meses','6-12-meses','12-24-meses'].includes(product.slug)}
