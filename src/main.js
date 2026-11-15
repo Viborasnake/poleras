@@ -11,6 +11,7 @@ import {designForProduct,designProductArtworks,modelProductSlug} from './catalog
 import {normalizeVariantRows,allowedVariantRows,resolveExactVariant,normalizeVariantColor,bodyCommerceReady} from '../supabase/functions/_shared/variant-selection.js';
 import {minimumEligibleVariantPrice} from './variant-pricing.js';
 import {createProductSizeCatalog,productSizeLabel,sortProductSizes} from './product-size-labels.js';
+import {sizeGuideReferences} from './size-guide-reference.js';
 import './design-system.css';
 import './style.css';
 import './accessibility.css';
@@ -103,9 +104,23 @@ const adultShirtKinds=new Set(['basic','over','woman']);
 let productSizeCatalog=createProductSizeCatalog();
 const sizeLabel=(kind,size)=>productSizeLabel(productSizeCatalog,kind,size);
 const sortAvailableSizes=(kind,available)=>sortProductSizes(productSizeCatalog,kind,available);
-function syncSizeGuideLabels(){
- const kind=adultShirtKinds.has(state.kind)?state.kind:'basic';
- document.querySelectorAll('#size-guide-modal [data-guide-size]').forEach(button=>{const label=button.querySelector('strong');if(label)label.textContent=sizeLabel(kind,button.dataset.guideSize)});
+let activeSizeGuideKind='basic',shirtGuideSvg='';
+function syncSizeGuideLabels(kind=activeSizeGuideKind){
+ const guide=document.querySelector('#size-guide-modal');if(!guide)return;
+ activeSizeGuideKind=sizeGuideReferences[kind]?kind:'basic';
+ const reference=sizeGuideReferences[activeSizeGuideKind];
+ const body=guide.querySelector('.size-guide-body'),visual=guide.querySelector('.measure-visual');
+ if(!shirtGuideSvg)shirtGuideSvg=visual.querySelector('svg')?.outerHTML||'';
+ let tabs=guide.querySelector('.size-guide-tabs');
+ if(!tabs){tabs=document.createElement('div');tabs.className='size-guide-tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Tipo de producto');guide.querySelector('.size-guide-header').after(tabs)}
+ tabs.innerHTML=Object.entries(sizeGuideReferences).map(([code,item])=>`<button type="button" data-guide-kind="${code}" aria-pressed="${code===activeSizeGuideKind}">${item.name}</button>`).join('');
+ if(!guide.dataset.guideBound){guide.addEventListener('click',event=>{const button=event.target.closest('[data-guide-kind]');if(button)syncSizeGuideLabels(button.dataset.guideKind)});guide.dataset.guideBound='true'}
+ const tote=activeSizeGuideKind==='tote',isShirt=!['tote','body'].includes(activeSizeGuideKind);
+ visual.innerHTML=`${isShirt?shirtGuideSvg:`<div class="measure-symbol">${productFamilyIcon(reference.family)}</div>`}<div class="measure-caption"><strong>${tote?'Ancho × alto':isShirt?'Medida A · ancho':'Ancho × largo'}</strong><span>Medidas en centímetros, con la prenda extendida y sin estirar.</span></div>`;
+ const steps=tote?['Extiende la bolsa sobre una superficie plana.','Mide el ancho y el alto de la bolsa, sin contar las asas.','Compara ambas medidas con la tabla.']:['Busca una prenda similar que te quede como te gusta.','Extiéndela plana sobre una mesa, sin estirar la tela.','Compara su ancho y largo con la tabla.'];
+ body.querySelector('.measure-steps').innerHTML=steps.map((step,index)=>`<li><b>${index+1}</b><span>${step}</span></li>`).join('');
+ body.querySelector('.visual-size-table').innerHTML=`<table><caption class="sr-only">Medidas de referencia para ${reference.name}</caption><thead><tr><th scope="col">Talla</th><th scope="col">${tote?'Ancho × alto':'Ancho × largo'} (cm)</th></tr></thead><tbody>${reference.rows.map(([size,measure])=>`<tr><th scope="row">${size}</th><td>${measure}</td></tr>`).join('')}</tbody></table>`;
+ body.querySelector('.measure-note').innerHTML=reference.source?`Medidas orientativas de <a href="${reference.url}" target="_blank" rel="noopener noreferrer">${reference.source}</a>. ${reference.inferred?'Los rangos de meses se aproximan a sus tallas de 3, 6, 12 y 18 meses. ':''}La prenda que use Droska puede variar; confirma las medidas antes de comprar.`:'Medidas de tote bag indicadas por Droska. La talla comercial L corresponde a G en esta guía.';
 }
 const products={basic:{name:'Básica',family:'men',price:14990,sizes:[...garmentSizes]},over:{name:'Oversize',family:'men',price:21990,sizes:[...garmentSizes]},woman:{name:'Básica mujer',family:'women',price:14990,sizes:[...garmentSizes]},kids:{name:'Niños',family:'kids',price:8990,sizes:[]},body:{name:'Body bebé',family:'body',price:null,sizes:[]},tote:{name:'Tote bag',family:'tote',price:8990,prices:{M:8990,L:9900},sizes:['M','L']}};
 const productFamilies=[
@@ -182,7 +197,7 @@ function normalizeTextSymbols(root=document){
 document.querySelector('#app').innerHTML=`
 <div class="announcement" data-store-announcement><span class="announcement-message"><span data-store-announcement-text>🛍️ ¡Compra por WhatsApp disponible!</span><svg class="announcement-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 14.3 9.7 22 12l-7.7 2.3L12 22l-2.3-7.7L2 12l7.7-2.3L12 2Z"/></svg></span><span class="announcement-origin" data-store-announcement-origin>Hecho a tu pinta, en 🇨🇱 Chile.</span></div>
 <header><a class="logo" href="#" aria-label="Polerama inicio">polerama<span>✳</span></a><nav><button type="button" class="product-nav-direct" data-bring-design>Trae tu diseño</button></nav><button class="nav-cta ds-cta ds-cta--sm" data-start="ready">Crear mi polera ↗</button></header>
-<main>${useDropWall?`<section class="drop-intro" aria-labelledby="drop-title"><div class="drop-intro-decor" aria-hidden="true"><div class="hero-editorial-rail hero-editorial-rail--left"><span>DISEÑA</span><i></i><b>TU ESTILO <em>—</em> DISEÑOS <em>—</em> POLERAS</b></div><div class="hero-editorial-rail drop-head-rail--right"><span>✦</span><b>HECHA A TU PINTA</b><i></i></div></div><div><span class="eyebrow"><i></i> REGALOS CON PERSONALIDAD</span><h1 id="drop-title">Regalos que dicen:<br><span>pensé en ti.</span><b aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 4v92M4 50h92M17 17l66 66M83 17 17 83"/></svg></b></h1><p class="drop-intro-subtitle">Para cumpleaños, fechas especiales o un regalo porque sí.</p></div><span class="drop-style-note" aria-hidden="true">CERO<br>DISEÑOS<br>ABURRIDOS.</span><div class="drop-intro-aside"><button type="button" class="drop-create-card" data-start="ready"><span class="drop-create-eyebrow">¿TIENES UNA IDEA?</span><span class="drop-create-title">Trae tu<br> diseño</span><span class="drop-create-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 18 18 6M6 6h12v12"/></svg></span><svg class="drop-create-rays" viewBox="0 0 44 44" aria-hidden="true"><path d="m12 15 3-11m8 16 9-9M27 30l12-1"/></svg></button></div></section><div class="ticker"><span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳ <span>TU POLERA</span> ✳ <span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳</div>
+<main>${useDropWall?`<section class="drop-intro" aria-labelledby="drop-title"><div class="drop-intro-decor" aria-hidden="true"><div class="hero-editorial-rail drop-head-rail--right"><span>✦</span><b>HECHA A TU PINTA</b><i></i></div></div><div><span class="eyebrow"><i></i> REGALOS CON PERSONALIDAD</span><h1 id="drop-title">Regalos que dicen:<br><span>pensé en ti.</span><b aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 4v92M4 50h92M17 17l66 66M83 17 17 83"/></svg></b></h1><p class="drop-intro-subtitle">Para cumpleaños, fechas especiales o un regalo porque sí.</p></div><span class="drop-style-note" aria-hidden="true">CERO<br>DISEÑOS<br>ABURRIDOS.</span><div class="drop-intro-aside"><button type="button" class="drop-create-card" data-start="ready"><span class="drop-create-eyebrow">¿TIENES UNA IDEA?</span><span class="drop-create-title">Trae tu<br> diseño</span><span class="drop-create-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 18 18 6M6 6h12v12"/></svg></span><svg class="drop-create-rays" viewBox="0 0 44 44" aria-hidden="true"><path d="m12 15 3-11m8 16 9-9M27 30l12-1"/></svg></button></div></section><div class="ticker"><span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳ <span>TU POLERA</span> ✳ <span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳</div>
 `:`<section class="hero"><div class="hero-copy"><span class="eyebrow"><i></i> PARA IDEAS QUE NO CABEN EN UN CATÁLOGO</span><h1>Tu idea<br>favorita,<br><span>puesta.</span><svg class="hero-star" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 0l9 33 27-20-19 28 33 9-33 9 19 28-27-20-9 33-9-33-28 20 20-28L0 50l33-9-20-28 28 20Z" fill="#dfff6b" stroke="#242720" stroke-width="2"/></svg></h1><p>Tu mascota, ese recuerdo, una idea muy tuya.<br>Lo convertimos en la polera que solo tú tienes.</p><button class="button dark" data-start="ready">Dale forma a tu idea <span>↗</span></button><div class="hero-note"><span class="mini-faces">☺ ☻ ☺</span><span>Diseñada por ti. Creada contigo.</span></div></div>
 <div class="hero-art"><div class="art-grid"></div><span class="art-label">EL LIENZO ERES TÚ</span><div class="bubble">Esta puede ser tu mascota <span aria-hidden="true"><svg viewBox="0 0 70 90" role="img"><path d="M8 8 C50 12, 65 32, 57 55 C52 69, 43 76, 31 78" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M19 64 L30 79 L43 66" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><img class="hero-static-image" src="/hero-customization-v2.png" width="1254" height="1254" alt="Foto de un perro convertida en un diseño sobre una polera personalizada" fetchpriority="high" decoding="async"><button class="hero-personalize" data-start="ready">＋ Agrega tu diseño</button><div class="floating-chip pink">ÚNICA.<br>COMO TÚ. <span>✷</span></div><div class="floating-chip cream"><span>✧</span> Cero poleras aburridas.</div><div class="art-bottom"><span>FOTO A POLERA · HECHA A TU PINTA</span><span>↙ HECHA A TU PINTA</span></div></div></section>
 <div class="ticker"><span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳ <span>TU POLERA</span> ✳ <span>TU FOTO</span> ✳ <span>TU IDEA</span> ✳ <span>TU DISEÑO DE IA</span> ✳</div>
@@ -585,7 +600,7 @@ const heroCatalogStage=document.querySelector('.hero-art');
 if(heroCatalogStage){
  const heroRoot=heroCatalogStage.closest('.hero');
  const samples=document.createElement('div');samples.className='hero-catalog-samples';samples.setAttribute('aria-label','Tres diseños destacados del catálogo');samples.setAttribute('role','list');heroCatalogStage.append(samples);
- const editorialDecor=document.createElement('div');editorialDecor.className='hero-editorial-decor';editorialDecor.setAttribute('aria-hidden','true');editorialDecor.innerHTML='<div class="hero-editorial-rail hero-editorial-rail--left"><span>DISEÑA</span><i></i><b>TU ESTILO <em>—</em> DISEÑOS <em>—</em> POLERAS</b></div><div class="hero-editorial-top"><span>DISEÑOS LISTOS<br>PARA LLEVAR</span><i></i></div><div class="hero-editorial-rail hero-editorial-rail--right"><span class="hero-editorial-star">✦</span><b>COLECCIONES<br>PARA EXPLORAR</b><i></i></div></div>';
+ const editorialDecor=document.createElement('div');editorialDecor.className='hero-editorial-decor';editorialDecor.setAttribute('aria-hidden','true');editorialDecor.innerHTML='<div class="hero-editorial-top"><span>DISEÑOS LISTOS<br>PARA LLEVAR</span><i></i></div><div class="hero-editorial-rail hero-editorial-rail--right"><span class="hero-editorial-star">✦</span><b>COLECCIONES<br>PARA EXPLORAR</b><i></i></div></div>';
  heroCatalogStage.closest('.hero')?.append(editorialDecor);
  const setEditorialCopy=catalog=>{const top=editorialDecor.querySelector('.hero-editorial-top span'),right=editorialDecor.querySelector('.hero-editorial-rail--right b');if(top)top.innerHTML=catalog?'DISEÑOS LISTOS<br>PARA LLEVAR':'EL LIENZO<br>ERES TÚ';if(right)right.innerHTML=catalog?'COLECCIONES<br>PARA EXPLORAR':'HECHA<br>A TU PINTA'};
  heroRoot?.classList.add('is-creative-slide');
@@ -626,9 +641,9 @@ document.querySelector('#live-preview').after(studioGallery);
 const stagePhoto=document.createElement('div');
 stagePhoto.className='studio-stage-photo';
 stagePhoto.hidden=true;
-stagePhoto.innerHTML='<img class="studio-stage-photo-image" alt=""><img class="studio-stage-photo-image" alt=""><span class="studio-stage-photo-label"></span><button type="button" class="studio-stage-photo-nav studio-stage-photo-nav--prev" aria-label="Fotografía anterior"><span aria-hidden="true">‹</span></button><button type="button" class="studio-stage-photo-nav studio-stage-photo-nav--next" aria-label="Fotografía siguiente"><span aria-hidden="true">›</span></button><div class="studio-stage-photo-dots" aria-hidden="true"></div><button type="button" class="studio-stage-photo-pause" aria-pressed="false"><span aria-hidden="true">Ⅱ</span><span>Pausar fotos</span></button>';
+stagePhoto.innerHTML='<img class="studio-stage-photo-image" alt=""><img class="studio-stage-photo-image" alt=""><div class="studio-stage-photo-pills"></div><button type="button" class="studio-stage-photo-nav studio-stage-photo-nav--prev" aria-label="Fotografía anterior"><span aria-hidden="true">‹</span></button><button type="button" class="studio-stage-photo-nav studio-stage-photo-nav--next" aria-label="Fotografía siguiente"><span aria-hidden="true">›</span></button><div class="studio-stage-photo-dots" aria-hidden="true"></div><button type="button" class="studio-stage-photo-pause" aria-pressed="false"><span aria-hidden="true">Ⅱ</span><span>Pausar fotos</span></button>';
 document.querySelector('#live-preview').append(stagePhoto);
-let galleryKey='',galleryItems=[],photoOpener=null,stageAngle=0,activePhotoIndex=0,photoRotationTimer=null,photoRotationPaused=false,photoTransitionVersion=0;
+let galleryKey='',galleryItems=[],photoOpener=null,stageAngle=0,activePhotoIndex=0,photoRotationTimer=null,photoRotationPaused=false,photoTransitionVersion=0,activePhotoImage=null,photoFadeTimer=null;
 const stageControls=document.createElement('div');
 stageControls.className='studio-view-controls';
 stageControls.setAttribute('role','group');
@@ -652,8 +667,9 @@ function closeStagePhoto({restoreFocus=true}={}){
  if(stagePhoto.hidden)return;
  photoTransitionVersion++;
  clearInterval(photoRotationTimer);photoRotationTimer=null;
+ clearTimeout(photoFadeTimer);photoFadeTimer=null;activePhotoImage=null;
  stagePhoto.hidden=true;
- stagePhoto.querySelectorAll('.studio-stage-photo-image').forEach(image=>{image.onload=null;image.onerror=null;image.classList.remove('is-visible')});
+ stagePhoto.querySelectorAll('.studio-stage-photo-image').forEach(image=>{image.onload=null;image.onerror=null;image.classList.remove('is-visible');image.style.removeProperty('z-index')});
  const livePreview=document.querySelector('#live-preview');
  livePreview.classList.remove('is-photo-open','is-portrait-photo');
  livePreview.style.removeProperty('--stage-photo-aspect');
@@ -667,25 +683,42 @@ function showStagePhoto(index){
  const transitionVersion=++photoTransitionVersion;
  activePhotoIndex=index;
  studioGallery.querySelectorAll('[data-gallery-index]').forEach(card=>card.setAttribute('aria-pressed',String(Number(card.dataset.galleryIndex)===index)));
- const currentImage=stagePhoto.querySelector('.studio-stage-photo-image.is-visible');
+ clearTimeout(photoFadeTimer);photoFadeTimer=null;
+ const currentImage=activePhotoImage;
  const image=[...stagePhoto.querySelectorAll('.studio-stage-photo-image')].find(candidate=>candidate!==currentImage);
+ image.classList.remove('is-visible');
+ image.onload=null;image.onerror=null;
  const livePreview=document.querySelector('#live-preview');
  const revealPhoto=()=>{
   if(transitionVersion!==photoTransitionVersion||stagePhoto.hidden||!image.naturalWidth||!image.naturalHeight)return;
   const ratio=image.naturalWidth/image.naturalHeight;
   livePreview.style.setProperty('--stage-photo-aspect',String(ratio));livePreview.classList.toggle('is-portrait-photo',ratio<.9);
   stagePhoto.classList.toggle('is-artwork-fallback',Boolean(item.artworkFallback));
-  stagePhoto.querySelector('.studio-stage-photo-label').textContent=`${item.label} · ${selectedCatalogDesign()?.name||'Tu diseño'}`;
-  currentImage?.classList.remove('is-visible');image.classList.add('is-visible');
+  const design=selectedCatalogDesign();
+  const productKind=Object.keys(products).find(kind=>modelProductSlug(kind)===item.productSlug);
+  const price=productKind&&designSupportsProduct(design,productKind)?productPrice(productKind,null,null,design):null;
+  const icon=productFamilyIcon(({poleras:'men',bodys:'body',totebags:'tote'})[item.productSlug]);
+  const designType=design?.acceptsCustomerImage?'Diseño personalizable':design?.featured?'✦ Diseño destacado':'Diseño original';
+  stagePhoto.querySelector('.studio-stage-photo-pills').innerHTML=`<span class="studio-stage-photo-product">${icon}<span>${escapeText(item.label)}</span></span><span class="studio-stage-photo-type">${designType}</span>${price==null?'':`<span class="studio-stage-photo-price">Desde ${money(price)}</span>`}`;
+  image.style.objectPosition=`${Number(item.focusX)||50}% ${Number(item.focusY)||50}%`;
+  image.style.zIndex='2';
+  if(currentImage)currentImage.style.zIndex='1';
+  image.classList.add('is-visible');activePhotoImage=image;
+  photoFadeTimer=window.setTimeout(()=>{if(transitionVersion===photoTransitionVersion){currentImage?.classList.remove('is-visible');currentImage?.style.removeProperty('z-index')}},430);
  };
- image.onload=revealPhoto;
- image.onerror=()=>{if(transitionVersion===photoTransitionVersion)currentImage?.classList.add('is-visible')};
- image.src=item.src;image.alt=`${item.label} con el diseño ${selectedCatalogDesign()?.name||'elegido'}`;
+ const preload=new Image();
+ preload.onload=()=>{
+  if(transitionVersion!==photoTransitionVersion)return;
+  image.src=preload.src;
+  image.alt=`${item.label} con el diseño ${selectedCatalogDesign()?.name||'elegido'}`;
+  if(image.complete)revealPhoto();else image.onload=revealPhoto;
+ };
+ preload.onerror=()=>{if(transitionVersion===photoTransitionVersion)image.removeAttribute('src')};
+ preload.src=item.src;
  stagePhoto.dataset.kind=state.kind;stagePhoto.dataset.step=String(state.step);
  stagePhoto.hidden=false;
  livePreview.classList.add('is-photo-open');
  stagePhoto.querySelectorAll('.studio-stage-photo-dots span').forEach((dot,dotIndex)=>dot.classList.toggle('is-active',dotIndex===index));
- if(image.complete)revealPhoto();
 }
 function schedulePhotoRotation(){
  clearInterval(photoRotationTimer);photoRotationTimer=null;
@@ -725,6 +758,20 @@ stagePhoto.querySelectorAll('.studio-stage-photo-nav').forEach(button=>button.ad
  showStagePhoto((activePhotoIndex+direction+galleryItems.length)%galleryItems.length);
  schedulePhotoRotation();
 }));
+let photoSwipeStart=null;
+stagePhoto.addEventListener('touchstart',event=>{
+ photoSwipeStart=event.touches.length===1&&!event.target.closest('button')?{x:event.touches[0].clientX,y:event.touches[0].clientY}:null;
+},{passive:true});
+stagePhoto.addEventListener('touchend',event=>{
+ if(!photoSwipeStart||galleryItems.length<2)return;
+ const touch=event.changedTouches[0];
+ const dx=touch.clientX-photoSwipeStart.x,dy=touch.clientY-photoSwipeStart.y;
+ photoSwipeStart=null;
+ if(Math.abs(dx)<44||Math.abs(dx)<Math.abs(dy)*1.2)return;
+ showStagePhoto((activePhotoIndex+(dx<0?1:-1)+galleryItems.length)%galleryItems.length);
+ schedulePhotoRotation();
+},{passive:true});
+stagePhoto.addEventListener('touchcancel',()=>{photoSwipeStart=null},{passive:true});
 studioGallery.addEventListener('click',event=>{
  const button=event.target.closest('[data-gallery-index]');
  if(!button)return;
@@ -915,14 +962,13 @@ trustStrip.setAttribute('aria-label','Beneficios de comprar en droska SHIRT');
 trustStrip.innerHTML=`<ul><li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M39 8C23 9 12 17 10 34c12 2 23-5 29-26Z"/><path d="M8 41c7-11 14-18 25-25"/></svg><span><strong>Diseños originales</strong><small>Creaciones exclusivas Droska.</small></span></li><li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 12h23v22H6zM29 21h7l6 7v6H29z"/><circle cx="14" cy="36" r="4"/><circle cx="36" cy="36" r="4"/></svg><span><strong>Despachos a todo Chile</strong><small>Rápido y seguro.</small></span></li><li><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5c5 4 10 6 16 7v11c0 10-6 17-16 21C14 40 8 33 8 23V12c6-1 11-3 16-7Z"/><path d="m17 24 5 5 10-11"/></svg><span><strong>Compra segura</strong><small>Tus datos siempre protegidos.</small></span></li></ul>`;
 catalogSection.before(trustStrip);
 let dropExplore=null;
-const dropExploreDesktop=window.matchMedia('(min-width:1001px)');
 if(useDropWall){
 document.querySelector('.drop-intro').after(catalogSection);
 catalogSection.after(trustStrip);
 dropExplore=document.createElement('section');
 dropExplore.className='drop-explore';
 dropExplore.setAttribute('aria-labelledby','drop-explore-title');
-dropExplore.innerHTML='<div class="drop-explore-heading"><h2 id="drop-explore-title">Diseños por explorar</h2><span aria-hidden="true"></span><button type="button" data-explore-all>Ver todos los diseños <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></div><div class="drop-explore-track"></div>';
+dropExplore.innerHTML='<div class="drop-explore-heading"><h2 id="drop-explore-title">Recién llegados</h2><span aria-hidden="true"></span><button type="button" data-explore-all>Ver todos los diseños <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></div><div class="drop-explore-track"></div>';
 catalogSection.after(dropExplore);
 dropExplore.addEventListener('click',event=>{
  if(event.target.closest('[data-explore-all]')){
@@ -934,7 +980,6 @@ dropExplore.addEventListener('click',event=>{
  if(!button)return;
  void chooseCatalogDesign(button);
 });
-dropExploreDesktop.addEventListener('change',positionDropExplore);
 
 document.querySelector('.ticker').remove();
 document.body.classList.add('drop-wall-enabled');
@@ -1073,6 +1118,14 @@ function renderCatalog(){
   if(dropExplore?.parentElement===grid)catalogSection.after(dropExplore);
   if(useDropWall&&!isDesignView){
    grid.innerHTML=renderDropCollectionSections(shownCollections,productDesigns);
+   const sections=grid.querySelectorAll('.drop-collection-section');
+   if(sections.length>=2){
+    const explore=document.createElement('section');
+    explore.className='drop-collection-links';
+    explore.setAttribute('aria-labelledby','drop-collection-links-title');
+    explore.innerHTML=`<h2 id="drop-collection-links-title">Explora colecciones</h2><div class="drop-collection-links-grid">${activeCollections.map(collection=>{const count=productDesigns.filter(design=>design.collection===collection.id).length;return `<button type="button" data-open-collection="${safe(collection.id)}" data-product="${safe(collection.productSlug||'poleras')}" aria-label="Ver colección ${safe(collection.label)}, ${designCountLabel(count)}"><strong>${safe(collection.label)}</strong><span>${designCountLabel(count)} <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></span></button>`}).join('')}</div>`;
+    sections[1].after(explore);
+   }
   }else{
    grid.innerHTML=isDesignView?shownDesigns.map(({design,collection},index)=>catalogDesignCard(design,index,collection,'',useDropWall)).join(''):shownCollections.map((item,index)=>catalogCollectionCard(item,index,productDesigns)).join('');
   }
@@ -1164,17 +1217,13 @@ function renderCatalog(){
 function positionDropExplore(){
  if(!dropExplore)return;
  const grid=catalogSection.querySelector('.catalog-grid');
- const firstFeatured=grid.querySelector('.drop-collection-section .drop-collection--featured')?.closest('.drop-collection-section');
- if(dropExploreDesktop.matches&&catalogView==='collections'&&firstFeatured)firstFeatured.after(dropExplore);
- else catalogSection.after(dropExplore);
+ grid.before(dropExplore);
 }
 function renderDropExplore(entries,isDesignView){
- dropExplore.hidden=isDesignView||!entries.length;
+ const recent=entries.filter(({design})=>Number.isFinite(new Date(design.createdAt).getTime())).sort((a,b)=>new Date(b.design.createdAt)-new Date(a.design.createdAt)).slice(0,6);
+ dropExplore.hidden=isDesignView||!recent.length;
  if(dropExplore.hidden)return;
- const seen=new Set(),picks=[];
- for(const entry of entries){if(!seen.has(entry.collection.id)){picks.push(entry);seen.add(entry.collection.id)}if(picks.length===12)break}
- for(const entry of entries){if(picks.length===12)break;if(!picks.some(item=>item.design.id===entry.design.id))picks.push(entry)}
- dropExplore.querySelector('.drop-explore-track').innerHTML=picks.map(({design,collection})=>{
+ dropExplore.querySelector('.drop-explore-track').innerHTML=recent.map(({design,collection})=>{
   const preview=catalogPreviewDesign(design,collection.productSlug);
   const image=preview.featuredPhoto||artworkUrl(preview);
   const focus=preview.mockupFocus||{x:50,y:50};
@@ -1922,7 +1971,7 @@ function renderStep(){
   }).join('');
   const modelOptions=productsForFamily(activeFamily).filter(available);
   const purchaseModeChoice=catalogDesignAllowsBasePurchase(source)?`<section class="catalog-purchase-mode"><div class="catalog-purchase-mode-options" role="group" aria-label="Versión del diseño"><button type="button" data-catalog-purchase-mode="base" aria-pressed="${state.catalogDesignPurchaseMode==='base'}" class="${state.catalogDesignPurchaseMode==='base'?'selected':''}"><span aria-hidden="true">✓</span><strong>Comprar tal cual</strong><small>Recibe el diseño original que ves en la muestra.</small></button><button type="button" data-catalog-purchase-mode="personalized" aria-pressed="${state.catalogDesignPurchaseMode==='personalized'}" class="${state.catalogDesignPurchaseMode==='personalized'?'selected':''}"><span aria-hidden="true">☺</span><strong>Personalizar con tus fotos</strong><small>Cambiamos los rostros por tu familia, amigos o colegas.</small></button></div></section>`:'';
-  html=`<span class="eyebrow">PASO 1 · DETALLES</span><h2>${state.catalogDesignPurchaseMode==='base'?'Elige tu producto.':'Elige qué quieres personalizar.'}</h2>${purchaseModeChoice}<section class="detail-block product-family-block"><div class="detail-heading"><strong>Elige un producto</strong><small>Después define modelo, talla y color</small></div><div class="product-family-options" role="group" aria-label="Tipo de producto">${familyCards}</div></section><section class="detail-block model-block"><div class="detail-heading"><strong>${activeFamily==='tote'?'Formato':'Modelo'}</strong><small>Precio base</small></div><div class="product-options">${modelOptions.map(([id,item])=>`<button type="button" class="${state.kind===id?'selected':''}" data-product="${id}"><strong>${item.name}</strong><span class="model-price">${priceLabel(productPrice(id,null,null,source))}</span></button>`).join('')}</div></section><div class="details-grid"><section class="detail-block color-block"><div class="detail-heading"><strong>${state.kind==='tote'?'Tela':'Color'}</strong><small>${colorOptions.length===1?'Única opción':'Elige uno'}</small></div><div class="colors" role="group" aria-label="Color del producto">${colorOptions.map(([color,name])=>`<button type="button" aria-label="${escapeText(name)}" aria-pressed="${state.color===color}" data-color="${color}" style="--swatch:${color}" class="${state.color===color?'chosen':''}"><i aria-hidden="true"></i><span>${escapeText(name)}</span></button>`).join('')}</div>${!colorOptions.length?`<p class="field-note" role="status">${variantLoadStatus==='loading'?'Cargando colores disponibles…':'No hay colores disponibles para esta talla y diseño.'}</p>`:''}</section><section class="detail-block size-block"><div class="detail-heading"><strong>${state.kind==='kids'?'Edad':state.kind==='body'?'Edad':'Talla'}</strong>${state.kind==='kids'||state.kind==='tote'||state.kind==='body'?'':`<button type="button" class="size-guide-trigger" id="open-size-guide"><span class="size-guide-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 16 16V4m-5 5 5-5 5 5"/><path d="M5 14v5h14v-5"/></svg></span><span class="size-guide-label">Guía de tallas</span><i aria-hidden="true">›</i></button>`}</div><div class="sizes ${adultShirtKinds.has(state.kind)?'named-garment-sizes':''}">${p.sizes.map(size=>`<button type="button" data-size="${size}" class="${state.size===size?'selected':''}" aria-pressed="${state.size===size}"><span class="size-name">${sizeLabel(state.kind,size)}</span><small class="size-price">${sizePriceLabel(state.kind,size,source)}</small></button>`).join('')}</div></section></div><div class="studio-price-summary" aria-live="polite"><div><span>Precio de tu selección</span><strong>${selectedVariant?money(pricing.total):'Elige talla y color'}</strong></div>${selectedVariant?`<small>Producto ${money(selectedPrice)} · Estampado ${pricing.print?`+${money(pricing.print)}`:'incluido'}${qualityReview?` · Revisión +${money(QUALITY_ADJUSTMENT_CLP)}`:''}</small>`:'<small>El precio final depende de la talla, el color y el estampado.</small>'}</div><section class="detail-block print-placement-block">${printSidesHtml()}</section>`;
+  html=`<span class="eyebrow">PASO 1 · DETALLES</span><h2>${state.catalogDesignPurchaseMode==='base'?'Elige tu producto.':'Elige qué quieres personalizar.'}</h2>${purchaseModeChoice}<section class="detail-block product-family-block"><div class="detail-heading"><strong>Elige un producto</strong><small>Después define modelo, talla y color</small></div><div class="product-family-options" role="group" aria-label="Tipo de producto">${familyCards}</div></section><section class="detail-block model-block"><div class="detail-heading"><strong>${activeFamily==='tote'?'Formato':'Modelo'}</strong><small>Precio base</small></div><div class="product-options">${modelOptions.map(([id,item])=>`<button type="button" class="${state.kind===id?'selected':''}" data-product="${id}"><strong>${item.name}</strong><span class="model-price">${priceLabel(productPrice(id,null,null,source))}</span></button>`).join('')}</div></section><div class="details-grid"><section class="detail-block color-block"><div class="detail-heading"><strong>${state.kind==='tote'?'Tela':'Color'}</strong><small>${colorOptions.length===1?'Única opción':'Elige uno'}</small></div><div class="colors" role="group" aria-label="Color del producto">${colorOptions.map(([color,name])=>`<button type="button" aria-label="${escapeText(name)}" aria-pressed="${state.color===color}" data-color="${color}" style="--swatch:${color}" class="${state.color===color?'chosen':''}"><i aria-hidden="true"></i><span>${escapeText(name)}</span></button>`).join('')}</div>${!colorOptions.length?`<p class="field-note" role="status">${variantLoadStatus==='loading'?'Cargando colores disponibles…':'No hay colores disponibles para esta talla y diseño.'}</p>`:''}</section><section class="detail-block size-block"><div class="detail-heading"><strong>${state.kind==='kids'?'Edad':state.kind==='body'?'Edad':'Talla'}</strong><button type="button" class="size-guide-trigger" id="open-size-guide"><span class="size-guide-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 16 16V4m-5 5 5-5 5 5"/><path d="M5 14v5h14v-5"/></svg></span><span class="size-guide-label">Guía de tallas</span><i aria-hidden="true">›</i></button></div><div class="sizes ${adultShirtKinds.has(state.kind)?'named-garment-sizes':''}">${p.sizes.map(size=>`<button type="button" data-size="${size}" class="${state.size===size?'selected':''}" aria-pressed="${state.size===size}"><span class="size-name">${sizeLabel(state.kind,size)}</span><small class="size-price">${sizePriceLabel(state.kind,size,source)}</small></button>`).join('')}</div></section></div><div class="studio-price-summary" aria-live="polite"><div><span>Precio de tu selección</span><strong>${selectedVariant?money(pricing.total):'Elige talla y color'}</strong></div>${selectedVariant?`<small>Producto ${money(selectedPrice)} · Estampado ${pricing.print?`+${money(pricing.print)}`:'incluido'}${qualityReview?` · Revisión +${money(QUALITY_ADJUSTMENT_CLP)}`:''}</small>`:'<small>El precio final depende de la talla, el color y el estampado.</small>'}</div><section class="detail-block print-placement-block">${printSidesHtml()}</section>`;
  }
  if(state.step===1&&!state.catalogDesign&&failingSides().length){const names=[...includedSides().filter(side=>state.assessments[side]&&!state.assessments[side].qualifies).map(side=>sideNames[side].toLowerCase()),...state.additionalPrints.filter(item=>item.assessment&&!item.assessment.qualifies).map(item=>item.configuration.placement.startsWith('sleeve_')?'brazo':'bolsillo')].join(' y ');html+=`<aside class="quality-inline-notice" role="status"><strong>Revisión técnica necesaria</strong><p>El archivo de ${names} podría verse pixelado al imprimir. Lo revisaremos antes de producirlo; el ajuste se verá desglosado en el resumen.</p><span>+${money(QUALITY_ADJUSTMENT_CLP)}</span></aside>`}
  if(state.step===2)html=`<span class="eyebrow">PASO 2 · RESUMEN</span><h2>Tu idea, lista para pedir.</h2>${hasTwoSides()?`<div class="mockup-sides">${includedSides().map(side=>`<button type="button" data-view-side="${side}" class="${state.printSide===side?'selected':''}">${sideNames[side]}</button>`).join('')}</div>`:''}<p class="mockup-note">Gira el producto y revisa todos los detalles antes de añadirla al carro.</p>${qualityReview?`<div class="review-chip">Revisión del equipo incluida · ${money(QUALITY_ADJUSTMENT_CLP)}</div>`:''}<div class="order-summary"><div><span>${state.kind==='tote'?'Tote bag':state.kind==='body'?'Body bebé':`Polera ${p.name}`} · talla ${sizeLabel(state.kind,state.size)} · ${escapeText(selectedVariant?.colorName||state.color)}</span><strong>${money(pricing.base)}</strong></div><div><span>Diseño ${printSidesLabel()}</span><strong>${pricing.print?`+${money(pricing.print)}`:'Incluido'}</strong></div><div class="order-summary-detail"><span>Posición y tamaño</span><strong>${escapeText(printConfigurationLabel(currentPrintConfiguration(),choice))}</strong></div>${qualityReview?`<div><span>Ajuste técnico del archivo</span><strong>+${money(QUALITY_ADJUSTMENT_CLP)}</strong></div>`:''}<div><span>Extras</span><strong>${money(0)}</strong></div><div class="total"><span>Total</span><strong>${money(pricing.total)}</strong></div></div>`;
@@ -1950,7 +1999,6 @@ function renderStep(){
  if(state.step===1&&state.catalogDesign){
   if(state.kind==='tote'){
    stepContent.querySelector('h2').textContent='Elige tu tote bag.';
-   stepContent.querySelector('#open-size-guide')?.remove();
    const locked=stepContent.querySelector('.locked-color span');if(locked)locked.textContent='Tela natural para este diseño.';
   }
  }
@@ -2017,7 +2065,7 @@ function renderStep(){
  document.querySelectorAll('[data-product]').forEach(button=>button.onclick=()=>selectProductKind(button.dataset.product));
  document.querySelectorAll('[data-size]').forEach(b=>b.onclick=()=>{state.size=b.dataset.size;reconcileVariant(selectedCatalogDesign()?.sampleColor,true);confirmDetail('size');persistDraft();renderStep()});
  document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{state.color=b.dataset.color;reconcileVariant();confirmDetail('color');persistDraft();renderStep();viewer?.update(previewState())});
- const guide=document.querySelector('#size-guide-modal');const openGuide=document.querySelector('#open-size-guide');if(openGuide)openGuide.onclick=()=>{syncSizeGuideLabels();guide.showModal()};
+ const guide=document.querySelector('#size-guide-modal');const openGuide=document.querySelector('#open-size-guide');if(openGuide)openGuide.onclick=()=>{syncSizeGuideLabels(state.kind);guide.showModal()};
  guide.querySelectorAll('[data-size-close]').forEach(button=>button.onclick=()=>guide.close());
  guide.querySelectorAll('[data-guide-size]').forEach(button=>button.onclick=()=>{state.size=button.dataset.guideSize;reconcileVariant(selectedCatalogDesign()?.sampleColor,true);guide.close();confirmDetail('size');persistDraft();renderStep();toast(`Talla ${sizeLabel(state.kind,state.size)} seleccionada.`)});
  document.querySelectorAll('[data-view-side]').forEach(b=>b.onclick=()=>{activateSide(b.dataset.viewSide);renderStep();faceSelectedSide()});

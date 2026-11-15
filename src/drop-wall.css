@@ -1082,6 +1082,18 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
 .drop-wall-enabled .drop-design-card:not(.drop-collection--featured[data-collection-id]):has(.drop-personalizable) .drop-design-price{top:56px}
 
 .drop-wall-enabled .drop-collection-sections>.drop-explore{width:100%;margin:0}
+.drop-wall-enabled #catalogo>.drop-explore{width:100%;margin:0}
+.drop-wall-enabled .drop-collection-links{width:100%;margin:54px 0 62px;color:var(--ds-text-inverse)}
+.drop-wall-enabled .drop-collection-links h2{margin:0 0 22px;font:700 clamp(25px,3vw,34px)/1.15 var(--ds-font-display)}
+.drop-wall-enabled .drop-collection-links-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.drop-wall-enabled .drop-collection-links-grid button{display:flex;flex-direction:column;justify-content:space-between;gap:20px;min-height:100px;padding:18px;border:1px solid color-mix(in srgb,var(--ds-text-inverse) 52%,transparent);border-radius:18px;background:var(--ds-brand-primary);color:var(--ds-text-inverse);text-align:left;cursor:pointer}
+.drop-wall-enabled .drop-collection-links-grid button:hover{border-color:var(--ds-brand-accent);background:color-mix(in srgb,var(--ds-brand-accent) 10%,var(--ds-brand-primary))}
+.drop-wall-enabled .drop-collection-links-grid button:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:3px}
+.drop-wall-enabled .drop-collection-links-grid strong{font:700 clamp(14px,1.6vw,19px)/1.2 var(--ds-font-display)}
+.drop-wall-enabled .drop-collection-links-grid span{display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 12px/1.2 var(--ds-font-body)}
+.drop-wall-enabled .drop-collection-links-grid svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
+@media(max-width:1000px){.drop-wall-enabled .drop-collection-links-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){.drop-wall-enabled .drop-collection-links{margin:38px 0 44px}.drop-wall-enabled .drop-collection-links-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.drop-wall-enabled .drop-collection-links-grid button{min-height:95px;padding:14px}}
 
 /* A soft edge makes the horizontal theme list visibly pass beneath the product selector. */
 .drop-wall-enabled .catalog-theme-filter{position:relative}
