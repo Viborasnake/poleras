@@ -3223,7 +3223,7 @@ body.theme-dark .catalog-product-badge[aria-pressed="true"]{background:var(--ds-
 .studio-browse-details p{margin:0;max-width:52ch;color:inherit;font:500 clamp(16px,1.35vw,20px)/1.5 var(--ds-font-body)}
 .studio-browse-price{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;margin-top:2px}
 .studio-browse-price>span{font:600 13px/1.3 var(--ds-font-body)}
-.studio-browse-price strong{position:relative;max-width:100%;color:inherit;font:700 clamp(26px,2.4vw,34px)/1.1 var(--ds-font-display);letter-spacing:-.03em;overflow-wrap:anywhere}
+.studio-browse-price strong{position:relative;max-width:100%;color:inherit;font:700 clamp(23px,2vw,28px)/1.1 var(--ds-font-display);letter-spacing:-.03em;overflow-wrap:anywhere}
 .studio-browse-price strong::after{position:absolute;right:0;bottom:-8px;width:49%;border-top:4px solid var(--ds-brand-accent);border-radius:50%;content:'';transform:rotate(-3deg)}
 .studio-browse-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px}
 .studio-browse-cta{margin-top:12px}
@@ -3234,20 +3234,14 @@ body.theme-dark #studio .studio-browse-cta:is(:hover,:focus-visible){background:
 .studio-browse-share{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 2px;background:transparent;color:inherit;font:600 13px/1.2 var(--ds-font-body)}
 .studio-browse-share svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .studio-browse-share:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:3px}
-.studio-browse-benefits{width:100%;margin-top:10px;border-top:1px solid currentColor}
+.studio-browse-benefits{width:100%;margin-top:10px}
 .studio-browse-benefits h3{margin:16px 0 16px;font:700 13px/1.4 var(--ds-font-body);letter-spacing:.1em;text-transform:uppercase}
 .studio-browse-benefits ul{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0;padding:0;list-style:none}
-.studio-browse-benefits li{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;margin:0;padding:0 2px;text-align:center;font:600 12px/1.25 var(--ds-font-body)}
+.studio-browse-benefits li{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;margin:0;padding:0 2px;border:0;text-align:center;font:600 12px/1.25 var(--ds-font-body)}
 .studio-browse-benefits li>.studio-browse-benefit-icon{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:12px;background:var(--ds-brand-accent);color:var(--ds-text-primary)}
 .studio-browse-benefit-icon svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .studio-browse-benefits li>.studio-browse-benefit-label{display:block;min-width:0;width:auto;height:auto;border-radius:0;background:transparent;color:inherit;font:inherit}
-.studio-browse-payment{display:grid;gap:10px;width:100%;margin-top:8px;padding-top:18px;border-top:1px solid currentColor;font:700 14px/1.3 var(--ds-font-body)}
-.studio-browse-payment-title,.studio-browse-payment-methods{display:flex;align-items:center;gap:10px}
-.studio-browse-payment-title>svg{flex:none;width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.studio-browse-payment-methods{flex-wrap:wrap}
-.studio-browse-payment img{display:block;width:120px;max-width:100%;height:auto;padding:3px 7px;border-radius:8px;background:var(--ds-surface-raised)}
-.studio-browse-bank{display:inline-flex;align-items:center;gap:6px;font:600 13px/1.25 var(--ds-font-body);white-space:nowrap}
-.studio-browse-bank svg{flex:none;width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#studio.is-browse .steps{display:none}
 #studio:has(.studio-gallery:not([hidden])) .preview{background:var(--ds-brand-primary);color:var(--ds-text-inverse)}
 #studio:has(.studio-gallery:not([hidden])) #live-preview{position:relative;min-width:0;min-height:0;align-self:stretch;border:2px solid var(--ds-brand-accent);border-radius:22px;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--ds-brand-secondary) 42%,transparent),transparent 68%),var(--ds-brand-primary);overflow:hidden}
 #studio:has(.studio-gallery:not([hidden])) #live-preview>.eyebrow{position:absolute;z-index:4;top:18px;left:18px;max-width:calc(100% - 90px);color:var(--ds-text-inverse);font-size:11px;line-height:1.35;letter-spacing:.1em}
