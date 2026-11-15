@@ -5,6 +5,7 @@ import {mountDropHeroSearch} from './drop-hero-search.js';
 import {planDropWall} from './drop-wall-layout.js';
 import {catalogFiltersMarkup,catalogProductToggleMarkup} from './catalog-filters.js';
 import {catalogProductDesigns,catalogProductOptions,designWithProductMockup,designAppliesToProduct} from './catalog-product-mockups.js';
+import {studioGalleryItems} from './studio-gallery.js';
 import {mountAccountDataDisclosure} from './account-data-disclosure.js';
 import {designForProduct,designProductArtworks,modelProductSlug} from './catalog-product-artworks.js';
 import {normalizeVariantRows,allowedVariantRows,resolveExactVariant,normalizeVariantColor,bodyCommerceReady} from '../supabase/functions/_shared/variant-selection.js';
@@ -299,7 +300,7 @@ const menuDivider=document.createElement('span');menuDivider.className='drop-men
 const searchButton=document.createElement('button');searchButton.type='button';searchButton.className='drop-search-trigger';searchButton.setAttribute('aria-label','Buscar diseños');searchButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>';
 header.insertBefore(menuDivider,accountButton);header.insertBefore(searchButton,accountButton);
 function searchEntries(){return catalogDesigns.filter(design=>design.active!==false&&catalogProductOptions(catalogProducts,[design]).length).map(design=>({design,collection:collections.find(item=>item.id===design.collection),products:catalogProductOptions(catalogProducts,[design]).map(product=>product.name),productSlugs:catalogProductOptions(catalogProducts,[design]).map(product=>product.slug)})).filter(entry=>entry.collection).map(entry=>({...entry,category:catalogCategories.find(category=>category.id===entry.collection.category)?.label||''}))}
-dropHeroSearch=mountDropHeroSearch(document.querySelector('.drop-intro-aside'),{getEntries:searchEntries,getTopics:()=>catalogCategories.filter(category=>searchEntries().some(entry=>entry.collection.category===category.id)),getProducts:()=>catalogProductOptions(catalogProducts,catalogDesigns),isAvailable:()=>catalogAvailable,getPreview:(design,collection,product)=>catalogPreviewDesign(design,collection.productSlug,product||'all').featuredPhoto,onChoose:openCatalogDesign,onCollection:openCatalogCollection,onCreate:()=>beginIdea(),onRetry:()=>refreshCatalog()});
+dropHeroSearch=mountDropHeroSearch(document.querySelector('.drop-intro-aside'),{getEntries:searchEntries,getTopics:()=>catalogCategories.filter(category=>searchEntries().some(entry=>entry.collection.category===category.id)),getProducts:()=>catalogProductOptions(catalogProducts,catalogDesigns),isAvailable:()=>catalogAvailable,getPreview:(design,collection,product)=>catalogPreviewDesign(design,collection.productSlug,product||'all').featuredPhoto,onChoose:(design,collection,product)=>{const trigger=document.createElement('button');trigger.dataset.design=design.id;trigger.dataset.product=catalogPreviewDesign(design,collection.productSlug,product||'all').previewProductSlug;void chooseCatalogDesign(trigger)},onCollection:openCatalogCollection,onCreate:()=>beginIdea(),onRetry:()=>refreshCatalog()});
 searchButton.addEventListener('click',()=>dropHeroSearch.open());
 
 }
@@ -556,7 +557,7 @@ const faqs=[
  ['¿Cómo elijo un diseño?','Parte por Colecciones para descubrir una temática. Luego abre Diseños para comparar las piezas disponibles y elegir la que quieres personalizar.'],
  ['¿Qué productos puedo personalizar?','En Productos verás solo las opciones activas. Al elegir una, el catálogo muestra los diseños que tienen un mockup disponible para ese producto.'],
  ['¿Cómo sé si un diseño sirve para el producto que quiero?','Cada diseño muestra sus productos compatibles. También puedes usar el filtro Productos para ver únicamente los diseños disponibles para Poleras, Bodys o Totebags.'],
- ['¿Puedo personalizar el diseño que elija?','Sí. Abre “Personalizar este diseño” y selecciona las opciones disponibles antes de agregarlo a tu pedido.'],
+ ['¿Puedo personalizar el diseño que elija?','Sí. Abre “Ver diseño”, revisa los mockups y la descripción, y elige “Personalizar” para seleccionar las opciones disponibles.'],
  ['¿Hacen despachos a regiones?','Sí. Coordinamos despachos dentro de Chile. El costo y el plazo se calculan antes de pagar, según tu dirección y tu pedido.'],
  ['¿Qué medios de pago aceptan?','Puedes pagar de forma segura con Mercado Pago. Verás el total del pedido y el despacho antes de confirmar el pago.']
 ];
@@ -616,13 +617,114 @@ if(heroSlider){
  scheduleAutoplay();
 }
 const studio=document.querySelector('#studio');const fullscreenViewerDialog=document.querySelector('#fullscreen-viewer');let viewer,viewerPromise,viewerKind=null,viewerVersion=0,fullscreenViewer,fullscreenViewerVersion=0,productTransitionVersion=0,introTurn=null,introSession=0,introInteracted=false;const uploadVersions={front:0,back:0};
+const studioGallery=document.createElement('section');
+studioGallery.className='studio-gallery';
+studioGallery.setAttribute('aria-label','Fotografías del diseño');
+studioGallery.hidden=true;
+studioGallery.innerHTML='<div class="studio-gallery-grid"></div>';
+document.querySelector('#live-preview').after(studioGallery);
+const stagePhoto=document.createElement('div');
+stagePhoto.className='studio-stage-photo';
+stagePhoto.hidden=true;
+stagePhoto.innerHTML='<img class="studio-stage-photo-image" alt=""><span class="studio-stage-photo-label"></span><button type="button" class="studio-stage-photo-pause" aria-pressed="false">Pausar fotos</button>';
+document.querySelector('#live-preview').append(stagePhoto);
+let galleryKey='',galleryItems=[],photoOpener=null,stageAngle=0,activePhotoIndex=0,photoRotationTimer=null,photoRotationPaused=false;
+const stageControls=document.createElement('div');
+stageControls.className='studio-view-controls';
+stageControls.setAttribute('role','group');
+stageControls.setAttribute('aria-label','Controles de vista 3D');
+stageControls.innerHTML='<button type="button" data-stage-action="rotate-left" aria-label="Girar prenda a la izquierda">↶</button><button type="button" data-stage-action="rotate-right" aria-label="Girar prenda a la derecha">↷</button><button type="button" data-stage-action="zoom-in" aria-label="Acercar prenda">+</button><button type="button" data-stage-action="zoom-out" aria-label="Alejar prenda">−</button><span class="sr-only" role="status" aria-live="polite"></span>';
+document.querySelector('#live-preview').append(stageControls);
+stageControls.addEventListener('click',event=>{
+ const action=event.target.closest('[data-stage-action]')?.dataset.stageAction;
+ if(!action)return;
+ cancelIntroTurn();
+ if(action.startsWith('rotate'))stageAngle+=action==='rotate-left'?-Math.PI/8:Math.PI/8;
+ const apply=created=>{
+  if(!created)return;
+  if(action.startsWith('rotate'))created.turn(stageAngle);
+  else created.zoomBy(action==='zoom-in'?-.5:.5);
+  stageControls.querySelector('[role="status"]').textContent=action.startsWith('rotate')?'Prenda girada.':`Acercamiento ${created.zoomPercent()}%.`;
+ };
+ if(viewer)apply(viewer);else viewerPromise?.then(apply);
+});
+function closeStagePhoto({restoreFocus=true}={}){
+ if(stagePhoto.hidden)return;
+ clearInterval(photoRotationTimer);photoRotationTimer=null;
+ stagePhoto.hidden=true;
+ const livePreview=document.querySelector('#live-preview');
+ livePreview.classList.remove('is-photo-open','is-portrait-photo');
+ livePreview.style.removeProperty('--stage-photo-aspect');
+ studioGallery.querySelectorAll('[data-gallery-index][aria-pressed="true"]').forEach(button=>button.setAttribute('aria-pressed','false'));
+ if(restoreFocus&&photoOpener?.isConnected)photoOpener.focus({preventScroll:true});
+ photoOpener=null;
+ requestAnimationFrame(()=>viewer?.resize());
+}
+function showStagePhoto(index){
+ const item=galleryItems[index];if(!item)return;
+ activePhotoIndex=index;
+ studioGallery.querySelectorAll('[data-gallery-index]').forEach(card=>card.setAttribute('aria-pressed',String(Number(card.dataset.galleryIndex)===index)));
+ const image=stagePhoto.querySelector('.studio-stage-photo-image');
+ const livePreview=document.querySelector('#live-preview');
+ const updatePhotoSize=()=>{if(stagePhoto.hidden||!image.naturalWidth||!image.naturalHeight)return;const ratio=image.naturalWidth/image.naturalHeight;livePreview.style.setProperty('--stage-photo-aspect',String(ratio));livePreview.classList.toggle('is-portrait-photo',ratio<.9)};
+ image.onload=updatePhotoSize;
+ image.src=item.src;image.alt=`${item.label} con el diseño ${selectedCatalogDesign()?.name||'elegido'}`;
+ stagePhoto.querySelector('.studio-stage-photo-label').textContent=`${item.label} · ${selectedCatalogDesign()?.name||'Tu diseño'}`;
+ stagePhoto.classList.toggle('is-artwork-fallback',Boolean(item.artworkFallback));
+ stagePhoto.dataset.kind=state.kind;stagePhoto.dataset.step=String(state.step);
+ stagePhoto.hidden=false;
+ livePreview.classList.add('is-photo-open');
+ if(image.complete)updatePhotoSize();
+}
+function schedulePhotoRotation(){
+ clearInterval(photoRotationTimer);photoRotationTimer=null;
+ if(stagePhoto.hidden||photoRotationPaused||introReducedMotion.matches||document.hidden||galleryItems.length<2)return;
+ photoRotationTimer=setInterval(()=>showStagePhoto((activePhotoIndex+1)%galleryItems.length),3000);
+}
+function renderStudioGallery(){
+ const design=selectedCatalogDesign();
+ const items=studioGalleryItems(design,catalogProducts);
+ if(design&&!items.some(item=>item.productSlug===modelProductSlug(state.kind))){
+  const selectedProduct=modelProductSlug(state.kind);
+  const artwork=designForProduct(design,selectedProduct);
+  const src=artwork&&artworkUrl(artwork);
+  if(src)items.unshift({src,label:'Vista del diseño',productSlug:selectedProduct,focusX:50,focusY:50,artworkFallback:true});
+ }
+ const key=JSON.stringify([design?.id,design?.name,items]);
+ studioGallery.hidden=state.mode!=='browse'||!items.length;
+ if(!stagePhoto.hidden&&(studioGallery.hidden||stagePhoto.dataset.kind!==state.kind||stagePhoto.dataset.step!==String(state.step)||key!==galleryKey))closeStagePhoto({restoreFocus:false});
+ if(key===galleryKey)return;
+ galleryKey=key;galleryItems=items;
+ const grid=studioGallery.querySelector('.studio-gallery-grid');
+ grid.replaceChildren(...items.map((item,index)=>{
+  const button=document.createElement('button');button.type='button';button.className='studio-gallery-card';button.dataset.galleryIndex=String(index);button.setAttribute('aria-label',`Ver fotografía ${index+1} en el visor: ${item.label}`);button.setAttribute('aria-pressed','false');
+  const image=document.createElement('img');image.src=item.src;image.alt=`${item.label} con el diseño ${design.name}`;image.loading='lazy';image.decoding='async';image.style.objectPosition=`${item.focusX}% ${item.focusY}%`;
+  const caption=document.createElement('span');caption.className='studio-gallery-caption';caption.innerHTML=`<b>${String(index+1).padStart(2,'0')}</b><span></span>`;caption.querySelector('span').textContent=item.label;
+  button.append(image,caption);return button;
+ }));
+}
+studioGallery.addEventListener('click',event=>{
+ const button=event.target.closest('[data-gallery-index]');
+ if(!button)return;
+ if(!galleryItems[Number(button.dataset.galleryIndex)])return;
+ photoOpener=button;
+ showStagePhoto(Number(button.dataset.galleryIndex));
+ schedulePhotoRotation();
+ if(window.matchMedia('(max-width:760px)').matches)document.querySelector('#live-preview').scrollIntoView({behavior:introReducedMotion.matches?'auto':'smooth',block:'start'});
+});
+stagePhoto.querySelector('.studio-stage-photo-pause').addEventListener('click',event=>{
+ photoRotationPaused=!photoRotationPaused;
+ event.currentTarget.textContent=photoRotationPaused?'Reanudar fotos':'Pausar fotos';
+ event.currentTarget.setAttribute('aria-pressed',String(photoRotationPaused));
+ schedulePhotoRotation();
+});
 const introReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
 const cancelIntroTurn=()=>{introInteracted=true;introTurn?.cancel()};
 studio.addEventListener('pointerdown',cancelIntroTurn,{passive:true});
 studio.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' '].includes(event.key))cancelIntroTurn()});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelIntroTurn()});
-introReducedMotion.addEventListener?.('change',event=>{if(event.matches)cancelIntroTurn()});
-studio.addEventListener('close',()=>{cancelIntroTurn();introSession++;closeFullscreenViewer()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelIntroTurn();schedulePhotoRotation()});
+introReducedMotion.addEventListener?.('change',event=>{if(event.matches)cancelIntroTurn();schedulePhotoRotation()});
+studio.addEventListener('close',()=>{cancelIntroTurn();introSession++;closeStagePhoto({restoreFocus:false});closeFullscreenViewer()});
 const previewFallbackTemplate=document.querySelector('.preview-fallback')?.cloneNode(true);
 document.querySelector('.preview-fallback')?.setAttribute('hidden','');
 const previewLoading=document.createElement('div');
@@ -720,8 +822,24 @@ document.querySelector('#fullscreen-reset-view')?.addEventListener('click',()=>{
 fullscreenViewerDialog?.addEventListener('close',disposeFullscreenViewer);
 function syncPreview(){
  const checkoutPreview=document.querySelector('#checkout-cart-preview');
+ renderStudioGallery();
  if(state.step===3&&!state.catalogDesignCustomerImage){document.querySelector('#reference-panel').hidden=true;document.querySelector('#live-preview').hidden=true;renderCheckoutCartPreview();checkoutPreview.hidden=false;return}
  if(checkoutPreview)checkoutPreview.hidden=true;
+ if(state.mode==='browse'){
+  const livePreview=document.querySelector('#live-preview');
+  livePreview.hidden=false;
+  livePreview.classList.remove('is-forging');
+  stageControls.hidden=true;
+  if(viewer||viewerPromise){viewerVersion++;viewer?.dispose();viewer=null;viewerPromise=null;viewerKind=null;introTurn?.cancel();introTurn=null}
+  previewLoading.hidden=true;
+  if(stagePhoto.hidden&&galleryItems.length){
+   const selectedProduct=modelProductSlug(state.kind);
+   const selectedIndex=galleryItems.findIndex(item=>item.productSlug===selectedProduct);
+   showStagePhoto(selectedIndex<0?0:selectedIndex);
+   schedulePhotoRotation();
+  }
+  return;
+ }
  const petPlaceholder=Boolean(state.catalogDesignCustomerImage);
  const sideImage=activeAdditionalPrint()?.image||state.images?.[state.printSide]||'';
  const catalogPreviewReady=Boolean(catalogDesignLocked()&&sideImage);
@@ -729,6 +847,7 @@ function syncPreview(){
  const renderState=previewState(),hasArtwork=Boolean(renderState.printLayers?.length||renderState.image);
  const isForging=!petPlaceholder&&!hasArtwork&&!showSample&&!catalogPreviewReady,showMockup=Boolean(petPlaceholder||hasArtwork||showSample);
  const livePreview=document.querySelector('#live-preview');livePreview.hidden=!(isForging||showMockup);livePreview.classList.toggle('is-forging',isForging);
+ stageControls.hidden=!showMockup;
  let story=livePreview.querySelector('.studio-personalization-story');
  const personalizedDesign=state.catalogDesignCustomerImage&&selectedCatalogDesign();
  if(personalizedDesign&&sideImage){
@@ -743,12 +862,12 @@ function syncPreview(){
  const panel=document.querySelector('#reference-panel');panel.hidden=true;panel.replaceChildren();
  const fallbackShell=document.querySelector('.preview-fallback');
  if(fallbackShell){fallbackShell.classList.toggle('body-fallback',state.kind==='body');fallbackShell.style.setProperty('--shirt',state.color);const fallback=fallbackShell.querySelector('img');if(fallback){fallback.hidden=!renderState.image;fallback.alt=state.kind==='body'?'Tu diseño sobre el body':'Tu diseño sobre la polera';if(!fallback.hidden)fallback.src=renderState.image}}
- if((isForging||showMockup)&&studio.open){const wantedKind=state.kind==='tote'?'tote':'shirt';if(viewerKind!==wantedKind){viewer?.dispose();viewer=null;viewerPromise=null;introTurn=null;viewerKind=wantedKind;viewerVersion++;showPreviewLoading()}viewer?.update(renderState);if(!viewerPromise){const version=viewerVersion,session=introSession;viewerPromise=import(wantedKind==='tote'?'./tote-viewer.js':'./garment.js').then(async m=>{const created=wantedKind==='tote'?await m.createToteViewer(document.querySelector('#viewer'),renderState):await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:4.9});if(version!==viewerVersion){created.dispose();return null}viewer=created;introTurn=createIntroTurn({turn:created.turn,reducedMotion:()=>introReducedMotion.matches});requestAnimationFrame(()=>requestAnimationFrame(()=>{if(session===introSession&&!introInteracted&&studio.open&&viewer===created)introTurn.start()}));return viewer}).catch(()=>{if(version===viewerVersion){viewerPromise=null;showPreviewFallback(renderState);toast('El visor 3D no está disponible en este navegador.','error')}return null})}
+ if((isForging||showMockup)&&studio.open){const wantedKind=state.kind==='tote'?'tote':'shirt';if(viewerKind!==wantedKind){viewer?.dispose();viewer=null;viewerPromise=null;introTurn=null;viewerKind=wantedKind;viewerVersion++;stageAngle=0;showPreviewLoading()}viewer?.update(renderState);if(!viewerPromise){const version=viewerVersion,session=introSession;viewerPromise=import(wantedKind==='tote'?'./tote-viewer.js':'./garment.js').then(async m=>{const created=wantedKind==='tote'?await m.createToteViewer(document.querySelector('#viewer'),renderState):await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:4.9});if(version!==viewerVersion){created.dispose();return null}viewer=created;introTurn=createIntroTurn({turn:created.turn,reducedMotion:()=>introReducedMotion.matches});requestAnimationFrame(()=>requestAnimationFrame(()=>{if(session===introSession&&!introInteracted&&!introReducedMotion.matches&&studio.open&&viewer===created)introTurn.start()}));return viewer}).catch(()=>{if(version===viewerVersion){viewerPromise=null;showPreviewFallback(renderState);stageControls.hidden=true;toast('El visor 3D no está disponible en este navegador.','error')}return null})}
  viewerPromise?.then(created=>{created?.update(renderState);created?.resize()})}
  if(fullscreenViewerDialog?.open)fullscreenViewer?.update(renderState);
 }
 function renderCheckoutCartPreview(){normalizeCartPrices();const target=document.querySelector('#checkout-cart-preview');if(!target)return;const items=cart,itemCount=cart.reduce((sum,item)=>sum+item.quantity,0),designCount=cart.length,shipping=state.shippingQuote?.amount,hasQuote=Boolean(state.shippingQuote),total=cartTotal()+(shipping||0)-state.couponDiscount,couponSummary=state.couponDiscount?`−${money(state.couponDiscount)}`:'Disponible';target.innerHTML=`<span class="eyebrow">TU PEDIDO · ${designCount} ${designCount===1?'DISEÑO':'DISEÑOS'} · ${itemCount} ${itemCount===1?'PRODUCTO':'PRODUCTOS'}</span><h3>Resumen del pedido</h3><div class="checkout-cart-preview-list">${items.map((item,index)=>{const image=item.catalogDesignCustomerImage?'':catalogPreviewForCart(item.catalogDesignSlug,item.modelCode)||item.designPreview,breakdown=cartItemBreakdown(item);return `<article><div class="checkout-cart-preview-art" style="--cart-color:${safe(item.color)}">${image?`<img src="${safe(image)}" alt="Diseño ${index+1} de tu pedido">`:`<span>${safe(item.initial)}</span>`}</div><div><strong>${safe(cartProductLabel(item))}</strong><small>Talla ${safe(sizeLabel(item.modelCode,item.size))} · ${safe(cartColorLabel(item))} · ${safe(item.sides)} · ${item.quantity} ${item.quantity===1?'unidad':'unidades'}</small><small class="cart-item-placement">${safe(cartPrintConfigurationLabel(item))}</small>${cartBreakdownMarkup(item)}<div class="checkout-cart-line-total"><span>Total del producto</span><b>${money(breakdown.line)}</b></div></div></article>`}).join('')}</div><div class="checkout-cart-preview-total"><table><tbody><tr><th scope="row">Subtotal de productos</th><td>${money(cartTotal())}</td></tr><tr><th scope="row">Despacho</th><td>${hasQuote?(shipping?money(shipping):'Gratis'):'Por calcular'}</td></tr><tr class="checkout-cart-preview-coupon"><th scope="row">Cupón de descuento</th><td>${couponSummary}</td></tr>${hasQuote?`<tr class="checkout-cart-preview-grand-total"><th scope="row">Total</th><td>${money(total)}</td></tr>`:''}</tbody></table></div>`}
-function openStudio(mode='choose',kind){state.mode=mode;state.cartItemId=null;state.checkoutAsGuest=false;introSession++;introInteracted=false;introTurn?.reset();introTurn=null;if(kind){state.kind=kind;state.size=products[kind].sizes[0]}state.step=1;studio.showModal();document.body.classList.add('locked');renderStep();loadProductPrices()}
+function openStudio(mode='choose',kind){state.mode=mode;state.cartItemId=null;state.checkoutAsGuest=false;introSession++;introInteracted=false;introTurn?.reset();introTurn=null;if(mode==='browse'){photoRotationPaused=false;const pause=stagePhoto.querySelector('.studio-stage-photo-pause');pause.textContent='Pausar fotos';pause.setAttribute('aria-pressed','false')}if(kind){state.kind=kind;state.size=products[kind].sizes[0]}state.step=1;studio.showModal();document.body.classList.add('locked');renderStep();loadProductPrices()}
 function resetIdea(){
  detailsDisclosure=createDisclosureState();detailsDisclosureScope='own';publicFlowStates.clear();state.referencesBusy=false;
  state.catalogDesignCustomerImage=false;
@@ -790,9 +909,7 @@ dropExplore.addEventListener('click',event=>{
  }
  const button=event.target.closest('[data-explore-design]');
  if(!button)return;
- const design=catalogDesigns.find(item=>item.id===button.dataset.exploreDesign);
- const collection=collections.find(item=>item.id===design?.collection);
- if(design&&collection)openCatalogDesign(design,collection);
+ void chooseCatalogDesign(button);
 });
 dropExploreDesktop.addEventListener('change',positionDropExplore);
 
@@ -852,7 +969,7 @@ function catalogDesignCard(design,index,collection,preferredProduct='',wall=fals
  design=catalogPreviewDesign(design,collection?.productSlug,productChoice.selected);
  const productSlug=design.previewProductSlug;
  const commerceSupported=['poleras','bodys','totebags'].includes(productSlug);
- const chooseLabel=!commerceSupported?'Próximamente':design.name==='Laika Kauiju'?'Coloca a tu mascota':'Personalizar este diseño';
+ const chooseLabel=commerceSupported?'Ver diseño':'Próximamente';
  const mainFocus=design.mockupFocus||{x:50,y:50};
  const hoverFocus=design.mockupHoverFocus||{x:50,y:50};
  const personalizationArrow=design.personalizationArrow||{x:50,y:50};
@@ -864,7 +981,7 @@ function catalogDesignCard(design,index,collection,preferredProduct='',wall=fals
  if(wall){
   const price=priceLabel(productSlug==='totebags'?productPrice('tote','M',null,design):productSlug==='bodys'?productPrice('body',null,null,design):productSlug==='poleras'?productPrice('basic','M',null,design):null);
   const personalizationStory=petStory&&design.featuredPhoto?catalogPetStory(personalizationArrow,design.customerPhotoSubject):'';
-  return `<article class="catalog-card drop-collection drop-design-card${petStory?' catalog-card--pet-story':''}${design.featured||wallFeatured?' drop-collection--featured':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}"><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}"><button type="button" class="drop-collection-link" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}"><span class="drop-card-media">${visual.replaceAll('<img ',`<img loading="${index<3?'eager':'lazy'}" decoding="async" `)}${personalizationStory}</span><span class="drop-labels">${petStory?'<span class="drop-personalizable">Diseño personalizable</span>':`<span class="drop-collection-type">${wallFeatured?'✦ Diseño destacado':design.featured?'✦ Destacado':'Diseño original'}</span>`}</span><span class="drop-design-price">${price}</span><span class="drop-caption"><span><small>${safe(collection?.label||'Diseño original')}</small><strong>${safe(design.name)}</strong>${commerceSupported?'':'<small>Próximamente</small>'}</span>${dropArrowMarkup('Personalizar')}</span></button></div></article>`;
+  return `<article class="catalog-card drop-collection drop-design-card${petStory?' catalog-card--pet-story':''}${design.featured||wallFeatured?' drop-collection--featured':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}"><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}"><button type="button" class="drop-collection-link" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}"><span class="drop-card-media">${visual.replaceAll('<img ',`<img loading="${index<3?'eager':'lazy'}" decoding="async" `)}${personalizationStory}</span><span class="drop-labels">${petStory?'<span class="drop-personalizable">Diseño personalizable</span>':`<span class="drop-collection-type">${wallFeatured?'✦ Diseño destacado':design.featured?'✦ Destacado':'Diseño original'}</span>`}</span><span class="drop-design-price">${price}</span><span class="drop-caption"><span><small>${safe(collection?.label||'Diseño original')}</small><strong>${safe(design.name)}</strong>${commerceSupported?'':'<small>Próximamente</small>'}</span>${dropArrowMarkup('Ver diseño')}</span></button></div></article>`;
  }
 
  return `<article class="catalog-card catalog-design-card${petStory?' catalog-card--pet-story':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}"><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}">${design.featured?'<span class="catalog-featured-pill">Destacado</span>':''}<span class="catalog-design-kicker"><span aria-hidden="true">✦</span> Diseño original</span><span class="catalog-design-number" aria-hidden="true">${String(index+1).padStart(2,'0')}</span>${visual}${petStory&&design.featuredPhoto?catalogPetStory(personalizationArrow,design.customerPhotoSubject):''}<span class="catalog-price">${priceLabel(productSlug==='totebags'?productPrice('tote','M',null,design):productSlug==='bodys'?productPrice('body',null,null,design):productSlug==='poleras'?productPrice('basic','M',null,design):null)}</span></div><div class="catalog-card-info"><div>${inDialog?catalogProductBadges([sourceDesign],productChoice.selected,cardKey):''}${collection?`<span class="catalog-design-collection">${safe(collection.label)}</span>`:''}<h3>${safe(design.name)}</h3><details class="catalog-description"><summary><span class="catalog-description-show">Ver descripción</span><span class="catalog-description-hide">Ocultar descripción</span></summary><p>${safe(design.caption)}</p></details></div></div><div class="catalog-card-actions"><button type="button" class="catalog-choose ds-cta" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}">${chooseLabel} <span aria-hidden="true">→</span></button>${shareCollection?`<button type="button" class="catalog-share share-button" data-share-url="${safe(shareUrl)}" data-share-title="Colección ${safe(collection.label)} · Droska" data-share-text="Mira esta colección de Droska.">${shareIcon}<span>Compartir colección</span></button>`:''}</div></article>`;
@@ -1038,7 +1155,7 @@ function renderDropExplore(entries,isDesignView){
   const preview=catalogPreviewDesign(design,collection.productSlug);
   const image=preview.featuredPhoto||artworkUrl(preview);
   const focus=preview.mockupFocus||{x:50,y:50};
-  return `<button type="button" class="drop-explore-card${preview.featuredPhoto?'':' drop-explore-card--art'}" data-explore-design="${safe(design.id)}" aria-label="Explorar ${safe(design.name)}, colección ${safe(collection.label)}">${image?`<img src="${safe(image)}" alt="${safe(design.name)} en ${safe(catalogProductName(preview.previewProductSlug))}" loading="lazy" decoding="async" style="object-position:${Number(focus.x)}% ${Number(focus.y)}%">`:'<span class="drop-explore-placeholder">Mockup pendiente</span>'}<span class="drop-explore-caption"><small>${safe(collection.label)}</small><strong>${safe(design.name)}</strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></button>`;
+  return `<button type="button" class="drop-explore-card${preview.featuredPhoto?'':' drop-explore-card--art'}" data-explore-design="${safe(design.id)}" data-design="${safe(design.id)}" data-product="${safe(preview.previewProductSlug)}" aria-label="Ver diseño ${safe(design.name)}, colección ${safe(collection.label)}">${image?`<img src="${safe(image)}" alt="${safe(design.name)} en ${safe(catalogProductName(preview.previewProductSlug))}" loading="lazy" decoding="async" style="object-position:${Number(focus.x)}% ${Number(focus.y)}%">`:'<span class="drop-explore-placeholder">Mockup pendiente</span>'}<span class="drop-explore-caption"><small>${safe(collection.label)}</small><strong>${safe(design.name)}</strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></button>`;
  }).join('');
 }
 function renderCatalogWithMotion({animate=true}={}){
@@ -1291,9 +1408,13 @@ catalogSection.querySelector('.catalog-reset').addEventListener('click',()=>{
 catalogSection.querySelector('.catalog-actions').addEventListener('click',event=>{
  const layoutButton=event.target.closest('[data-catalog-grid-columns]');if(layoutButton){catalogGridColumns=Number(layoutButton.dataset.catalogGridColumns)===4?4:3;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-catalog-grid-columns="${catalogGridColumns===3?4:3}"]`)?.focus());return}
   const viewButton=event.target.closest('[data-catalog-view]');if(viewButton){catalogFilterMode=viewButton.dataset.catalogView;catalogView=catalogFilterMode;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-catalog-view="${catalogFilterMode}"]`)?.focus());return}
- const productButton=event.target.closest('[data-catalog-product]');if(productButton){selectedCatalogProduct=productButton.dataset.catalogProduct;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-catalog-product="${selectedCatalogProduct}"]`)?.focus());return}
  const button=event.target.closest('[data-category]');if(!button)return;
   selectedCatalogCategory=button.dataset.category;renderCatalogWithMotion().then(()=>catalogSection.querySelector(`[data-category="${selectedCatalogCategory}"]`)?.focus());
+});
+catalogSection.querySelector('.catalog-actions').addEventListener('change',event=>{
+ const select=event.target.closest('select[data-catalog-product]');if(!select)return;
+ selectedCatalogProduct=select.value;
+ renderCatalogWithMotion().then(()=>catalogSection.querySelector('select[data-catalog-product]')?.focus());
 });
 async function chooseCatalogDesign(button){
   if(!button||button.disabled)return;
@@ -1339,7 +1460,7 @@ async function chooseCatalogDesign(button){
     activateSide('front');
     syncPreview();
     catalogDialog.close();designDialog.close();
-    openStudio('ready');
+    openStudio('browse');
   }catch(error){console.warn('No pudimos abrir el diseño del catálogo:',error);toast('No pudimos abrir este diseño. Vuelve a intentarlo.')}finally{loading.remove();button.disabled=false;button.classList.remove('is-preparing');button.removeAttribute('aria-busy')}
 }
 let requestedDesignOpened=false;
@@ -1648,10 +1769,39 @@ function renderStep(){
  studio.classList.toggle('is-checkout-step',state.step===3&&!state.catalogDesignCustomerImage);
  studio.classList.toggle('is-entry-choice',state.mode==='choose');
  studio.classList.toggle('is-request-mode',state.mode==='custom');
+ studio.classList.toggle('is-browse',state.mode==='browse');
+ studio.classList.toggle('is-catalog-design',Boolean(selectedCatalogDesign())&&state.mode!=='choose'&&state.mode!=='custom');
  colorDock.hidden=true;sizeDock.hidden=catalogDesignLocked();
  const stepContent=document.querySelector('#step-content');
  const next=document.querySelector('#next');
  const back=document.querySelector('#back');
+ if(state.mode==='browse'){
+  const design=selectedCatalogDesign();
+  const collection=collections.find(item=>item.id===design?.collection);
+  const shareUrl=`/?design=${encodeURIComponent(design?.id||'')}&product=${encodeURIComponent(modelProductSlug(state.kind))}#catalogo`;
+  const startingOffer=Object.keys(products)
+   .filter(kind=>catalogProducts.some(product=>product.active!==false&&product.slug===modelProductSlug(kind))&&designSupportsProduct(design,kind))
+   .map(kind=>({kind,price:productPrice(kind,null,null,design)}))
+   .filter(offer=>offer.price!==null)
+   .sort((a,b)=>a.price-b.price)[0];
+  const startingPrice=startingOffer?.price??null;
+  const startingFormat=startingOffer?.kind==='tote'?'tote bag':startingOffer?.kind==='body'?'body bebé':'polera';
+  const benefits=[
+   ['Impresión de alta calidad','<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 11V3h16v8M8 24H4V12h24v12h-4M8 21h16v8H8zM24 16h1"/></svg>'],
+   ['Fabricación a pedido','<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 2 2.3 8.7L27 13l-8.7 2.3L16 24l-2.3-8.7L5 13l8.7-2.3L16 2Zm11 19 .9 3.1L31 25l-3.1.9L27 29l-.9-3.1L23 25l3.1-.9L27 21ZM5 21l.9 3.1L9 25l-3.1.9L5 29l-.9-3.1L1 25l3.1-.9L5 21Z"/></svg>'],
+   ['Despacho a todo Chile','<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h17v17H3zM20 12h5l4 5v7h-9M7 24a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0Zm16 0a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0Z"/></svg>'],
+   ['Cambios y devoluciones','<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 28 7v8c0 7-4.7 11.8-12 15C8.7 26.8 4 22 4 15V7L16 2Zm-6 13 4 4 8-8"/></svg>'],
+  ];
+  const benefitRows=benefits.map(([label,icon])=>`<li><span class="studio-browse-benefit-icon">${icon}</span><span class="studio-browse-benefit-label">${label}</span></li>`).join('');
+  const paymentHtml='<div class="studio-browse-payment"><div class="studio-browse-payment-title"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 28 7v8c0 7-4.7 11.8-12 15C8.7 26.8 4 22 4 15V7L16 2Zm-6 13 4 4 8-8"/></svg><span>Medios de pago</span></div><div class="studio-browse-payment-methods"><img src="/mercado-pago-logo.svg" alt="Mercado Pago"><span class="studio-browse-bank"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18M5 9v10m5-10v10m4-10v10m5-10v10M2 21h20M12 3 2 8h20L12 3Z"/></svg>Transferencia bancaria</span></div></div>';
+  document.querySelector('.steps').innerHTML='';
+  next.hidden=true;back.hidden=true;colorDock.hidden=true;sizeDock.hidden=true;
+  stepContent.innerHTML=`<section class="studio-browse-details" aria-labelledby="studio-browse-title"><span class="eyebrow">${escapeText(collection?.label||'DISEÑO ORIGINAL')}</span><h2 id="studio-browse-title">${escapeText(design?.name||'Tu diseño')}</h2><p>${escapeText(design?.caption||'Mira cómo se ve este diseño en los productos disponibles.')}</p><div class="studio-browse-price" aria-label="Precio según formato"><span>${startingPrice==null?'Precio según formato':`Precio inicial en ${startingFormat}`}</span><strong>${startingPrice==null?'Precio por confirmar':`Desde ${money(startingPrice)}`}</strong></div><div class="studio-browse-actions"><button type="button" class="studio-browse-cta ds-cta ds-cta--md" id="studio-start-personalizing">Personalizar ${dropArrowIcon}</button><button type="button" class="studio-browse-share" data-share-url="${escapeText(shareUrl)}" data-share-title="${escapeText(`${design?.name||'Diseño'} · Droska`)}" data-share-text="Mira este diseño de Droska.">${shareIcon}<span>Compartir</span></button></div><section class="studio-browse-benefits" aria-labelledby="studio-browse-benefits-title"><h3 id="studio-browse-benefits-title">Lo que hace especial tu compra</h3><ul>${benefitRows}</ul></section>${paymentHtml}</section>`;
+  stepContent.querySelector('#studio-start-personalizing').onclick=()=>{state.mode='ready';renderStep();requestAnimationFrame(()=>{const title=stepContent.querySelector('h2');if(title){title.tabIndex=-1;title.focus({preventScroll:true})}})};
+  stepContent.querySelector('.studio-browse-share').onclick=event=>shareCatalogLink(event.currentTarget);
+  syncPreview();
+  return;
+ }
  if(state.mode==='choose'){
   document.querySelector('.steps').innerHTML='';
   next.hidden=true;back.hidden=true;colorDock.hidden=true;sizeDock.hidden=true;

@@ -28,6 +28,12 @@ test('archivo propio reemplaza el marcador y respeta el lado seleccionado', () =
 test('un catálogo sin arte no se sustituye por el marcador de diseño propio', () => {
  assert.equal(studioPreviewState({mode:'ready',catalogDesign:'Elegido',isDefault:true,images:{},printSide:'front'}, '/placeholder.svg').image, '');
 });
+test('la vista de exploración conserva el estampado en el visor 3D', () => {
+ const state={mode:'browse',catalogDesign:'Guerrera del fuego',kind:'basic',printSide:'front',printSides:['front'],images:{front:'/arte.webp'},printConfigurations:{front:{placement:'center',size:'large'}}};
+ const preview=studioPreviewState(state,'/placeholder.svg');
+ assert.equal(preview.image,'/arte.webp');
+ assert.deepEqual(preview.printLayers.map(item=>item.image),['/arte.webp']);
+});
 test('la vista usa posición, tamaño y movimiento de la cara activa', () => {
  const preview=studioPreviewState({mode:'ready',isDefault:false,printSide:'front',images:{front:'/arte.webp'},printConfigurations:{front:{placement:'chest_left',size:'pocket',scale:.55,offsetX:1,offsetY:-2}}},'/placeholder.svg');
  assert.deepEqual({placement:preview.printPlacement,scale:preview.printScale,x:preview.printOffsetX,y:preview.printOffsetY},{placement:'chest_left',scale:.55,x:1,y:-2});

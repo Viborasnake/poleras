@@ -2,19 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {catalogFiltersMarkup,catalogProductToggleMarkup} from './catalog-filters.js';
 
-test('el selector superior conserva Colecciones y Diseños y el filtro de producto queda debajo',()=>{
+test('el selector superior conserva Colecciones y Diseños y el producto usa un select a la derecha',()=>{
  const html=catalogFiltersMarkup({category:'anime',product:'bodys',categories:[{id:'anime',label:'Anime'}],products:[{slug:'poleras',name:'Poleras'},{slug:'bodys',name:'Bodys'},{slug:'totebags',name:'Totebags'}]});
  assert.match(html,/data-catalog-view="collections"/);
  assert.match(html,/data-catalog-view="designs"/);
  assert.doesNotMatch(html,/data-catalog-view="products"/);
  assert.match(html,/catalog-product-group/);
- assert.match(html,/id="catalog-product-label">Producto/);
- assert.match(html,/role="group" aria-labelledby="catalog-product-label"/);
- assert.match(html,/data-catalog-product="all" aria-pressed="false"/);
- assert.match(html,/data-catalog-product="poleras" aria-pressed="false"/);
- assert.match(html,/data-catalog-product="bodys" aria-pressed="true"/);
- assert.match(html,/data-catalog-product="totebags" aria-pressed="false"/);
- for(const slug of ['poleras','bodys','totebags'])assert.match(html,new RegExp(`data-catalog-product="${slug}"[^>]*><span class="catalog-selected-mark"[^>]*>✓</span><svg class="product-family-icon"`));
+ assert.match(html,/<label class="catalog-product-group">/);
+ assert.match(html,/<select class="ds-field" data-catalog-product aria-label="Filtrar por producto">/);
+ assert.match(html,/<option value="all">Todos los productos<\/option>/);
+ assert.match(html,/<option value="poleras">Poleras<\/option>/);
+ assert.match(html,/<option value="bodys" selected>Bodys<\/option>/);
+ assert.match(html,/<option value="totebags">Totebags<\/option>/);
  assert.ok(html.indexOf('catalog-product-group')>html.indexOf('catalog-theme-filter'));
 });
 
