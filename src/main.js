@@ -1357,9 +1357,23 @@ function toggleCatalogZoom(event){
   visual.classList.toggle('is-zoomed');
   return true;
 }
+function clearRevealedDesignCards(){
+ catalogSection.querySelectorAll('.drop-design-card.is-touch-revealed').forEach(card=>{card.classList.remove('is-touch-revealed');card.querySelector('.drop-collection-link')?.removeAttribute('aria-expanded')});
+}
 catalogSection.querySelector('.catalog-grid').addEventListener('click',async event=>{
   if(event.target.closest('[data-drop-create]')){beginIdea();return}
   if(toggleCatalogZoom(event))return;
+  const touchedCard=event.target.closest('.drop-wall-enabled .catalog-grid.drop-wall .drop-design-card');
+  if(touchedCard&&window.matchMedia('(max-width:1000px)').matches&&event.detail>0){
+    if(!touchedCard.classList.contains('is-touch-revealed')){
+      event.preventDefault();
+      clearRevealedDesignCards();
+      touchedCard.classList.add('is-touch-revealed');
+      touchedCard.querySelector('.drop-collection-link')?.setAttribute('aria-expanded','true');
+      return;
+    }
+    clearRevealedDesignCards();
+  }
   const productButton=event.target.closest('[data-card-product]');
   if(productButton){event.preventDefault();event.stopPropagation();selectCatalogCardProduct(productButton);return}
   const shareButton=event.target.closest('[data-share-url]');
@@ -1374,6 +1388,10 @@ catalogSection.querySelector('.catalog-grid').addEventListener('click',async eve
   }
   const collectionButton=event.target.closest('[data-open-collection]');if(collectionButton){openCatalogCollection(collectionButton.dataset.openCollection,collectionButton.dataset.product);return}
   await chooseCatalogDesign(event.target.closest('[data-design]'));
+});
+document.addEventListener('click',event=>{
+ if(event.target.closest('.drop-wall-enabled .catalog-grid.drop-wall .drop-design-card'))return;
+ clearRevealedDesignCards();
 });
 function focusCatalogCardProduct(root,cardKey,productSlug){
  [...root.querySelectorAll('[data-card-product]')].find(button=>button.dataset.cardKey===cardKey&&button.dataset.cardProduct===productSlug)?.focus();

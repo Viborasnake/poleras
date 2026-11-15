@@ -1125,3 +1125,24 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
 @media(min-width:1001px) and (hover:hover) and (pointer:fine) and (prefers-reduced-motion:reduce){
  .drop-wall-enabled .drop-collection-section-grid>.drop-design-card :is(.drop-labels,.drop-design-price,.catalog-pet-story,.drop-collection-tools){transition:none}
 }
+
+/* At tablet widths the photograph and title lead; the first tap reveals the rest. */
+@media(max-width:1000px){
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card :is(.drop-labels,.drop-design-price,.catalog-pet-story,.drop-collection-tools){opacity:0;visibility:hidden;pointer-events:none}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card .drop-caption small,
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card .drop-featured-description,
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card .drop-caption>.drop-arrow{display:none}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card .drop-caption{bottom:16px}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card.drop-collection--featured[data-collection-id] .drop-caption{padding-bottom:18px}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card:is(.is-touch-revealed,:has(.drop-collection-link:focus-visible)) :is(.drop-labels,.drop-design-price,.catalog-pet-story,.drop-collection-tools){opacity:1;visibility:visible}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card:is(.is-touch-revealed,:has(.drop-collection-link:focus-visible)) .drop-caption small{display:block}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card.drop-collection--featured[data-collection-id]:is(.is-touch-revealed,:has(.drop-collection-link:focus-visible)) .drop-caption>span:first-child>small:first-child{display:flex}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card:is(.is-touch-revealed,:has(.drop-collection-link:focus-visible)) .drop-featured-description{display:block}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card:is(.is-touch-revealed,:has(.drop-collection-link:focus-visible)) .drop-caption>.drop-arrow{display:flex}
+ .drop-wall-enabled .catalog-grid.drop-wall .drop-design-card.drop-collection--featured[data-collection-id]:is(.is-touch-revealed,:has(.drop-collection-link:focus-visible)) .drop-caption{padding-bottom:90px}
+}
+@media(max-width:640px){
+ .drop-wall-enabled .catalog-functional-filters>.catalog-product-group{display:block;flex:1 1 100%;width:100%;margin:14px 0 0}
+ .drop-wall-enabled .catalog-product-select{display:block;width:100%;min-width:0}
+ .drop-wall-enabled .drop-collection-section-grid+.drop-collection-more{margin-top:26px}
+}
