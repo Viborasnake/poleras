@@ -1,11 +1,21 @@
 export const INVENTORY_STORAGE_KEY='droska-admin-inventory';
 export const inventoryToday=(now=new Date())=>new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 export const inventoryText=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('es-CL');
+// Same model codes used by the shop; inventory classification is manual.
+export const INVENTORY_PRODUCT_TYPES=[{code:'basic',name:'Unisex'},{code:'over',name:'Oversize'},{code:'woman',name:'Mujer'},{code:'kid',name:'Niños'},{code:'body',name:'Body bebé'},{code:'tote',name:'Tote bag'},{code:'other',name:'Otro producto'}];
+export const inventoryProductType=item=>INVENTORY_PRODUCT_TYPES.find(type=>type.code===item.model_code)?.name||'Sin clasificar';
+export function inventoryGroups(items,groupBy='model'){
+ const definitions=groupBy==='none'?[{code:'all',name:'Todos los lotes'}]:[...INVENTORY_PRODUCT_TYPES,{code:'',name:'Sin clasificar'}];
+ return definitions.map(type=>{
+  const rows=groupBy==='none'?items:items.filter(item=>(item.model_code||'')===type.code);
+  return {code:type.code,name:type.name,items:rows,units:rows.reduce((sum,row)=>sum+row.quantity,0),value:rows.reduce((sum,row)=>sum+row.price*row.quantity,0)};
+ }).filter(group=>group.items.length);
+}
 export const INVENTORY_SUGGESTION_FIELDS=['name','brand','color','size','location'];
 export function inventorySuggestions(items,field,values={}){
  if(!INVENTORY_SUGGESTION_FIELDS.includes(field))return [];
  const dependencies={name:['brand'],brand:['name'],color:['name','brand'],size:['name','brand','color'],location:['name','brand','color','size']}[field];
- const context=dependencies.filter(key=>inventoryText(values[key]));
+ const context=['model_code',...dependencies].filter(key=>inventoryText(values[key]));
  const words=inventoryText(values[field]).split(/\s+/).filter(Boolean),options=new Map();
  for(const item of items){
   const value=String(item[field]??'').trim(),key=inventoryText(value);
@@ -22,6 +32,8 @@ const limits={name:100,brand:80,color:50,size:30,location:100,notes:300};
 export function validateInventoryItem(input){
  if(!input||typeof input!=='object')throw new Error('El registro de inventario no es válido.');
  const item={};
+ item.model_code=String(input.model_code??'').trim();
+ if(item.model_code&&!INVENTORY_PRODUCT_TYPES.some(type=>type.code===item.model_code))throw new Error('Selecciona un tipo de producto válido.');
  for(const [key,max] of Object.entries(limits)){
   item[key]=String(input[key]??'').trim();
   if(item[key].length>max)throw new Error(`El campo ${key} supera el largo permitido.`);
@@ -79,9 +91,9 @@ export function inventoryStore(storage){
   }
  };
 }
-export function inventoryRows(items,{query='',brand='',color='',location='',stock='',sort='date_desc'}={}){
+export function inventoryRows(items,{query='',brand='',color='',location='',stock='',model_code='',sort='date_desc'}={}){
  const words=inventoryText(query).split(/\s+/).filter(Boolean),[field,direction]=sort.split('_');
- return items.filter(item=>words.every(word=>inventoryText([item.name,item.brand,item.color,item.size,item.location,item.notes,item.price,item.date].join(' ')).includes(word))&&['brand','color','location'].every(key=>!({brand,color,location}[key])||inventoryText(item[key])===inventoryText({brand,color,location}[key]))&&(!stock||(stock==='available'?item.quantity>0:item.quantity===0))).sort((a,b)=>{
+ return items.filter(item=>(!model_code||(model_code==='unclassified'?!item.model_code:item.model_code===model_code))&&words.every(word=>inventoryText([inventoryProductType(item),item.name,item.brand,item.color,item.size,item.location,item.notes,item.price,item.date].join(' ')).includes(word))&&['brand','color','location'].every(key=>!({brand,color,location}[key])||inventoryText(item[key])===inventoryText({brand,color,location}[key]))&&(!stock||(stock==='available'?item.quantity>0:item.quantity===0))).sort((a,b)=>{
   const result=['price','quantity'].includes(field)?a[field]-b[field]:String(a[field]??'').localeCompare(String(b[field]??''),'es-CL',{numeric:true,sensitivity:'base'});
   return result*(direction==='desc'?-1:1)||a.name.localeCompare(b.name,'es-CL')||a.id.localeCompare(b.id);
  });
@@ -89,5 +101,5 @@ export function inventoryRows(items,{query='',brand='',color='',location='',stoc
 export function inventoryBackup(items){return JSON.stringify({format:'droska-inventory',version:1,exported_at:new Date().toISOString(),items},null,2)}
 export function inventoryCsv(items){
  const cell=value=>`"${String(value??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')}"`;
- return '\uFEFF'+[['Producto','Marca','Color','Talla','Precio unitario CLP','Cantidad','Fecha de ingreso','Ubicación','Notas'],...items.map(row=>['name','brand','color','size','price','quantity','date','location','notes'].map(key=>row[key]))].map(row=>row.map(cell).join(';')).join('\r\n');
+ return '\uFEFF'+[['Tipo de producto','Producto / modelo','Marca','Color','Talla','Precio unitario CLP','Cantidad','Fecha de ingreso','Ubicación','Notas'],...items.map(row=>[inventoryProductType(row),...['name','brand','color','size','price','quantity','date','location','notes'].map(key=>row[key])])].map(row=>row.map(cell).join(';')).join('\r\n');
 }

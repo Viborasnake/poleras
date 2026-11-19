@@ -12,9 +12,16 @@
 .inventory-metrics strong { font:700 clamp(20px,2.3vw,28px)/1.2 var(--ds-font-display); overflow-wrap:anywhere; }
 .inventory-panel { padding:0; overflow:hidden; }
 .inventory-panel .admin-panel-head { align-items:flex-end; margin:0; padding:22px; }
+.inventory-view-controls { display:flex; flex-wrap:wrap; gap:12px; }
+.inventory-view-controls .inventory-sort { min-width:180px; }
+.inventory-group-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px 22px; border-top:1px solid var(--ds-border-control); background:var(--ds-surface-subtle); color:var(--ds-text-primary); }
+.inventory-group-heading h3 { margin:0; font:700 20px/1.3 var(--ds-font-display); }
+.inventory-group-heading p { margin:5px 0 0; color:var(--ds-text-secondary); font-size:13px; }
+.inventory-group-heading>span { display:grid; gap:4px; text-align:right; font-size:12px; }
+.inventory-group-heading strong { font:700 18px/1.3 var(--ds-font-display); }
 .inventory-sort,.inventory-filters label { display:grid; gap:7px; color:var(--ds-text-primary); font-size:12px; font-weight:700; min-width:0; }
 .inventory-sort select,.inventory-filters select { min-width:0; width:100%; min-height:44px; padding:9px 12px; border:1px solid var(--ds-border-control); border-radius:var(--ds-radius-control); background:var(--ds-surface-raised); color:var(--ds-text-primary); font:inherit; }
-.inventory-filters { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)) auto; align-items:end; gap:12px; padding:0 22px 22px; }
+.inventory-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:end; gap:12px; padding:0 22px 22px; }
 .inventory-table { min-width:1000px; }
 .inventory-table td { max-width:260px; overflow-wrap:anywhere; }
 .inventory-table td:first-child { display:table-cell; min-width:180px; }
@@ -41,6 +48,10 @@
  .inventory-sort { width:100%; }
 }
 @media(max-width:620px) {
+ .inventory-view-controls { width:100%; display:grid; grid-template-columns:1fr; }
+ .inventory-view-controls .inventory-sort { min-width:0; }
+ .inventory-group-heading { padding:16px; align-items:start; flex-wrap:wrap; }
+ .inventory-group-heading>span { text-align:left; }
  .inventory-metrics article { padding:14px; }
  .inventory-panel .admin-panel-head { padding:18px 16px; }
  .inventory-filters { padding:0 16px 18px; }

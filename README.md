@@ -36,6 +36,8 @@ El build consulta el catálogo público de Supabase y genera HTML estático para
 
 ## Administración local
 
+Inventario se agrupa por tipo de producto (Unisex, Oversize, Mujer, Niños, Body bebé, Tote bag u Otro), con totales por grupo y filtro de tipo. El tipo se selecciona al crear/editar el lote y es independiente de su modelo comercial; los registros anteriores permanecen en Sin clasificar hasta asignarlos. Se puede volver a Sin agrupar desde el selector Agrupar por. Respaldos y CSV conservan la clasificación.
+
 Los campos Producto o modelo, Marca, Color, Talla y Ubicación de Inventario sugieren valores de lotes guardados al enfocar o escribir. Priorizan el contexto de la prenda, admiten valores nuevos y se conservan entre visitas junto con el inventario local. Las sugerencias no se aprenden de formularios cancelados.
 
 **Inventario** tiene una sección propia en `/admin#inventario`. Registra lotes por producto, marca, color, talla, precio unitario en CLP, cantidad, fecha de ingreso, ubicación y notas. Permite crear, editar, eliminar, buscar sin tildes, combinar filtros y ordenar. Funciona como registro manual independiente del catálogo, pedidos e insumos. Los datos se conservan solo en el navegador y origen actuales: descarga un respaldo JSON para conservarlos o trasladarlos; CSV exporta la vista filtrada. Restaurar agrega registros faltantes y rechaza conflictos sin sobrescribir versiones existentes. Un error de lectura bloquea cambios para conservar el contenido original. El banco local `/samples/inventory.html` usa datos ficticios en memoria.

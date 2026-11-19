@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem,inventorySuggestions} from './inventory.js';
+import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem,inventorySuggestions,inventoryGroups} from './inventory.js';
 
 const draft={name:'Polera básica',brand:'Gildan',color:'Azul',size:'M',price:5000,quantity:4,date:'2026-01-01',location:'Estante 2',notes:'Algodón'};
 function setup(raw=null){let value=raw;return {getItem:()=>value,setItem:(_,next)=>{value=next},raw:()=>value};}
@@ -67,4 +67,29 @@ test('prioriza sugerencias del producto y marca escritos, conservando otras opci
  assert.equal(inventorySuggestions(items,'size',{name:'Dogo',brand:'Roly',color:'Rojo'})[0].value,'XL');
  assert.equal(inventorySuggestions(items,'color',{name:'Nuevo producto'}).length,2);
  assert.deepEqual(inventorySuggestions(items,'price'),[]);
+});
+test('agrupa distintos modelos comerciales por tipo y calcula totales de la vista filtrada',()=>{
+ const rows=[{...draft,id:'a',model_code:'basic',name:'Dogo Premium'},{...draft,id:'b',model_code:'basic',name:'Otro modelo',quantity:2,price:3000},{...draft,id:'c',model_code:'over',quantity:0},{...draft,id:'d',model_code:''}];
+ const groups=inventoryGroups(rows);
+ assert.deepEqual(groups.map(group=>group.name),['Unisex','Oversize','Sin clasificar']);
+ assert.equal(groups[0].units,6);assert.equal(groups[0].value,26000);assert.equal(groups[0].items.length,2);
+ assert.equal(groups[1].units,0);
+ assert.deepEqual(inventoryGroups(inventoryRows(rows,{model_code:'basic',stock:'available',color:'Azul'})).map(group=>group.name),['Unisex']);
+ assert.equal(inventoryGroups(rows,'none')[0].items.length,4);
+ assert.deepEqual(inventoryRows(rows,{model_code:'unclassified'}).map(row=>row.id),['d']);
+ assert.equal(inventoryRows(rows,{query:'unisex'}).length,2);
+});
+test('lotes históricos y respaldos conservan clasificación sin inferirla del nombre',()=>{
+ const store=inventoryStore(setup(JSON.stringify([{...draft,id:'old'}])));
+ assert.equal(store.read()[0].model_code,'');
+ const edited=store.save({...store.read()[0],model_code:'basic'},store.read()[0]);
+ assert.equal(store.read()[0].name,draft.name);assert.equal(store.read()[0].model_code,'basic');
+ const backup=inventoryBackup(store.read()),copy=inventoryStore(setup());copy.restore(backup);
+ assert.equal(copy.read()[0].model_code,'basic');assert.ok(inventoryCsv(copy.read()).includes('Unisex'));
+ assert.throws(()=>store.save({...draft,model_code:'unknown'}),/tipo de producto/);
+ assert.equal(edited.quantity,draft.quantity);
+});
+test('tipo elegido prioriza las sugerencias de esa familia sin alterar el resto del formulario',()=>{
+ const rows=[{...draft,model_code:'over',name:'Modelo oversize'},{...draft,model_code:'basic',name:'Modelo unisex'}];
+ assert.equal(inventorySuggestions(rows,'name',{model_code:'over'})[0].value,'Modelo oversize');
 });
