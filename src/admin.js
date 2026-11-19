@@ -178,10 +178,11 @@ async function ensureBaseCatalog(){
 const routes=[['resumen','home','Resumen'],['productos','box','Productos'],['categorias','tag','Categorías'],['colecciones','layers','Colecciones'],['disenos','image','Diseños'],['tallas','tag','Tallas'],['inventario','box','Inventario'],['insumos','tag','Insumos'],['precios','receipt','Precios'],['pedidos','receipt','Pedidos'],['servicio-cliente','users','Servicio al cliente'],['cupones','tag','Cupones'],['clientes','users','Clientes'],['analitica','chart','Analítica'],['configuracion','settings','Configuración']];
 function currentRoute(){const route=location.hash.replace('#','');if(route==='proveedores'){history.replaceState(null,'','#insumos');return 'insumos'}return routes.some(([id])=>id===route)?route:'resumen'}
 function navMarkup(active){
- const catalogIds=new Set(['productos','categorias','colecciones','tallas','disenos','insumos','precios']);
+ const catalogIds=new Set(['productos','categorias','colecciones','tallas','disenos','insumos','precios','inventario']);
  const activeOrderCount=adminData.orders.filter(order=>!order.archived_at).length;
  const link=([id,iconName,label],catalog=false)=>`<a href="#${id}" class="${active===id?'active ':''}${catalog?'admin-catalog-link ':''}${id==='productos'?'admin-catalog-parent ':''}${catalog&&id!=='productos'?'admin-catalog-child ':''}${['resumen','productos','categorias','colecciones','tallas','disenos','pedidos','inventario','insumos','precios','cupones','clientes','configuracion'].includes(id)?'':' is-planned'}" aria-label="${label}" title="${label}" ${active===id?'aria-current="page"':''}>${icon(iconName)}<span>${label}</span>${id==='pedidos'&&activeOrderCount?`<b aria-hidden="true">${activeOrderCount}</b>`:''}</a>`;
- const catalog=routes.filter(([id])=>catalogIds.has(id));
+ const catalogOrder=['productos','categorias','colecciones','disenos','tallas','insumos','precios','inventario'];
+ const catalog=routes.filter(([id])=>catalogIds.has(id)).sort((a,b)=>catalogOrder.indexOf(a[0])-catalogOrder.indexOf(b[0]));
  const catalogNav=`<div class="admin-catalog-nav${catalogIds.has(active)?' has-active-child':''}" role="group" aria-label="Productos y contenido del catálogo">${link(catalog[0],true)}<div class="admin-catalog-children">${catalog.slice(1).map(item=>link(item,true)).join('')}</div></div>`;
  const toolLink=`<a href="${DTF_SEMITONE_URL}" target="_blank" rel="noreferrer" aria-label="Semitonos DTF, abre en una pestaña nueva" title="Semitonos DTF">${icon('image')}<span>Semitonos DTF</span></a>`;
  return `${routes.filter(([id])=>!catalogIds.has(id)).map(route=>route[0]==='resumen'?`${link(route)}${catalogNav}`:link(route)).join('')}${toolLink}`;

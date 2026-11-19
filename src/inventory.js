@@ -15,6 +15,10 @@ export function inventoryProduct(item,products=[]){
  return slug?products.find(product=>product.slug===slug)||null:null;
 }
 export const inventoryProductType=(item,products=[])=>inventoryProduct(item,products)?.name||'Sin clasificar';
+export function inventoryShirtName(value){
+ const original=String(value??'').trim(),cleaned=original.replace(/^poleras?\b[\s·:–—-]+/i,'').trim();
+ return cleaned||original;
+}
 export function inventoryGroups(items,groupBy='product',products=[]){
  const groups=new Map();
  for(const item of items){
@@ -87,8 +91,21 @@ export function inventoryStore(storage){
  const write=items=>{try{storage.setItem(INVENTORY_STORAGE_KEY,JSON.stringify(items))}catch{throw new Error('No pudimos guardar. Revisa el espacio y los permisos del navegador; tus cambios siguen en el formulario.')}};
  return {
   read,
+  removeShirtPrefixes(products=[]){
+   // Update only names and their timestamps, retaining every other stored field.
+   const raw=storage.getItem(INVENTORY_STORAGE_KEY),items=parseInventory(raw),changes=new Map();
+   for(const item of items){
+    const product=inventoryProduct(item,products),name=inventoryShirtName(item.name);
+    if((!product||product.slug==='poleras')&&name!==item.name)changes.set(item.id,name);
+   }
+   if(!changes.size)return 0;
+   const now=new Date().toISOString();
+   write(JSON.parse(raw).map(item=>changes.has(String(item.id))?{...item,name:changes.get(String(item.id)),updated_at:now}:item));
+   return changes.size;
+  },
   save(draft,previous=null){
    const item=validateInventoryItem(draft),items=read();
+   if(item.product_type_slug==='poleras')item.name=inventoryShirtName(item.name);
    if(previous){
     const current=items.find(row=>row.id===previous.id);
     if(!current||JSON.stringify(current)!==JSON.stringify(previous))throw new Error('Este registro cambió en otra pestaña. Cierra y vuelve a abrirlo para editar la versión actual.');

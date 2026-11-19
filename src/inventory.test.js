@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem,inventorySuggestions,inventoryGroups,inventoryProduct,inventoryModelOptions} from './inventory.js';
+import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem,inventorySuggestions,inventoryGroups,inventoryProduct,inventoryModelOptions,inventoryShirtName} from './inventory.js';
 
 const draft={name:'Polera básica',brand:'Gildan',color:'Azul',size:'M',price:5000,quantity:4,date:'2026-01-01',location:'Estante 2',notes:'Algodón'};
 const products=[{id:'shirts',slug:'poleras',name:'Poleras'},{id:'totes',slug:'totebags',name:'Totebags'},{id:'new-product',slug:'imanes',name:'Imanes'}];
@@ -116,4 +116,19 @@ test('clasificación anterior se conserva bajo su producto y los productos elimi
  assert.equal(inventoryProduct(deleted,products).missing,true);
  assert.equal(inventoryGroups([deleted],'product',products)[0].items.length,1);
  assert.equal(inventoryGroups([{...draft,id:'unknown'}],'product',products)[0].name,'Sin clasificar');
+});
+test('quita solo el prefijo Polera y conserva nombres completos cuando no corresponde',()=>{
+ for(const [before,after] of [['Polera Básica','Básica'],['POLERAS - Dogo Premium','Dogo Premium'],['Polera: Oversize','Oversize'],['Polerama','Polerama'],['Mi polera favorita','Mi polera favorita'],['Polera','Polera']])assert.equal(inventoryShirtName(before),after);
+});
+test('limpieza automática es idempotente y conserva cantidades, precios, clasificación y datos adicionales',()=>{
+ const original=[{...draft,id:'shirt',model_code:'basic',name:'Polera Básica',extra:'conservar'},{...draft,id:'other',name:'Polera ejemplo',product_type_id:'new-product',product_type_slug:'imanes',product_type_name:'Imanes'}];
+ const storage=setup(JSON.stringify(original)),store=inventoryStore(storage);
+ assert.equal(store.removeShirtPrefixes(products),1);assert.equal(store.removeShirtPrefixes(products),0);
+ const raw=JSON.parse(storage.raw());assert.equal(raw[0].name,'Básica');assert.equal(raw[0].extra,'conservar');
+ for(const key of ['id','quantity','price','color','size','date','location','notes','model_code'])assert.equal(raw[0][key],original[0][key]);
+ assert.deepEqual(raw[1],original[1]);
+});
+test('una falla de escritura al limpiar nombres conserva los registros originales',()=>{
+ const raw=JSON.stringify([{...draft,id:'shirt',model_code:'basic'}]),store=inventoryStore({getItem:()=>raw,setItem:()=>{throw Error('quota')}});
+ assert.throws(()=>store.removeShirtPrefixes(products),/No pudimos guardar/);assert.equal(store.read()[0].name,draft.name);
 });
