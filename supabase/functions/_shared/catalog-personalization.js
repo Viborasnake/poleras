@@ -1,8 +1,15 @@
 const acceptsCustomerImage=design=>Boolean(design?.accepts_customer_image??design?.acceptsCustomerImage);
 const customerPhotoSubject=design=>(design?.customer_photo_subject??design?.customerPhotoSubject)==='people'?'people':'pets';
 
+export function isUnmodifiedCatalogItem(item={}){
+  return Boolean(item.catalogDesignSlug)&&!Boolean(item.catalogDesignCustomerImage);
+}
+
 export function isCatalogPrintIncluded(item={},printSides='front',printCount=1){
-  return Boolean(item.catalogDesignSlug)&&!Boolean(item.catalogDesignCustomerImage)&&printSides==='front'&&printCount===1;
+  // El estampado principal forma parte del precio del diseño de catálogo,
+  // también cuando el cliente reemplaza la foto. Solo las ubicaciones
+  // adicionales deben conservar un recargo propio.
+  return Boolean(item.catalogDesignSlug)&&printCount===1;
 }
 
 export function catalogDesignAllowsBasePurchase(design){

@@ -5,6 +5,7 @@ import { catalogDesignRequiresCustomerImage,isCatalogPrintIncluded } from '../_s
 import { allowedColorsForModel } from '../_shared/catalog-product-colors.js'
 import { verifyTurnstile } from '../_shared/turnstile.ts'
 import { normalizePrintConfiguration, printConfigurationCount } from '../_shared/print-configuration.js'
+import { variantPriceForPurchase } from '../_shared/variant-selection.js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -75,7 +76,7 @@ Deno.serve(async request => {
   const catalogDesignSlug = String(product.catalogDesignSlug || '').trim()
   const customerImage = Boolean(product.catalogDesignCustomerImage)
   if (!Number.isInteger(variantId) || !modelCode || !size || !/^#[0-9a-f]{6}$/i.test(color) || !validSides.has(printSides)) return json({ error: 'La selección del producto no es válida.' }, 400)
-  const { data: variant, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(code,name,active)').eq('id', variantId).maybeSingle()
+  const { data: variant, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,personalization_base_price_clp,active,product_models!inner(code,name,active)').eq('id', variantId).maybeSingle()
   const model = Array.isArray(variant?.product_models) ? variant.product_models[0] : variant?.product_models
   if (variantError || !variant?.active || !model?.active || model.code !== modelCode || variant.size !== size || variant.color_hex?.toLowerCase() !== color || (model.code === 'tote' && printSides !== 'front')) return json({ error: 'La talla, color o producto ya no están disponibles.' }, 409)
 
@@ -97,8 +98,9 @@ Deno.serve(async request => {
     : design ? 'catalog_design' : 'own_artwork'
   const { data: storeSettings, error: settingsError } = await admin.from('storefront_settings').select('front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
   if (settingsError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
-  const printExtra = model.code === 'tote' || isCatalogPrintIncluded({catalogDesignSlug,catalogDesignCustomerImage:customerImage},printSides,printConfigurationCount(product.printConfiguration,printSides)) ? 0 : printPrice(normalizePrintConfiguration(product.printConfiguration,printSides),printSides,storeSettings)
-  const total = Number(variant.price_clp) + printExtra
+  const printExtra = model.code === 'tote' || isCatalogPrintIncluded({catalogDesignSlug, catalogDesignCustomerImage:customerImage},printSides,printConfigurationCount(product.printConfiguration,printSides)) ? 0 : printPrice(normalizePrintConfiguration(product.printConfiguration,printSides),printSides,storeSettings)
+  const basePrice = variantPriceForPurchase({ priceClp: Number(variant.price_clp), personalizationBasePriceClp: Number.isInteger(variant.personalization_base_price_clp) ? Number(variant.personalization_base_price_clp) : null }, purchaseType === 'personalized') ?? Number(variant.price_clp)
+  const total = basePrice + printExtra
   const productLabel = model.code === 'tote' ? 'Tote bag' : model.code === 'body' ? 'Body bebé' : `Polera ${model.name}`
   const name = design?.name ? `${productLabel} · ${design.name}` : `${productLabel} personalizada`
   const { data: order, error: orderError } = await admin.from('orders').insert({

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { automaticPrintScale, visibleAlphaBounds, visibleAlphaEdgeSamples } from './artwork-fit.js';
+import { automaticPrintOffsetY, automaticPrintScale, visibleAlphaBounds, visibleAlphaEdgeSamples } from './artwork-fit.js';
 
 test('visibleAlphaBounds finds the artwork inside transparent padding', () => {
   const pixels = new Uint8ClampedArray(4 * 4 * 4);
@@ -29,4 +29,14 @@ test('automaticPrintScale reduces tall artwork but leaves square artwork at the 
   assert.equal(automaticPrintScale(.45), .82);
   assert.equal(automaticPrintScale(.6), .88);
   assert.equal(automaticPrintScale(1), 1);
+});
+
+test('automaticPrintOffsetY lifts only square artwork', () => {
+  assert.equal(automaticPrintOffsetY(.6), 0);
+  assert.equal(automaticPrintOffsetY(.89), 0);
+  assert.equal(automaticPrintOffsetY(1), .2);
+  assert.equal(automaticPrintOffsetY(1.1), .2);
+  assert.equal(automaticPrintOffsetY(1.11), 0);
+  assert.equal(automaticPrintOffsetY(1.5), 0);
+  assert.equal(automaticPrintOffsetY(2), 0);
 });

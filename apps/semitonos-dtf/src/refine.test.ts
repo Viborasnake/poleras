@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {applyColorCorrection,flattenSelectedColor,removeSmallParticles, removeTinyDots, restoreProtectedPixels, smoothRgba} from './refine.ts'
+import {applyColorCorrection,flattenSelectedColor,removeSmallParticles, removeTinyDots, restoreProtectedPixels, shrinkAlphaMask, smoothRgba} from './refine.ts'
 
 test('removes only alpha islands smaller than the configured area', () => {
   const data = new Uint8ClampedArray(5 * 3 * 4)
@@ -47,4 +47,18 @@ test('protected edges keep binary alpha when solid DTF alpha is enabled', () => 
   const soft = new Uint8ClampedArray(colors.length)
   restoreProtectedPixels(soft, colors, source, mask, false, true)
   assert.deepEqual([soft[3],soft[7],soft[11]], [96,255,0])
+})
+
+test('shrinks the outside contour and the edge of interior holes', () => {
+  const width = 9, height = 9
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let y = 1; y < 8; y++) for (let x = 1; x < 8; x++) {
+    if (x === 4 && y === 4) continue
+    const i = (y * width + x) * 4
+    data[i] = 255; data[i + 3] = 255
+  }
+  assert.equal(shrinkAlphaMask(data, width, height, 1), 32)
+  assert.equal(data[(1 * width + 1) * 4 + 3], 0)
+  assert.equal(data[(2 * width + 2) * 4 + 3], 255)
+  assert.equal(data[(3 * width + 4) * 4 + 3], 0)
 })

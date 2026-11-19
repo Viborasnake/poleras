@@ -17,8 +17,16 @@ export function normalizeVariantRows(rows=[]){
     const model=Array.isArray(row.product_models)?row.product_models[0]:row.product_models;
     const color=normalizeVariantColor(row.color_hex);
     if(!model?.active||row.active===false||!color||!row.size||!Number.isInteger(row.price_clp)||row.price_clp<0)return [];
-    return [{id:row.id,sku:row.sku,modelCode:canonicalModelCode(model.code),size:row.size,color,colorName:row.color_name||color,priceClp:row.price_clp}];
+    const personalizationPrice=Number.isInteger(row.personalization_base_price_clp)&&row.personalization_base_price_clp>=0
+      ?row.personalization_base_price_clp
+      :null;
+    return [{id:row.id,sku:row.sku,modelCode:canonicalModelCode(model.code),size:row.size,color,colorName:row.color_name||color,priceClp:row.price_clp,personalizationBasePriceClp:personalizationPrice}];
   });
+}
+
+export function variantPriceForPurchase(variant,personalized=false){
+  if(personalized&&Number.isInteger(variant?.personalizationBasePriceClp)&&variant.personalizationBasePriceClp>=0)return variant.personalizationBasePriceClp;
+  return Number.isInteger(variant?.priceClp)&&variant.priceClp>=0?variant.priceClp:null;
 }
 
 export function allowedVariantRows(variants,modelCode,size,design=null){

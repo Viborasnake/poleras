@@ -1,4 +1,6 @@
-import {allowedVariantRows,canonicalModelCode} from '../supabase/functions/_shared/variant-selection.js';
+import {allowedVariantRows,canonicalModelCode,variantPriceForPurchase} from '../supabase/functions/_shared/variant-selection.js';
+
+export {variantPriceForPurchase};
 
 export function minimumEligibleVariantPrice(variants=[],modelCodes=[],design=null){
  const codes=new Set(modelCodes.map(canonicalModelCode));

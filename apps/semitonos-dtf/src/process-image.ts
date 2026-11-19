@@ -1,7 +1,7 @@
 import {halftone} from './halftone.ts'
 import {autoAdjust} from './auto-adjust.ts'
 import {removeBackground} from './background-stage.ts'
-import {applyColorCorrection,flattenSelectedColor,smoothRgba,removeTinyDots,removeSmallParticles,restoreProtectedPixels} from './refine.ts'
+import {applyColorCorrection,flattenSelectedColor,smoothRgba,removeTinyDots,removeSmallParticles,restoreProtectedPixels,shrinkAlphaMask} from './refine.ts'
 import {applyEdgeMask} from './edge-mask.ts'
 import type {Settings} from './App'
 
@@ -17,6 +17,7 @@ export function processImage(resized:Uint8ClampedArray,width:number,height:numbe
   removeSmallParticles(result.data,width,height,settings.particleMinSize??0)
   restoreProtectedPixels(result.data,flattened,resized,result.protectedMask,settings.solidAlpha,settings.protectSmoothEdge!==false)
   applyEdgeMask(result.data,width,height,{style:settings.edgeMask??'none',sizeMm:settings.edgeMaskSizeMm??5,dpi:settings.dpi??300,sides:settings.edgeSides,solidAlpha:settings.solidAlpha})
+  if (settings.enabled === false) shrinkAlphaMask(result.data,width,height,settings.contourShrinkPx??0)
   let transparent=0
   for(let i=3;i<result.data.length;i+=4)if(!result.data[i])transparent++
   return {...result,transparent:Math.round(transparent/(width*height)*100),background:includeBackground?new Uint8ClampedArray(removeBackground(adjusted,width,height,settings,softened)):undefined}

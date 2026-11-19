@@ -71,6 +71,7 @@ export type Settings = {
   preSmooth: number
   particleMinSize: number
   minDotSize: number
+  contourShrinkPx: number
   protectSolid: boolean
   protectSolidColor: string
   protectSolidTolerance: number
@@ -120,6 +121,7 @@ const defaults: Settings = {
   preSmooth: 0,
   particleMinSize: 0,
   minDotSize: 0,
+  contourShrinkPx: 0,
   protectSolid: false,
   protectSolidColor: '#ffffff',
   protectSolidTolerance: 10,
@@ -143,7 +145,7 @@ function readSavedPresets(): SavedPreset[] {
       if (!p || typeof p.id !== 'string' || !p.id.startsWith('saved:') || typeof p.name !== 'string' || !p.name.trim() || !p.settings) return false
       const s = p.settings
       if(p.garment!==undefined&&!['dark','light'].includes(p.garment))return false
-      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],edgeMaskSizeMm:[0.5,20],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],protectSolidTolerance:[0,100],flattenColorTolerance:[0,100]}
+      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],edgeMaskSizeMm:[0.5,20],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],contourShrinkPx:[0,4],protectSolidTolerance:[0,100],flattenColorTolerance:[0,100]}
       return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
         && ['circle','square','line'].includes(s.shape) && ['black','white','none','custom'].includes(s.background)
         && (s.colorRange===undefined||validColorRange(s.colorRange))
@@ -163,12 +165,12 @@ function readSavedPresets(): SavedPreset[] {
   } catch {return []}
 }
 
-function RangeControl({ label, value, min, max, step = 1, unit = '', onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }) {
+function RangeControl({ label, value, min, max, step = 1, unit = '', disabled = false, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; disabled?: boolean; onChange: (v: number) => void }) {
   const progress = ((value - min) / (max - min)) * 100
   return (
     <label className="range-control">
       <span><b>{label}</b><output>{value}{unit}</output></span>
-      <input aria-label={label} style={{ '--progress': `${progress}%` } as React.CSSProperties} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <input aria-label={label} disabled={disabled} style={{ '--progress': `${progress}%` } as React.CSSProperties} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
     </label>
   )
 }
@@ -552,7 +554,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
     if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
     if (panel === 'trama') { setSettings(s => ({...s, affectedColors:undefined,protectedColors:undefined,organic:0,screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
-    if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
+    if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, contourShrinkPx: defaults.contourShrinkPx, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
     if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
     setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides],edgeMask:defaults.edgeMask,edgeMaskSizeMm:defaults.edgeMaskSizeMm}))
   }
@@ -1146,6 +1148,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <p className="help-text">Descarta puntos demasiado pequeños para imprimir. Úsalo con moderación para no perder detalle fino.</p>
                 <RangeControl label="Suavizado previo" value={settings.preSmooth} min={0} max={2} step={1} unit=" px" onChange={v => update('preSmooth', v)} />
                 <p className="help-text">Suaviza el original antes del semitono para reducir ruido y variaciones de antialiasing.</p>
+                <RangeControl label="Contraer contorno (sin semitono)" value={settings.contourShrinkPx} min={0} max={4} step={1} unit=" px" disabled={settings.enabled} onChange={v => update('contourShrinkPx', v)} />
+                <p className="help-text">Come hacia dentro el contorno del diseño para quitar halos claros. Solo se aplica en «Sin semitono» y también limpia el borde de los huecos internos.</p>
                 <div className="brush-tools">
                   <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel de limpieza'}</button>
                   {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}

@@ -54,9 +54,9 @@ Deno.serve(async request => {
     if (error) return json({ error: 'No pudimos validar el diseño de colección.' }, 503)
     if (!data?.active || !data.accepts_customer_image) return json({ error: 'Este diseño no admite referencias del cliente.' }, 409)
     catalogDesign = data
-    const photoLimit = data.customer_photo_subject === 'people' ? 3 : 1
+    const photoLimit = 3
     if (references.length > photoLimit) return json({ error: `Puedes adjuntar hasta ${photoLimit} ${photoLimit === 1 ? 'foto' : 'fotos'} para este diseño.` }, 400)
-    if (!references.length) return json({ error: data.customer_photo_subject === 'people' ? 'Sube la foto de la persona para personalizar este diseño.' : 'Sube la foto de tu mascota para personalizar este diseño.' }, 400)
+    if (!references.length) return json({ error: data.customer_photo_subject === 'people' ? 'Sube al menos una foto de la persona para personalizar este diseño.' : 'Sube al menos una foto de tu mascota para personalizar este diseño.' }, 400)
     if (body.productSelection) {
       const { data: variant, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,active,product_models!inner(code,name,active)').eq('id', body.productSelection.variantId).maybeSingle()
       const model = Array.isArray(variant?.product_models) ? variant.product_models[0] : variant?.product_models
@@ -101,7 +101,7 @@ Deno.serve(async request => {
     source: 'idea_request',
     request_type: 'creative',
     creative_request_id: requestId,
-    request_details: catalogDesign ? `Personalización de colección · ${catalogDesign.name}\n${selectedProduct ? `Producto: ${selectedProduct.model} · Talla/formato: ${selectedProduct.size} · Color: ${selectedProduct.color} · Estampado: ${selectedProduct.side === 'back' ? 'Espalda' : 'Frente'}\n` : ''}Foto de la ${subjectLabel} adjunta como referencia obligatoria.\n${idea}${recoveryNote}` : `${idea}${recoveryNote}`,
+    request_details: catalogDesign ? `Personalización de colección · ${catalogDesign.name}\n${selectedProduct ? `Producto: ${selectedProduct.model} · Talla/formato: ${selectedProduct.size} · Color: ${selectedProduct.color} · Estampado: ${selectedProduct.side === 'back' ? 'Espalda' : 'Frente'}\n` : ''}Fotos de la ${subjectLabel} adjuntas como referencias obligatorias.\n${idea}${recoveryNote}` : `${idea}${recoveryNote}`,
     request_references: references,
     status: 'submitted',
     subtotal_clp: 0,

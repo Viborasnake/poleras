@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {minimumEligibleVariantPrice} from './variant-pricing.js';
+import {minimumEligibleVariantPrice,variantPriceForPurchase} from './variant-pricing.js';
 import {normalizeVariantRows} from '../supabase/functions/_shared/variant-selection.js';
 
 const variants=[
@@ -17,4 +17,11 @@ test('minimum spans eligible models and respects design colors',()=>{
  assert.equal(minimumEligibleVariantPrice(normalized,['basic'],{allowed_colors:['#202124']}),null);
  const withInactive=normalizeVariantRows([{id:5,model_code:'basic',size:'M',color_hex:'#fff000',price_clp:1000,active:false,product_models:{code:'basic',active:true}},...variants.map(row=>({id:row.id,model_code:row.modelCode,size:row.size,color_hex:row.color,price_clp:row.priceClp,active:true,product_models:{code:row.modelCode,active:true}}))]);
  assert.equal(minimumEligibleVariantPrice(withInactive,['basic']),14990);
+});
+
+test('usa la base de personalización solo cuando corresponde',()=>{
+ const variant={priceClp:19990,personalizationBasePriceClp:14990};
+ assert.equal(variantPriceForPurchase(variant,false),19990);
+ assert.equal(variantPriceForPurchase(variant,true),14990);
+ assert.equal(variantPriceForPurchase({priceClp:19990},true),19990);
 });

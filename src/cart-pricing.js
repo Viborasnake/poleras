@@ -1,7 +1,16 @@
 import {PRINT_EXTRAS_CLP,QUALITY_ADJUSTMENT_CLP,orderTotal} from './print-check.js';
 import {effectiveQualityReview} from './quality-review.js';
-import {isCatalogPrintIncluded} from '../supabase/functions/_shared/catalog-personalization.js';
+import {isCatalogPrintIncluded,isUnmodifiedCatalogItem} from '../supabase/functions/_shared/catalog-personalization.js';
 import {normalizePrintConfiguration,printConfigurationCount} from '../supabase/functions/_shared/print-configuration.js';
+import {variantPriceForPurchase} from '../supabase/functions/_shared/variant-selection.js';
+
+export function cartUsesPersonalizationBase(item={}){
+ return !isUnmodifiedCatalogItem(item);
+}
+
+export function cartVariantBasePrice(variant,item={}){
+ return variantPriceForPurchase(variant,cartUsesPersonalizationBase(item));
+}
 
 function normalizedPrintSides(item={}){
  if(['front','back','both'].includes(item.printSides))return item.printSides;

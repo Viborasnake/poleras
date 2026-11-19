@@ -13,7 +13,8 @@ const env={...loadEnv(process.env.NODE_ENV||'production',projectRoot,''),...proc
 const SUPABASE_URL=env.VITE_SUPABASE_URL||'https://dgndcklmmnnxyqfmnckh.supabase.co';
 const SUPABASE_KEY=env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_J2zSgCPaW1rENVCdEuYGNQ_62EhSxtS';
 const deploymentHost=env.VERCEL_PROJECT_PRODUCTION_URL||env.VERCEL_URL||'';
-const origin=(env.VITE_SITE_URL||env.SITE_URL||(deploymentHost?`https://${deploymentHost}`:'http://localhost:4173')).replace(/\/$/,'');
+const defaultSiteUrl='https://droska.frontbook.cl';
+const origin=(env.VITE_SITE_URL||env.SITE_URL||(deploymentHost?`https://${deploymentHost}`:defaultSiteUrl)).replace(/\/$/,'');
 const basePrices={};
 const useFallbackCatalog=env.CATALOG_SEO_ALLOW_FALLBACK==='true'||env.VERCEL_ENV!=='production';
 
@@ -74,7 +75,7 @@ function fillTemplate(data){
   return template.replaceAll('__SEO_TITLE__',escapeHtml(seo.title)).replaceAll('__SEO_DESCRIPTION__',escapeHtml(seo.description)).replaceAll('__SEO_CANONICAL__',escapeHtml(seo.canonical)).replace('<!--__SEO_IMAGE_META__-->',imageMeta(seo.image)).replace('__SEO_JSON_LD__',safeJson(structuredData(data,seo))).replace('<!--__CATALOG_PAGE_MARKUP__-->',renderCatalogPage(data)).replace('__CATALOG_PAGE_DATA__',safeJson(data)).replace('<!--__CATALOG_FOOTER_LINKS__-->',footerLinks);
 }
 for(const page of pages){const directory=resolve(distRoot,page.path.replace(/^\//,''));await mkdir(directory,{recursive:true});await writeFile(resolve(directory,'index.html'),fillTemplate(page.data),'utf8')}
-const urls=pages.map(page=>`  <url><loc>${escapeHtml(`${origin}${page.path}`)}</loc></url>`).join('\n');
+const urls=[`/`, `/herramientas/semitonos-dtf/`, ...pages.map(page=>page.path)].map(path=>`  <url><loc>${escapeHtml(`${origin}${path}`)}</loc></url>`).join('\n');
 await writeFile(resolve(distRoot,'sitemap.xml'),`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,'utf8');
 await rm(resolve(distRoot,'catalog-page.html'));
 console.log(`Catálogo SEO: ${pages.length} páginas y sitemap generados para ${origin}.`);

@@ -10,7 +10,7 @@ const source = await readFile(new URL('../supabase/functions/create-design-reque
 const { code } = await transform(source.replace(/^import .*\n/gm, ''), { loader:'ts' });
 const userId = '11111111-1111-4111-8111-111111111111';
 const photoPath = `${userId}/reference/22222222-2222-4222-8222-222222222222.jpg`;
-async function send(references,productSelection,extra={}) {
+async function send(references,productSelection,extra={},subject='people') {
   const saved = {};
   const admin = {
     auth: { getUser: async () => ({data:{user:{id:userId}}}) },
@@ -18,7 +18,7 @@ async function send(references,productSelection,extra={}) {
     from(table) {
       const query = {
         select(){return this}, eq(){return this},
-        async maybeSingle(){return {data: table==='catalog_designs' ? {id:'design-uuid',slug:'pet-design',name:'Mascota Kaiju',active:true,accepts_customer_image:true,customer_photo_subject:'people',allowed_colors:['#ffffff'],product_artworks:{totebags:'catalog/tote.png'}} : table==='product_variants'?{id:42,sku:'TOTE-L',size:'L',color_name:'Natural',color_hex:'#e8e0cf',active:true,product_models:{code:'tote',name:'Tote bag',active:true}}:null}},
+        async maybeSingle(){return {data: table==='catalog_designs' ? {id:'design-uuid',slug:'pet-design',name:'Mascota Kaiju',active:true,accepts_customer_image:true,customer_photo_subject:subject,allowed_colors:['#ffffff'],product_artworks:{totebags:'catalog/tote.png'}} : table==='product_variants'?{id:42,sku:'TOTE-L',size:'L',color_name:'Natural',color_hex:'#e8e0cf',active:true,product_models:{code:'tote',name:'Tote bag',active:true}}:null}},
         insert(value){saved[table]=value;return this},
         async single(){return {data:{id:'order-123'}}},
       };
@@ -58,9 +58,15 @@ test('admin recibe diseño, foto privada e indicaciones en el mismo pedido',asyn
   assert.equal(saved.orders.request_references[0].path,photoPath);
   assert.match(saved.orders.request_details,/Mascota Kaiju/);
   assert.match(saved.orders.request_details,/mancha sobre el ojo/);
-  assert.match(saved.orders.request_details,/Foto de la persona/);
+ assert.match(saved.orders.request_details,/Fotos de la persona/);
   assert.equal(saved.order_items.catalog_design_id,'design-uuid');
   assert.equal(saved.orders.price_snapshot.catalog_design_slug,'pet-design');
+});
+test('servidor acepta hasta tres fotos de mascota',async()=>{
+  const references=[1,2,3].map((_,index)=>({name:`mascota-${index+1}.jpg`,path:photoPath}));
+  const {response,saved}=await send(references,{variantId:42,side:'front'},{},'pets');
+  assert.equal(response.status,201);
+  assert.equal(saved.orders.request_references.length,3);
 });
 
 test('guarda variante y formato de tote verificados para administración',async()=>{

@@ -1,6 +1,7 @@
 export const DETAIL_BLOCK_ORDER=['product-family-block','model-block','size-block','color-block','print-placement-block'];
 
-// Published catalog artwork keeps its configured placement.
+// Catalog artwork keeps the placement defined by the published design. The
+// additive print builder belongs only to the bring-your-own-design route.
 export const studioDetailIncludesPrintPlacement=catalogDesignSlug=>!catalogDesignSlug;
 
 // Keep a replaced control in the same visible position, even when an earlier

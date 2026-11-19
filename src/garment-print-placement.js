@@ -41,12 +41,14 @@ export function sleevePrintFrame(geometry,placement,offsetX=0,offsetY=0){
  return {origin,normal,up,right,width:Math.min(cuff.size.z*.8,height*.14),height:height*.16,depth:Math.max(.18,cuff.size.z*.8)};
 }
 
-export function facingDecalGeometry(geometry,normal,threshold=.15){
+export function facingDecalGeometry(geometry,normal,threshold=.15,minFacingDistance=null){
  const position=geometry.getAttribute('position'),normals=geometry.getAttribute('normal'),uv=geometry.getAttribute('uv');
  const positions=[],directions=[],uvs=[];
  for(let i=0;i<position.count;i+=3){
   const facing=[i,i+1,i+2].reduce((sum,index)=>sum+normals.getX(index)*normal.x+normals.getY(index)*normal.y+normals.getZ(index)*normal.z,0)/3;
   if(facing<threshold)continue;
+  // Imported double-sided fabric can have inward normals on the opposite half.
+  if(minFacingDistance!==null&&[i,i+1,i+2].some(index=>position.getX(index)*normal.x+position.getY(index)*normal.y+position.getZ(index)*normal.z<=minFacingDistance))continue;
   for(let j=i;j<i+3;j++){positions.push(position.getX(j),position.getY(j),position.getZ(j));directions.push(normals.getX(j),normals.getY(j),normals.getZ(j));uvs.push(uv.getX(j),uv.getY(j));}
  }
  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));

@@ -1,7 +1,7 @@
 import { printPrice } from '../_shared/print-pricing.js'
 import {designProductArtworks,modelProductSlug} from '../_shared/catalog-product-artworks.js'
-import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant} from '../_shared/variant-selection.js'
-import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage,isCatalogPrintIncluded} from '../_shared/catalog-personalization.js'
+import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant,variantPriceForPurchase} from '../_shared/variant-selection.js'
+import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage,isCatalogPrintIncluded,isUnmodifiedCatalogItem} from '../_shared/catalog-personalization.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { normalizePrintConfiguration, printConfigurationCount } from '../_shared/print-configuration.js'
 
@@ -70,7 +70,7 @@ Deno.serve(async request => {
   const { data: previousPayment } = await admin.from('payments').select('order_id,amount_clp').eq('provider_reference', requestId).maybeSingle()
   if (previousPayment) return json({ orderId: previousPayment.order_id, totalClp: previousPayment.amount_clp, reference: requestId })
 
-  const { data: variants, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(code,name,active)').eq('active', true).eq('product_models.active',true)
+  const { data: variants, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,personalization_base_price_clp,active,product_models!inner(code,name,active)').eq('active', true).eq('product_models.active',true)
   if (variantError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
   const normalizedVariants=normalizeVariantRows(variants||[])
   const { data: storeSettings, error: settingsError } = await admin.from('storefront_settings').select('quality_review_fee_clp,front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
@@ -100,11 +100,12 @@ Deno.serve(async request => {
     const modelRow=variants?.find((row:any)=>row.id===variant.id)
     const model=Array.isArray(modelRow?.product_models)?modelRow.product_models[0]:modelRow?.product_models
     const printExtra = item.modelCode === 'tote' || isCatalogPrintIncluded(item,item.printSides,printConfigurationCount(item.printConfiguration,item.printSides)) ? 0 : printPrice(normalizePrintConfiguration(item.printConfiguration,item.printSides),item.printSides,storeSettings)
-    const qualityExtra = item.qualityReview && !(item.catalogDesignSlug && !item.catalogDesignCustomerImage) ? qualityReviewFee : 0
-    const unitPrice = variant.priceClp + printExtra + qualityExtra
+    const qualityExtra = item.qualityReview && !isUnmodifiedCatalogItem(item) ? qualityReviewFee : 0
+    const design = item.catalogDesignSlug ? designMap.get(item.catalogDesignSlug) : null
+    const personalized = !design || Boolean(item.catalogDesignCustomerImage)
+    const unitPrice = (variantPriceForPurchase(variant, personalized) ?? variant.priceClp) + printExtra + qualityExtra
     const lineTotal = unitPrice * item.quantity
     subtotal += lineTotal
-    const design = item.catalogDesignSlug ? designMap.get(item.catalogDesignSlug) : null
     const productLabel=item.modelCode==='tote'?'Tote bag':item.modelCode==='body'?'Body bebé':`Polera ${model?.name||item.modelCode}`
     return {
       product_variant_id: variant.id,

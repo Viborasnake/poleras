@@ -3,7 +3,32 @@ import assert from 'node:assert/strict';
 import { isPrintableFacing, printPlacementCoordinates, printVisibilityForFacing, responsiveCameraDistance } from './garment.js';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {sleevePrintFrame} from './garment-print-placement.js';
+import {sleevePrintFrame,facingDecalGeometry} from './garment-print-placement.js';
+
+test('oversize recorta el decal a la cara elegida incluso con tela interior invertida',()=>{
+ const makeGeometry=()=>{
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute([
+   -.3,0,.4,.3,0,.4,0,.4,.4,
+   -.3,0,-.4,.3,0,-.4,0,.4,-.4,
+   -.3,0,-.3,.3,0,-.3,0,.4,-.3,
+  ],3));
+  geometry.setAttribute('normal',new THREE.Float32BufferAttribute([
+   0,0,1,0,0,1,0,0,1,
+   0,0,-1,0,0,-1,0,0,-1,
+   0,0,1,0,0,1,0,0,1,
+  ],3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(Array(9).fill(0).flatMap(()=>[0,0]),2));
+  return geometry;
+ };
+ for(const facing of [1,-1]){
+  const geometry=facingDecalGeometry(makeGeometry(),new THREE.Vector3(0,0,facing),.22,0);
+  const position=geometry.getAttribute('position');
+  assert.equal(position.count,3);
+  assert.ok([...position.array].filter((_,index)=>index%3===2).every(z=>z*facing>0));
+  geometry.dispose();
+ }
+});
 
 test('ubica mangas de mallas cerradas sin depender de bordes abiertos',()=>{
  const parts=[new THREE.BoxGeometry(1.3,2.65,.4),new THREE.BoxGeometry(.4,.8,.3).translate(-.9,.6,0),new THREE.BoxGeometry(.4,.8,.3).translate(.9,.6,0)];

@@ -6,7 +6,7 @@ import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { createGarmentCut } from './garment-cuts.js';
 import { createBodyGeometry, addBodyDetails } from './body-geometry.js';
 import { garmentOpenings, foldedGarmentEdges } from './garment-edges.js';
-import { automaticPrintScale, visibleAlphaBounds, visibleAlphaEdgeSamples } from './artwork-fit.js';
+import { automaticPrintOffsetY, automaticPrintScale, visibleAlphaBounds, visibleAlphaEdgeSamples } from './artwork-fit.js';
 import {garmentPrintLayers,createPrintLayerCollection} from './garment-print-layers.js';
 import {sleevePrintFrame,facingDecalGeometry} from './garment-print-placement.js';
 
@@ -210,20 +210,20 @@ export async function createViewer(container, state, { hero = false, viewAngle =
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = .88;
   renderer.domElement.classList.add('viewer-canvas');
   renderer.domElement.setAttribute('aria-label', 'Polera 3D en blanco. Arrastra para ver frente, costados y espalda.');
   container.replaceChildren(renderer.domElement);
 
-  const ambient = new THREE.HemisphereLight(0xffffff, 0x8a859b, 1.55);
+  const ambient = new THREE.HemisphereLight(0xffffff, 0x8a859b, 1.05);
   scene.add(ambient);
-  const softbox = new THREE.DirectionalLight(0xfff7ed, 2.6);
+  const softbox = new THREE.DirectionalLight(0xfff7ed, 1.35);
   softbox.position.set(-3, 4, 6);
   scene.add(softbox);
-  const fill = new THREE.DirectionalLight(0xe6e7ff, .85);
+  const fill = new THREE.DirectionalLight(0xe6e7ff, .35);
   fill.position.set(4, 1, 3);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffffff, 1.7);
+  const rim = new THREE.DirectionalLight(0xffffff, .55);
   rim.position.set(2, 3, -4);
   scene.add(rim);
 
@@ -311,10 +311,11 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
       const aspect=fitted.aspect,back=layer.side==='back',sleeve=layer.placement.startsWith('sleeve_');
       const safeScale=automaticPrintScale(aspect),area=garmentPrintArea(next.kind);
-      const maxScale=next.catalogPreview?2:next.catalogDesign?1.7:1.6;
+      const maxScale=next.catalogPreview?2:1.7;
       const layout=next.catalogDesign?next.catalogPrintLayout:null;
       let scale=Math.min(Number(layer.scale)||1,maxScale)*(layout?.size??1),flat=Boolean(next.catalogPreview||hero);
-      const point=printPlacementCoordinates(layer.placement,area.y+(1-safeScale)*.35-(flat?0:.12)+(layout?.y??0),layer.offsetX,layer.offsetY);
+      const automaticOffsetY=layer.placement==='center'?automaticPrintOffsetY(aspect):0;
+      const point=printPlacementCoordinates(layer.placement,area.y+(1-safeScale)*.35+automaticOffsetY-(flat?0:.12)+(layout?.y??0),layer.offsetX,layer.offsetY);
       point.x+=layout?.x??0;
       const frame=sleeve?sleevePrintFrame(shirt.geometry,layer.placement,layer.offsetX,layer.offsetY):{
         origin:new THREE.Vector3(point.x,point.y,0),normal:new THREE.Vector3(0,0,back?-1:1),
@@ -333,7 +334,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       const centerHit=cast();
       if(sleeve&&!centerHit)throw new Error('No pudimos proyectar el diseño sobre la manga.');
       const center=centerHit?centerHit.point.clone():frame.origin.clone().addScaledVector(frame.normal,.4);
-      const threshold=sleeve ? .15 : next.kind==='over' ? .05 : next.catalogDesign ? .32 : layer.placement.startsWith('chest_') ? .22 : .52;
+      const threshold=sleeve ? .15 : next.kind==='over' ? .22 : next.catalogDesign ? .32 : layer.placement.startsWith('chest_') ? .22 : .52;
       if(!flat){
         const edges=artworkEdgeSamples(fitted.image);
         const fits=value=>edges.every(({u,v})=>{
@@ -355,7 +356,8 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       else{
         decal=new DecalGeometry(surface,center,orientation,new THREE.Vector3(width,height,frame.depth));
         if(sleeve)facingDecalGeometry(decal,frame.normal,threshold);
-        else if(next.kind!=='over')keepForwardFacingDecal(decal,back,threshold);
+        else if(next.kind==='over')facingDecalGeometry(decal,frame.normal,threshold,0);
+        else keepForwardFacingDecal(decal,back,threshold);
         settleDecalOnFabric(decal);
         if(!decal.attributes.position.count)throw new Error('No pudimos aplicar el estampado a la tela.');
       }
@@ -371,7 +373,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     const version=++updateVersion;
     renderer.domElement.setAttribute('aria-label',`${next.kind==='body'?'Body de bebé':'Polera'} 3D. Arrastra para ver frente, costados y espalda.`);
     cloth.color.set(next.color);
-    ambient.intensity=next.kind==='over'?1.05:1.55;fill.intensity=next.kind==='over' ? .5 : .85;
+    ambient.intensity=next.kind==='over'?.78:1.05;fill.intensity=next.kind==='over' ? .25 : .35;
     const shirt=await getCut(next.kind);
     if(disposed||version!==updateVersion)return;
     shirt.material.color.set(next.color);

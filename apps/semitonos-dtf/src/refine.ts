@@ -94,3 +94,31 @@ export function removeTinyDots(data: Uint8ClampedArray, width: number, height: n
   const threshold = Math.ceil(Math.PI * (Math.max(0, minSize) / 2) ** 2)
   return removeSmallParticles(data, width, height, threshold > 1 ? threshold : 0)
 }
+
+/** Contracts the visible selection around every outer and interior contour. */
+export function shrinkAlphaMask(data: Uint8ClampedArray, width: number, height: number, pixels: number) {
+  const radius = Math.max(0, Math.floor(pixels))
+  if (!radius) return 0
+  const visible = new Uint8Array(width * height)
+  for (let p = 0; p < visible.length; p++) visible[p] = data[p * 4 + 3] > 0 ? 1 : 0
+
+  let removedPixels = 0
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const p = y * width + x
+    if (!visible[p]) continue
+    let keep = true
+    for (let oy = -radius; oy <= radius && keep; oy++) for (let ox = -radius; ox <= radius; ox++) {
+      const nx = x + ox, ny = y + oy
+      if (nx < 0 || nx >= width || ny < 0 || ny >= height || !visible[ny * width + nx]) {
+        keep = false
+        break
+      }
+    }
+    if (!keep) {
+      const i = p * 4
+      data[i] = data[i + 1] = data[i + 2] = data[i + 3] = 0
+      removedPixels++
+    }
+  }
+  return removedPixels
+}

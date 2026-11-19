@@ -48,3 +48,11 @@ export function automaticPrintScale(aspect) {
   if (aspect < .9) return .95;
   return 1;
 }
+
+// Square artwork reads lower than its geometric center on a shirt because the
+// printable panel narrows toward the waist. Only square artwork gets this lift;
+// rectangular pieces keep their existing placement and scale rules.
+export function automaticPrintOffsetY(aspect) {
+  if (!Number.isFinite(aspect) || aspect < .9 || aspect > 1.1) return 0;
+  return .2;
+}
