@@ -1,3 +1,4 @@
+import {adminSearch} from './admin-ui.js';
 export function priceOverviewMarkup({total,review,published,missingBase}){
  return `<div class="price-overview" role="group" aria-label="Filtrar productos por estado">${[
   ['all','Todos los productos',total,'con receta configurada'],
@@ -17,7 +18,7 @@ export function priceServicesMarkup(){
 }
 
 export function priceTableToolsMarkup(total){
- return `<div class="admin-panel-head price-table-heading"><div><h2 id="price-products-title">Precios de productos</h2><p>Define cuánto cobrar en cada tipo de pedido.</p><span class="price-tax-label">IVA incluido · CLP</span></div><div class="price-table-tools"><label class="supplier-table-search"><span>Buscar producto</span><input type="search" data-price-search placeholder="Nombre, categoría o precio" autocomplete="off"></label><div><output data-price-results aria-live="polite">${total} productos</output><button type="button" class="price-reset" data-price-reset hidden>Limpiar filtros</button></div></div></div>`;
+ return `<div class="admin-panel-head price-table-heading"><div><h2 id="price-products-title">Precios de productos</h2><p>Define cuánto cobrar en cada tipo de pedido.</p><span class="price-tax-label">IVA incluido · CLP</span></div></div><div class="admin-list-toolbar price-table-tools">${adminSearch({label:'Buscar producto',placeholder:'Nombre, categoría o precio',input:'data-price-search',output:`<output data-price-results aria-live="polite">${total} productos</output>`})}<button type="button" class="price-reset" data-price-reset hidden>Limpiar filtros</button></div>`;
 }
 
 export function matchesPriceFilter(row,query,filter='all'){

@@ -1,3 +1,4 @@
+import {adminActionTrigger,bindAdminActions,prepareAdminTable} from './admin-ui.js';
 import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,inventoryText,INVENTORY_STORAGE_KEY,inventoryProduct,inventoryModelOptions} from './inventory.js';
 import {inventoryListMarkup} from './admin-inventory-list.js';
 import {inventoryPageMarkup} from './admin-inventory-page.js';
@@ -34,22 +35,20 @@ export function renderInventory(context){
  };
  const content=inventoryPageMarkup({state,products,filter,sortOptions,editor:editorMarkup(products)});
  shell(content,'inventario');
+ bindAdminActions(root);
  const query=root.querySelector('#admin-search-input');
- query.setAttribute('aria-label','Buscar en inventario');
- const searchGroup=query.closest('.admin-search-group')||query.closest('.admin-search');
- root.querySelector('.inventory-search-slot').append(searchGroup);
- root.querySelector('#admin-search-count').hidden=true;
  root.querySelector('#inventory-status').textContent=maintenanceNotice;
- query.value=state.query;query.placeholder='Producto, talla, marca, color o ubicación';
+ query.value=state.query;
  query.oninput=()=>{state.query=query.value;updateResults()};
  function updateResults(){
   const rows=inventoryRows(items,state,products),units=items.reduce((sum,row)=>sum+row.quantity,0),value=items.reduce((sum,row)=>sum+row.price*row.quantity,0);
   root.querySelector('.inventory-metrics').innerHTML=[['Unidades',units,'disponibles'],['Lotes',items.length,'registrados'],['Valor registrado',money(value),'precio × cantidad'],['Ubicaciones',new Set(items.map(row=>inventoryText(row.location))).size,'en el inventario']].map(([label,total,hint])=>`<article><span>${label}</span><strong>${total}</strong><small>${hint}</small></article>`).join('');
   root.querySelector('.inventory-metrics').hidden=Boolean(loadError);
   const count=`${rows.length} de ${items.length} lotes · ${rows.reduce((sum,row)=>sum+row.quantity,0)} unidades en esta vista`;
-  root.querySelector('#inventory-count').textContent=loadError?'Carga pendiente':count;root.querySelector('#admin-search-count').textContent=loadError?'':count;
+  root.querySelector('#inventory-count').textContent=loadError?'Carga pendiente':count;
   root.querySelector('#inventory-clear').disabled=!['query','product_type_id','model_code','brand','color','location','stock'].some(key=>state[key]);
   root.querySelector('#inventory-results').innerHTML=loadError?`<div class="admin-empty" role="alert"><strong>No pudimos cargar el inventario.</strong><p>${safe(loadError)}</p><button type="button" class="admin-secondary" id="inventory-retry">Reintentar</button></div>`:!rows.length?`<div class="admin-empty"><strong>${items.length?'No hay lotes que coincidan.':'Aún no hay prendas registradas.'}</strong><p>${items.length?'Prueba otra búsqueda o limpia los filtros.':'Agrega tu primer lote para empezar a organizar tus prendas.'}</p></div>`:inventoryListMarkup(rows,state.groupBy,products);
+  root.querySelectorAll('.inventory-table').forEach(prepareAdminTable);
   for(const id of ['new-inventory-item','inventory-export'])root.querySelector(`#${id}`).disabled=Boolean(loadError)||(id==='inventory-export'&&!rows.length);
   root.querySelector('#inventory-retry')?.addEventListener('click',()=>renderInventory(context));
  }
@@ -86,7 +85,7 @@ export function renderInventory(context){
   const trigger=event.target.closest('[data-edit-inventory],[data-delete-inventory]');if(!trigger)return;
   try{const item=store.read().find(row=>row.id===(trigger.dataset.editInventory||trigger.dataset.deleteInventory));if(!item)throw new Error('El registro ya no existe. Actualiza el inventario.');
    if(trigger.dataset.editInventory)openEditor(item,trigger);
-   else{removing=item;opener=trigger;deletion.querySelector('[data-delete-description]').textContent=`${item.name} · ${item.brand} · ${item.color}${item.size?` · ${item.size}`:''} · ${item.quantity} unidades · ${item.location}`;deletion.querySelector('.admin-form-status').textContent='';deletion.showModal();deletion.querySelector('.dialog-cancel').focus()}
+   else{removing=item;opener=adminActionTrigger(trigger)||trigger;deletion.querySelector('[data-delete-description]').textContent=`${item.name} · ${item.brand} · ${item.color}${item.size?` · ${item.size}`:''} · ${item.quantity} unidades · ${item.location}`;deletion.querySelector('.admin-form-status').textContent='';deletion.showModal();deletion.querySelector('.dialog-cancel').focus()}
   }catch(error){toast(error.message)}
  };
  form.onsubmit=event=>{event.preventDefault();try{
@@ -98,6 +97,7 @@ export function renderInventory(context){
  deletion.querySelector('form').onsubmit=event=>{event.preventDefault();try{store.remove(removing);deletion.close();renderInventory(context);root.querySelector('#new-inventory-item').focus();toast('Lote eliminado.')}catch(error){deletion.querySelector('.admin-form-status').textContent=error.message}};
  root.querySelector('#inventory-export').onclick=()=>{try{download(inventoryCsv(inventoryRows(store.read(),state,products),products),`inventario-${inventoryToday()}.csv`,'text/csv;charset=utf-8')}catch(error){toast(error.message)}};
  root.querySelector('#inventory-backup').onclick=()=>{try{download(loadError?storage.getItem(INVENTORY_STORAGE_KEY):inventoryBackup(store.read()),`respaldo-inventario-${inventoryToday()}.json`,'application/json')}catch(error){toast(error.message)}};
+ root.querySelector('#inventory-restore').onclick=()=>root.querySelector('#inventory-import').click();
  root.querySelector('#inventory-import').onchange=async event=>{
   const input=event.target,file=input.files[0],status=root.querySelector('#inventory-status');if(!file)return;
   try{if(file.size>5*1024*1024)throw new Error('El respaldo debe pesar menos de 5 MB.');const added=store.restore(await file.text());renderInventory(context);toast(`${added} lotes restaurados. Los registros existentes se conservaron.`)}catch(error){status.textContent=error.message}finally{input.value=''}

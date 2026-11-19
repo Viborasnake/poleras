@@ -55,11 +55,6 @@
 .price-table-heading h2{font-size:26px;line-height:30px}
 .price-table-heading p{font-size:14px;line-height:1.5}
 .price-tax-label{display:inline-block;margin-top:10px;color:var(--ds-text-secondary);font-size:12px;font-weight:700;white-space:nowrap}
-.price-table-tools{display:grid;gap:4px;width:min(340px,42%);flex:none}
-.price-table-tools .supplier-table-search{width:min(380px,100%);min-width:0}
-.price-table-tools .supplier-table-search>span{font-size:12px}
-.price-table-tools .supplier-table-search input{min-height:44px;font-size:14px;background:var(--ds-surface-page);border-color:var(--ds-border-control)}
-.price-table-tools>div{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;min-height:32px;font-size:12px;color:var(--ds-text-secondary)}
 .price-reset{min-height:44px;padding:8px 0;border:0;background:transparent;color:var(--ds-color-link);font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
 .price-reset[hidden],.price-products-panel [hidden]{display:none!important}
 .price-help{margin:0;padding:8px 22px;border-top:1px solid var(--ds-border-subtle);background:var(--ds-surface-raised)}
@@ -91,6 +86,6 @@
 .price-products-panel .admin-table-wrap{scrollbar-gutter:stable}
 @media(max-width:1100px){.price-overview button{padding:16px}.price-overview{gap:10px}.price-services-grid{grid-template-columns:1fr}.price-service-card+section{padding:20px 0 0;border-left:0;border-top:1px solid var(--ds-border-subtle)}.price-print-fields{grid-template-columns:repeat(4,minmax(0,1fr))}.price-help>div{grid-template-columns:1fr 1fr}}
 @media(max-width:1440px){.price-overview button>small{display:none}}
-@media(max-width:760px){.price-overview{grid-template-columns:1fr 1fr}.admin-prices-page .admin-page-heading{align-items:flex-start;flex-direction:column;gap:14px}.price-overview button>small{font-size:14px}.price-print-fields{grid-template-columns:1fr 1fr}.price-services>summary{flex-wrap:wrap;padding:16px}.price-services>summary>span:nth-child(2){flex:1;min-width:0}.price-services-toggle{margin-left:54px}.price-services-content{padding:0 16px 16px}.price-products-panel .price-table-heading{align-items:flex-start;flex-direction:column;padding:18px 16px 12px;gap:16px}.price-table-tools{width:100%;gap:6px}.price-table-tools .supplier-table-search{width:100%}.price-table-tools>div{justify-content:space-between;min-height:36px}.price-help{padding:8px 16px}}
+@media(max-width:760px){.price-overview{grid-template-columns:1fr 1fr}.admin-prices-page .admin-page-heading{align-items:flex-start;flex-direction:column;gap:14px}.price-overview button>small{font-size:14px}.price-print-fields{grid-template-columns:1fr 1fr}.price-services>summary{flex-wrap:wrap;padding:16px}.price-services>summary>span:nth-child(2){flex:1;min-width:0}.price-services-toggle{margin-left:54px}.price-services-content{padding:0 16px 16px}.price-products-panel .price-table-heading{align-items:flex-start;flex-direction:column;padding:18px 16px 12px;gap:16px}.price-help{padding:8px 16px}}
 @media(max-width:420px){.price-overview button{padding:14px 12px;gap:6px}.price-overview button>span{font-size:14px;line-height:1.4}.price-overview button>i{right:10px;top:10px}.price-overview button>small{display:none}.price-help>div{grid-template-columns:1fr}.price-print-fields{grid-template-columns:1fr}.price-service-card footer{align-items:stretch;flex-direction:column}.price-service-card .admin-form-status{flex:auto}.price-service-card footer>button{width:100%}}
 @media(max-width:760px){.price-services-toggle{margin-left:0;gap:0}.price-services-toggle>span,.price-services[open] .price-services-open{display:none}.price-services>summary>span:nth-child(2){flex:1 1 0}.price-services-icon{width:36px;height:36px}}

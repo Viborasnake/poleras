@@ -17,18 +17,18 @@
 .collections-table{min-width:1000px;table-layout:fixed}
 .collections-table th,.collections-table td{padding:14px 16px;vertical-align:middle}
 .collections-table th{padding-block:12px;font-size:10px}
-.collections-table th:first-child{width:164px}
-.collections-table th:nth-child(2){width:24%}
+.collections-table th:first-child{width:24%}
+.collections-table th:nth-child(2){width:164px}
 .collections-table th:nth-child(3){width:148px}
 .collections-table th:nth-child(4){width:25%}
 .collections-table th:nth-child(5){width:104px}
-.collections-table th:last-child{width:136px}
+.collections-table th:last-child{width:190px}
 .collections-table .home-order-item:hover{background:var(--ds-surface-subtle)}
-.collections-table td:first-child .home-order-controls{display:flex;align-items:center;gap:5px}
+.collections-table td:nth-child(2) .home-order-controls{display:flex;align-items:center;gap:5px}
 .home-order-grip{display:flex;align-items:center;justify-content:center;gap:4px;width:44px;height:44px;border:1px solid transparent;background:transparent;border-radius:var(--ds-radius-control)}
 .home-order-dots{font-size:19px;color:var(--ds-text-secondary)}
 .home-order-position{display:inline;width:auto;height:auto;background:none;font-size:13px;font-variant-numeric:tabular-nums}
-.collections-table td:first-child .home-order-move{display:grid;grid-template-columns:repeat(2,44px);gap:0}
+.collections-table td:nth-child(2) .home-order-move{display:grid;grid-template-columns:repeat(2,44px);gap:0}
 .home-order-move button{width:44px;height:44px;border-color:transparent;border-radius:var(--ds-radius-control);background:transparent}
 .home-order-move svg{width:18px;height:18px}
 .home-order-move button:disabled{opacity:.35;cursor:not-allowed}
@@ -43,7 +43,6 @@
 .home-order-content{gap:7px;min-width:0}
 .home-order-content>small{color:var(--ds-text-secondary);font-size:11px}
 .home-order-field{gap:7px;font-size:12px}
-.collection-mobile-label{display:none}
 .home-order-featured{min-width:0;max-width:none}
 .home-order-select{display:block;position:relative;min-width:0}
 .home-order-select::after{position:absolute;right:14px;top:18px;width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;color:var(--ds-text-primary);transform:rotate(45deg);pointer-events:none;content:''}
@@ -51,30 +50,5 @@
 .home-order-select select:hover{border-color:var(--ds-text-primary)}
 .collections-table .status-pill{gap:5px;white-space:nowrap}
 .collections-table .status-pill>span{font-size:8px}
-.collection-row-actions{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap}
-.collection-edit,.collection-row-menu>summary{display:flex;align-items:center;justify-content:center;min-height:44px;padding:10px 12px;border:1px solid var(--ds-border-control);border-radius:var(--ds-radius-control);background:var(--ds-surface-raised);color:var(--ds-text-primary);font-size:12px;font-weight:700;cursor:pointer}
-.collection-row-menu>summary{width:44px;padding:0;font-size:22px;line-height:1;list-style:none}
-.collection-row-menu>summary::-webkit-details-marker{display:none}
-.collection-edit:hover,.collection-row-menu>summary:hover,.collection-row-menu[open]>summary{background:var(--ds-surface-subtle);border-color:var(--ds-text-primary)}
-.collection-row-menu[open]{flex-basis:100%;order:2}
-.collection-row-menu[open]>summary{margin-left:auto}
-.collection-row-menu-items{display:grid;gap:4px;margin-top:7px;padding:5px;border:1px solid var(--ds-border-subtle);border-radius:var(--ds-radius-control);background:var(--ds-surface-page)}
-.collection-row-menu-items button{min-height:44px;padding:8px;border:0;border-radius:6px;background:transparent;color:var(--ds-text-primary);font:700 12px var(--ds-font-body);text-align:left}
-.collection-row-menu-items button:hover:not(:disabled){background:var(--ds-surface-subtle)}
-.collection-row-menu-items .admin-danger-link{color:var(--ds-feedback-danger)}
-.collection-row-menu-items button:disabled{color:var(--ds-text-disabled);cursor:not-allowed}
-.collection-row-menu-items small{padding:3px 8px 7px;color:var(--ds-text-secondary);font-size:11px;line-height:1.4}
-.collection-row-menu>summary:focus-visible,.collection-edit:focus-visible,.collection-row-menu-items button:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:2px}
-
-/* El encabezado reserva espacio para búsqueda y acciones de cuenta. */
-.admin-topbar{flex-wrap:wrap;gap:16px 24px;padding-block:16px}
-.admin-topbar .admin-search-group{flex:1 1 260px;width:auto;max-width:590px;margin-right:auto}
-.admin-search-count:empty{display:none}
-.admin-account{flex:none;min-width:0;gap:10px}
-.admin-account>span:not(.admin-avatar){min-width:0;max-width:200px}
-.admin-account small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.admin-account .admin-account-password{display:inline-flex;align-items:center;justify-content:center;flex:none;width:auto;height:auto;min-height:44px;padding:10px 12px;border:1px solid var(--ds-border-control);border-radius:var(--ds-radius-control);background:var(--ds-surface-raised);color:var(--ds-text-primary)}
-.admin-account .admin-logout{min-height:44px}
-@media(max-width:900px){.admin-account>span:not(.admin-avatar){display:none}}
-@media(max-width:760px){.admin-topbar .admin-search-group{flex-basis:100%;max-width:none}.admin-account{margin-left:auto}.admin-main:has(.home-order-panel)>.admin-page-heading{align-items:stretch}.home-order-panel .admin-panel-head{align-items:flex-start;flex-direction:column;padding:18px 16px 12px}.collection-save-controls{width:100%;justify-content:space-between;gap:12px}.home-order-panel .home-order-status{text-align:left}.collection-order-help{padding:0 16px 16px}}
-@media(max-width:620px){.home-order-panel .admin-panel-head .admin-primary{width:auto}.collections-table{min-width:900px}.collections-table th:nth-child(2){width:250px}.collections-table th:nth-child(4){width:220px}}
+@media(max-width:760px){.admin-main:has(.home-order-panel)>.admin-page-heading{align-items:stretch}.home-order-panel .admin-panel-head{align-items:flex-start;flex-direction:column;padding:18px 16px 12px}.collection-save-controls{width:100%;justify-content:space-between;gap:12px}.home-order-panel .home-order-status{text-align:left}.collection-order-help{padding:0 16px 16px}}
+@media(max-width:620px){.home-order-panel .admin-panel-head .admin-primary{width:auto}.collections-table{min-width:900px}.collections-table th:first-child{width:250px}.collections-table th:nth-child(4){width:220px}}

@@ -65,6 +65,21 @@ html.admin-theme-dark .admin-color-option:has(input:checked),
 html.admin-theme-dark .admin-order-complete,
 html.admin-theme-dark .admin-payment-transfer-notice { color: var(--ds-brand-primary) !important; }
 
+/* Mensajes de estado legibles sobre las superficies elevadas del administrador. */
+html.admin-theme-dark :is(.home-order-status[data-state="error"], #admin-rebuild-catalog-status[data-state="error"], .admin-form-disclosure > .ds-disclosure-status[data-tone="error"], .admin-allowed-colors [data-color-config-note]:not([data-tone="success"])) {
+  color: var(--ds-text-inverse);
+  background: var(--ds-feedback-danger);
+}
+html.admin-theme-dark :is(#admin-rebuild-catalog-status[data-state="success"], .admin-allowed-colors [data-color-config-note][data-tone="success"]) {
+  color: var(--ds-text-inverse);
+  background: var(--ds-feedback-success);
+}
+html.admin-theme-dark :is(.home-order-status[data-state="error"], #admin-rebuild-catalog-status[data-state], .admin-form-disclosure > .ds-disclosure-status[data-tone="error"], .admin-allowed-colors [data-color-config-note]:not(:empty)) {
+  border-radius: var(--ds-radius-control);
+  padding: 8px 10px;
+}
+html.admin-theme-dark .admin-allowed-colors [data-color-config-note]:empty { background: none; }
+
 /* Las insignias de estado conservan texto propio sobre su fondo claro. */
 html.admin-theme-dark .status-pill { background: #fff3cf; color: #513800; }
 html.admin-theme-dark .status-pill.is-active,
