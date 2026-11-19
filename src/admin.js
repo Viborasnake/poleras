@@ -1,3 +1,4 @@
+import {collectionsPanelMarkup} from './admin-collections-panel.js';
 import {productMockupFields,productMockupDraft,mockupInputName} from './admin-product-mockups.js';
 import {designProductMockups} from './catalog-product-mockups.js';
 import {wireStoreSettings as bindStoreSettings,wireAdminNotifications as bindAdminNotifications} from './admin-store-settings.js';
@@ -14,6 +15,7 @@ import './admin-overdue.css';
 import './admin-manual-order.css';
 import './admin-creative-quote.css';
 import './admin-dark.css';
+import './admin-collections.css';
 import { createClient } from '@supabase/supabase-js';
 import {authWithCaptcha} from './auth-captcha.js';
 import { defaultStoreSettings, normalizeStoreSettings, validateStoreSettings, fetchStoreSettings } from './store-settings.js';
@@ -403,34 +405,23 @@ function wireSizes(rows){
  root.querySelectorAll('[data-create-size-supplier]').forEach(button=>button.onclick=()=>{try{sessionStorage.setItem('droska:pending-supplier-size',button.dataset.createSizeSupplier)}catch{}location.hash='#insumos'});
 }
 function collectionsPanel(){
- const collections=[...adminData.collections].sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)||a.name.localeCompare(b.name,'es'));
- const rows=collections.map((collection,index)=>{
-  const allDesigns=adminData.designs.filter(design=>design.collection_id===collection.id);
-  const designs=allDesigns.filter(design=>design.active).sort((a,b)=>Number(b.is_featured)-Number(a.is_featured)||new Date(b.created_at)-new Date(a.created_at));
-  const featured=designs.find(design=>design.is_featured)?.id||'';
-  const limit=Math.max(1,Math.min(12,Number(collection.home_design_limit)||4));
-  const limitOptions=Array.from({length:12},(_,offset)=>{const value=offset+1;return `<option value="${value}" ${value===limit?'selected':''}>${value}</option>`}).join('');
-  const designOptions=`<option value="">Automático por prioridad</option>${designs.map(design=>`<option value="${design.id}" ${design.id===featured?'selected':''}>${safe(design.name)}</option>`).join('')}`;
-  return `<tr class="home-order-item" data-home-collection="${collection.id}" data-admin-searchable="${safe(`${collection.name} ${collection.slug} ${productName(collection.product_type_id)} ${categoryName(collection.category_id)}`.toLowerCase())}">
-   <td><div class="home-order-controls"><span class="home-order-position" aria-label="Posición ${index+1}">${index+1}</span><button type="button" class="home-order-grip" draggable="true" data-home-drag aria-label="Arrastrar ${safe(collection.name)}" title="Arrastrar para ordenar">⠿</button><div class="home-order-move"><button type="button" data-home-up aria-label="Subir ${safe(collection.name)}">↑</button><button type="button" data-home-down aria-label="Bajar ${safe(collection.name)}">↓</button></div></div></td>
-   <td><div class="home-order-identity"><strong>${safe(collection.name)}</strong><small>/${safe(collection.slug)}</small>${collection.is_featured?'<span class="status-pill is-active">Colección destacada</span>':''}</div></td>
-   <td><div class="home-order-identity"><span class="admin-collection-label">${safe(productName(collection.product_type_id))}</span><small>${safe(categoryName(collection.category_id))}</small></div></td>
-   <td><div class="home-order-content"><span>${activeDesignCountLabel(designs.length)}</span><label class="home-order-field">Visibles en el home<select data-home-limit="${collection.id}" aria-label="Diseños visibles de ${safe(collection.name)}">${limitOptions}</select></label></div></td>
-   <td><label class="home-order-field home-order-featured">Primera tarjeta<select data-home-featured="${collection.id}" aria-label="Diseño destacado de ${safe(collection.name)}">${designOptions}</select></label></td>
-   <td><span class="status-pill ${collection.active?'is-active':'is-hidden'}">${collection.active?'Activa':'Oculta'}</span></td>
-   <td><div class="row-actions"><button type="button" data-edit-collection="${collection.id}">Editar</button><button type="button" data-toggle-collection="${collection.id}">${collection.active?'Ocultar':'Activar'}</button><button type="button" class="admin-danger-link" data-delete-collection="${collection.id}" ${allDesigns.length?'disabled':''} title="${allDesigns.length?'Primero mueve o elimina los diseños de esta colección.':'Eliminar colección'}">Eliminar</button></div></td>
-  </tr>`;
- }).join('');
- return `<section class="admin-panel collection-panel home-order-panel" aria-labelledby="collections-title"><div class="admin-panel-head"><div><h2 id="collections-title">Todas las colecciones</h2><p>${collections.length} en total · ${collections.filter(item=>item.active).length} visibles</p><p id="collections-order-help">Arrastra o usa las flechas para ordenar. El límite de diseños incluye la primera tarjeta destacada.</p></div><button type="button" class="admin-primary" data-save-home-order ${rows?'':'disabled'}>Guardar orden y home</button></div>${rows?`<div class="admin-table-wrap" role="region" aria-label="Colecciones: orden, contenido y edición" tabindex="0"><table class="admin-table collections-table" aria-describedby="collections-order-help"><thead><tr><th scope="col">Orden</th><th scope="col">Colección</th><th scope="col">Producto y categoría</th><th scope="col">Contenido</th><th scope="col">Diseño destacado</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead><tbody data-home-order-list>${rows}</tbody></table></div>`:'<div class="admin-empty"><strong>Aún no hay colecciones.</strong><p>Crea la primera para comenzar a organizar el catálogo.</p></div>'}<p class="admin-form-status home-order-status" role="status" aria-live="polite"></p></section>`;
+ return collectionsPanelMarkup({collections:adminData.collections,designs:adminData.designs,productName,categoryName,previewUrl:(design,collection)=>{
+  if(!design)return '';
+  const slug=adminData.productTypes.find(product=>product.id===collection.product_type_id)?.slug;
+  const mockups=designProductMockups(design);
+  return catalogAssetUrl(mockups[slug]?.path||Object.values(mockups).find(mockup=>mockup.path)?.path||'');
+ }});
 }
 function wireHomeOrder(){
  const list=root.querySelector('[data-home-order-list]');if(!list)return;
- const status=root.querySelector('.home-order-status');let dragged=null;
- const updatePositions=()=>{list.querySelectorAll('[data-home-collection]').forEach((row,index)=>{const position=row.querySelector('.home-order-position');position.textContent=index+1;position.setAttribute('aria-label',`Posición ${index+1}`)});status.textContent='Hay cambios sin guardar.'};
- const move=(row,offset)=>{const rows=[...list.querySelectorAll('[data-home-collection]')].filter(item=>!item.hidden),index=rows.indexOf(row),next=rows[index+offset];if(!next)return;const focused=document.activeElement;offset<0?list.insertBefore(row,next):list.insertBefore(next,row);updatePositions();focused?.focus()};
+ const status=root.querySelector('.home-order-status'),saveButton=root.querySelector('[data-save-home-order]');let dragged=null;
+ const markDirty=()=>{saveButton.disabled=false;status.textContent='Cambios sin guardar';status.dataset.state='pending'};
+ const syncMoveButtons=()=>{const visible=[...list.querySelectorAll('[data-home-collection]')].filter(row=>!row.hidden);visible.forEach((row,index)=>{row.querySelector('[data-home-up]').disabled=index===0;row.querySelector('[data-home-down]').disabled=index===visible.length-1})};
+ const updatePositions=()=>{list.querySelectorAll('[data-home-collection]').forEach((row,index)=>{const position=row.querySelector('.home-order-position');position.textContent=index+1;position.setAttribute('aria-label',`Posición ${index+1}`)});syncMoveButtons();markDirty()};
+ const move=(row,offset)=>{const rows=[...list.querySelectorAll('[data-home-collection]')].filter(item=>!item.hidden),index=rows.indexOf(row),next=rows[index+offset];if(!next)return;const focused=document.activeElement;offset<0?list.insertBefore(row,next):list.insertBefore(next,row);updatePositions();(focused?.disabled?row.querySelector('[data-home-up]:not(:disabled),[data-home-down]:not(:disabled)'):focused)?.focus()};
  const save=async()=>{
   const rows=[...list.querySelectorAll('[data-home-collection]')];if(!rows.length)return;
-  const button=root.querySelector('[data-save-home-order]');button.disabled=true;status.textContent='Guardando configuración…';
+  const button=root.querySelector('[data-save-home-order]');button.disabled=true;list.setAttribute('inert','');status.textContent='Guardando…';status.dataset.state='busy';
   try{
    const collectionUpdates=rows.map((row,index)=>{const id=Number(row.dataset.homeCollection);const limit=Math.max(1,Math.min(12,Number(row.querySelector('[data-home-limit]').value)||4));return supabase.from('catalog_collections').update({sort_order:index*10,home_design_limit:limit}).eq('id',id)});
    const results=await Promise.all(collectionUpdates);const failed=results.find(result=>result.error);if(failed?.error)throw failed.error;
@@ -440,7 +431,7 @@ function wireHomeOrder(){
     if(featuredId){const chosen=await supabase.from('catalog_designs').update({is_featured:true}).eq('id',featuredId).eq('collection_id',collectionId);if(chosen.error)throw chosen.error}
    }
    await refreshData('Configuración del home actualizada.',true);
-  }catch(error){button.disabled=false;status.textContent=`No se pudo guardar: ${error.message}`}
+  }catch(error){button.disabled=false;status.textContent=`No se pudo guardar: ${error.message}`;status.dataset.state='error'}finally{list.removeAttribute('inert')}
  };
  list.querySelectorAll('[data-home-up]').forEach(button=>button.onclick=()=>move(button.closest('[data-home-collection]'),-1));
  list.querySelectorAll('[data-home-down]').forEach(button=>button.onclick=()=>move(button.closest('[data-home-collection]'),1));
@@ -450,8 +441,11 @@ function wireHomeOrder(){
   row.addEventListener('drop',event=>event.preventDefault());
   row.addEventListener('dragend',()=>{row.classList.remove('is-dragging');dragged=null});
  });
+ syncMoveButtons();
+ root.querySelector('#admin-search-input')?.addEventListener('input',syncMoveButtons);
+ list.querySelectorAll('.collection-row-menu').forEach(menu=>menu.addEventListener('toggle',()=>{if(menu.open)list.querySelectorAll('.collection-row-menu[open]').forEach(other=>{if(other!==menu)other.open=false})}));
  root.querySelector('[data-save-home-order]').onclick=save;
- list.querySelectorAll('[data-home-limit],[data-home-featured]').forEach(input=>input.addEventListener('change',()=>{status.textContent='Hay cambios sin guardar.'}));
+ list.querySelectorAll('[data-home-limit],[data-home-featured]').forEach(input=>input.addEventListener('change',()=>{syncMoveButtons();markDirty()}));
 }
 function collectionsView(){
  const action=`<button type="button" class="admin-primary" id="new-collection">${icon('plus')} Nueva colección</button>`;
