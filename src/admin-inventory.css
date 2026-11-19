@@ -27,6 +27,12 @@
 .admin-inventory-dialog .ds-disclosure-panel { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .admin-inventory-dialog .ds-disclosure-panel input { width:100%; min-width:0; }
 .admin-inventory-dialog .ds-disclosure-continue { grid-column:1/-1; }
+.admin-inventory-dialog label:has(.inventory-suggestions) { align-content:start; min-width:0; }
+.inventory-suggestions { display:grid; gap:0; max-height:210px; margin:0; padding:4px; overflow-y:auto; overscroll-behavior:contain; border:1px solid var(--ds-border-control); border-radius:var(--ds-radius-control); background:var(--ds-surface-raised); color:var(--ds-text-primary); }
+.inventory-suggestions[hidden] { display:none; }
+.inventory-suggestion { display:grid; gap:3px; min-height:44px; padding:9px 10px; border:1px solid transparent; border-radius:6px; cursor:pointer; overflow-wrap:anywhere; font-size:14px; font-weight:700; }
+.inventory-suggestion small { color:var(--ds-text-secondary); font-size:11px; font-weight:400; }
+.inventory-suggestion:hover,.inventory-suggestion[aria-selected="true"] { border-color:var(--ds-border-control); background:var(--ds-surface-subtle); }
 .inventory-sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 @media(max-width:1100px) {
  .inventory-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }

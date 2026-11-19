@@ -1,6 +1,23 @@
 export const INVENTORY_STORAGE_KEY='droska-admin-inventory';
 export const inventoryToday=(now=new Date())=>new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 export const inventoryText=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('es-CL');
+export const INVENTORY_SUGGESTION_FIELDS=['name','brand','color','size','location'];
+export function inventorySuggestions(items,field,values={}){
+ if(!INVENTORY_SUGGESTION_FIELDS.includes(field))return [];
+ const dependencies={name:['brand'],brand:['name'],color:['name','brand'],size:['name','brand','color'],location:['name','brand','color','size']}[field];
+ const context=dependencies.filter(key=>inventoryText(values[key]));
+ const words=inventoryText(values[field]).split(/\s+/).filter(Boolean),options=new Map();
+ for(const item of items){
+  const value=String(item[field]??'').trim(),key=inventoryText(value);
+  if(!key||!words.every(word=>key.includes(word)))continue;
+  const contextual=context.length>0&&context.every(name=>inventoryText(item[name])===inventoryText(values[name]));
+  const previous=options.get(key);
+  if(previous){previous.count++;previous.contextual||=contextual}
+  else options.set(key,{value,count:1,contextual});
+ }
+ const query=inventoryText(values[field]);
+ return [...options.values()].sort((a,b)=>Number(b.contextual)-Number(a.contextual)||Number(inventoryText(b.value).startsWith(query))-Number(inventoryText(a.value).startsWith(query))||b.count-a.count||a.value.localeCompare(b.value,'es-CL',{numeric:true,sensitivity:'base'}));
+}
 const limits={name:100,brand:80,color:50,size:30,location:100,notes:300};
 export function validateInventoryItem(input){
  if(!input||typeof input!=='object')throw new Error('El registro de inventario no es válido.');

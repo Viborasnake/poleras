@@ -194,6 +194,8 @@ Editar un pedido abre resúmenes independientes, sin repetir el alta. Los bloque
 
 ### Administración: inventario
 
+En Agregar/Editar lote, Producto o modelo, Marca, Color, Talla y Ubicación muestran sugerencias guardadas dentro del mismo campo. La lista aparece al enfocar o escribir, filtra sin tildes ni mayúsculas, evita duplicados y prioriza coincidencias con la prenda ya descrita; permite escribir valores nuevos. Usa combobox/listbox con flechas, Enter para elegir, Escape para cerrar y Tab para continuar sin elegir automáticamente. Elegir mantiene el foco y nunca confirma el bloque ni altera otros campos. La lista se despliega en el flujo del formulario para conservar su ancho en móvil y usa superficie Raised/Subtle, texto Primary/Secondary y borde Control en ambos temas. Las sugerencias se obtienen de lotes guardados, también sin stock, y mantienen la persistencia local del inventario.
+
 Inventario es un destino administrativo propio. El alta de lotes reutiliza el formulario progresivo: Prenda y variante → Cantidad y precio → Ingreso y ubicación → Revisión. Editar abre las secciones resumidas con acciones independientes. El listado muestra todos los datos, incluidas notas, combina búsqueda y filtros, y conserva sus controles al ordenar. En móvil cada fila se apila con etiquetas visibles; todos los controles conservan 44 px y foco visible. El aviso de guardado local acompaña las acciones de respaldo JSON y exportación CSV. La muestra `/samples/inventory.html` permite revisar el módulo con datos en memoria.
 
 ### Administración: insumos y recetas

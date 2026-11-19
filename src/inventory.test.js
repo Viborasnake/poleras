@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem} from './inventory.js';
+import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem,inventorySuggestions} from './inventory.js';
 
 const draft={name:'Polera básica',brand:'Gildan',color:'Azul',size:'M',price:5000,quantity:4,date:'2026-01-01',location:'Estante 2',notes:'Algodón'};
 function setup(raw=null){let value=raw;return {getItem:()=>value,setItem:(_,next)=>{value=next},raw:()=>value};}
@@ -48,4 +48,23 @@ test('falla de escritura se informa y mantiene el inventario anterior',()=>{
 test('CSV conserva caracteres, comillas y saltos de línea, y neutraliza fórmulas',()=>{
  const csv=inventoryCsv([{...draft,name:'=HYPERLINK("url")',notes:'Línea 1\nLínea 2; algodón'}]);
  assert.ok(csv.startsWith('\uFEFF'));assert.ok(csv.includes('"\'=HYPERLINK(""url"")"'));assert.ok(csv.includes('"Línea 1\nLínea 2; algodón"'));
+});
+test('sugiere valores guardados tras recargar, incluidos lotes sin stock',()=>{
+ const storage=setup(),store=inventoryStore(storage);store.save({...draft,name:'Dogo Premium',brand:'Roly',quantity:0});
+ const reloaded=inventoryStore(storage).read();
+ for(const [field,value] of [['name','Dogo Premium'],['brand','Roly'],['color','Azul'],['size','M'],['location','Estante 2']])assert.equal(inventorySuggestions(reloaded,field)[0].value,value);
+});
+test('filtra sugerencias sin tildes ni mayúsculas y elimina duplicados',()=>{
+ const items=[{...draft,color:'Azul océano'},{...draft,color:'azul oceano'},{...draft,color:'Azul marino'}, {...draft,color:'Negro'}];
+ const suggestions=inventorySuggestions(items,'color',{color:'OCEANO'});
+ assert.equal(suggestions.length,1);assert.equal(suggestions[0].value,'Azul océano');assert.equal(suggestions[0].count,2);
+ assert.deepEqual(inventorySuggestions(items,'color',{color:'un color nuevo'}),[]);
+});
+test('prioriza sugerencias del producto y marca escritos, conservando otras opciones',()=>{
+ const items=[{...draft,name:'Dogo',brand:'Roly',color:'Rojo',size:'XL'},{...draft,name:'Otro',brand:'Gildan',color:'Negro',size:'S'},{...draft,name:'Otro',brand:'Gildan',color:'Negro',size:'M'}];
+ assert.equal(inventorySuggestions(items,'brand',{name:'dogo'})[0].value,'Roly');
+ assert.equal(inventorySuggestions(items,'color',{name:'Dogo',brand:'roly'})[0].value,'Rojo');
+ assert.equal(inventorySuggestions(items,'size',{name:'Dogo',brand:'Roly',color:'Rojo'})[0].value,'XL');
+ assert.equal(inventorySuggestions(items,'color',{name:'Nuevo producto'}).length,2);
+ assert.deepEqual(inventorySuggestions(items,'price'),[]);
 });
