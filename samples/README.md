@@ -26,3 +26,8 @@ Después de regenerar las fixtures, abrir `/samples/order-forms.html`. Usa el HT
 ## Banco de insumos y recetas
 
 Abrir `/samples/supplier-forms.html`. Ejecuta `renderSupplierProducts` completo con catálogo ficticio, cliente de datos simulado y almacenamiento de retorno en memoria; no importa el cliente real ni cambia su sesión. Gestionar insumos, edición, costos y recetas usan los handlers de producción. Ejecutar evaluación local comprueba quince escenarios, incluido crear/cancelar un componente sin perder la receta. Los guardados modifican únicamente la memoria de esta página; Reiniciar demo restaura los datos. Esta página queda fuera del build de producción.
+
+
+## Banco de precios
+
+Ejecutar `node scripts/generate-price-fixture.mjs` y abrir `/samples/prices.html` con Vite. El generador ejecuta la vista real de precios con seis productos ficticios; búsqueda, filtros y formularios de servicios usan los controladores de producción. Los guardados del banco actualizan solo memoria y permiten simular un error. «Evaluar interacciones» comprueba filtros combinados, estados vacíos, cero explícito, conservación de borradores, bloqueo durante guardado y recuperación tras error. El diálogo de producto muestra los campos reales con un guardado simulado; no acredita persistencia autenticada. No importa el cliente de datos ni inicia sesión. `?theme=light` permite revisar el tema claro. La página queda fuera del build de producción.
