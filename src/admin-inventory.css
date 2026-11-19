@@ -31,6 +31,7 @@
 .inventory-table .row-actions button { min-height:44px; font-size:12px; }
 .admin-inventory-dialog { width:min(700px,calc(100vw - 30px)); }
 .admin-inventory-dialog .admin-form-grid:empty { display:none; }
+.admin-inventory-dialog [data-inventory-model-field][hidden] { display:none; }
 .admin-inventory-dialog .ds-disclosure-panel { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .admin-inventory-dialog .ds-disclosure-panel input { width:100%; min-width:0; }
 .admin-inventory-dialog .ds-disclosure-continue { grid-column:1/-1; }

@@ -23,6 +23,7 @@ export function bindInventorySuggestions(form,read){
    let records;try{records=read()}catch{hint.textContent='No pudimos consultar los valores guardados.';close();return}
    const values=Object.fromEntries(INVENTORY_SUGGESTION_FIELDS.map(field=>[field,form.elements.namedItem(field).value]));
    values.model_code=form.elements.namedItem('model_code')?.value||'';
+   values.product_type_id=form.elements.namedItem('product_type_id')?.value||'';
    entry.options=inventorySuggestions(records,name,values);entry.index=-1;box.replaceChildren();input.removeAttribute('aria-activedescendant');
    hint.textContent=entry.options.length?`${entry.options.length} ${entry.options.length===1?'valor guardado':'valores guardados'}. Puedes elegir o escribir uno nuevo.`:'Sin coincidencias guardadas. Puedes escribir un valor nuevo.';
    for(const [index,option] of entry.options.entries()){

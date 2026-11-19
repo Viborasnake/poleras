@@ -244,7 +244,7 @@ function filterCurrentView(query){
  const empty=root.querySelector('#admin-design-filter-empty');if(empty)empty.hidden=visible>0;
 }
 
-function inventoryView(){renderInventory({root,shell,toast})}
+function inventoryView(){renderInventory({root,shell,toast,products:adminData.productTypes})}
 
 function summaryView(){
  const activeModels=new Set(adminData.variants.filter(item=>item.active).map(item=>item.product_models?.code)).size;

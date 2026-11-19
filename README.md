@@ -36,7 +36,7 @@ El build consulta el catálogo público de Supabase y genera HTML estático para
 
 ## Administración local
 
-Inventario se agrupa por tipo de producto (Unisex, Oversize, Mujer, Niños, Body bebé, Tote bag u Otro), con totales por grupo y filtro de tipo. El tipo se selecciona al crear/editar el lote y es independiente de su modelo comercial; los registros anteriores permanecen en Sin clasificar hasta asignarlos. Se puede volver a Sin agrupar desde el selector Agrupar por. Respaldos y CSV conservan la clasificación.
+Inventario elige su Producto desde la lista real de Administración → Productos, incluidos productos ocultos. Poleras tiene un segundo nivel Modelo (Unisex, Oversize, Mujer, Niños); el nombre o referencia comercial se conserva aparte. Puede agruparse por Producto, Producto y modelo o Sin agrupar, con filtros y totales. La clasificación anterior por modelo se conserva bajo su familia conocida (por ejemplo, Oversize pertenece a Poleras); los lotes sin clasificación siguen pendientes. Respaldos y CSV conservan producto y modelo, y los lotes de productos eliminados permanecen visibles con el nombre guardado.
 
 Los campos Producto o modelo, Marca, Color, Talla y Ubicación de Inventario sugieren valores de lotes guardados al enfocar o escribir. Priorizan el contexto de la prenda, admiten valores nuevos y se conservan entre visitas junto con el inventario local. Las sugerencias no se aprenden de formularios cancelados.
 

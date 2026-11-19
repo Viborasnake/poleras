@@ -1,8 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem,inventorySuggestions,inventoryGroups} from './inventory.js';
+import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,parseInventory,validateInventoryItem,inventorySuggestions,inventoryGroups,inventoryProduct,inventoryModelOptions} from './inventory.js';
 
 const draft={name:'Polera básica',brand:'Gildan',color:'Azul',size:'M',price:5000,quantity:4,date:'2026-01-01',location:'Estante 2',notes:'Algodón'};
+const products=[{id:'shirts',slug:'poleras',name:'Poleras'},{id:'totes',slug:'totebags',name:'Totebags'},{id:'new-product',slug:'imanes',name:'Imanes'}];
 function setup(raw=null){let value=raw;return {getItem:()=>value,setItem:(_,next)=>{value=next},raw:()=>value};}
 test('crear, editar, recargar, respaldar y restaurar conservan todos los campos',()=>{
  const storage=setup(),store=inventoryStore(storage),first=store.save(draft);
@@ -70,11 +71,11 @@ test('prioriza sugerencias del producto y marca escritos, conservando otras opci
 });
 test('agrupa distintos modelos comerciales por tipo y calcula totales de la vista filtrada',()=>{
  const rows=[{...draft,id:'a',model_code:'basic',name:'Dogo Premium'},{...draft,id:'b',model_code:'basic',name:'Otro modelo',quantity:2,price:3000},{...draft,id:'c',model_code:'over',quantity:0},{...draft,id:'d',model_code:''}];
- const groups=inventoryGroups(rows);
- assert.deepEqual(groups.map(group=>group.name),['Unisex','Oversize','Sin clasificar']);
+ const groups=inventoryGroups(rows,'model',products);
+ assert.deepEqual(groups.map(group=>group.name),['Poleras · Unisex','Poleras · Oversize','Sin clasificar']);
  assert.equal(groups[0].units,6);assert.equal(groups[0].value,26000);assert.equal(groups[0].items.length,2);
  assert.equal(groups[1].units,0);
- assert.deepEqual(inventoryGroups(inventoryRows(rows,{model_code:'basic',stock:'available',color:'Azul'})).map(group=>group.name),['Unisex']);
+ assert.deepEqual(inventoryGroups(inventoryRows(rows,{model_code:'basic',stock:'available',color:'Azul'}), 'product',products).map(group=>group.name),['Poleras']);
  assert.equal(inventoryGroups(rows,'none')[0].items.length,4);
  assert.deepEqual(inventoryRows(rows,{model_code:'unclassified'}).map(row=>row.id),['d']);
  assert.equal(inventoryRows(rows,{query:'unisex'}).length,2);
@@ -86,10 +87,33 @@ test('lotes históricos y respaldos conservan clasificación sin inferirla del n
  assert.equal(store.read()[0].name,draft.name);assert.equal(store.read()[0].model_code,'basic');
  const backup=inventoryBackup(store.read()),copy=inventoryStore(setup());copy.restore(backup);
  assert.equal(copy.read()[0].model_code,'basic');assert.ok(inventoryCsv(copy.read()).includes('Unisex'));
- assert.throws(()=>store.save({...draft,model_code:'unknown'}),/tipo de producto/);
+ assert.throws(()=>store.save({...draft,model_code:'unknown'}),/modelo/);
  assert.equal(edited.quantity,draft.quantity);
 });
 test('tipo elegido prioriza las sugerencias de esa familia sin alterar el resto del formulario',()=>{
  const rows=[{...draft,model_code:'over',name:'Modelo oversize'},{...draft,model_code:'basic',name:'Modelo unisex'}];
  assert.equal(inventorySuggestions(rows,'name',{model_code:'over'})[0].value,'Modelo oversize');
+});
+test('usa productos reales por ID, incluidos nuevos, renombrados u ocultos; modelo es un nivel secundario',()=>{
+ const store=inventoryStore(setup());
+ store.save({...draft,product_type_id:'new-product',product_type_name:'Imanes',product_type_slug:'imanes',model_code:''});
+ store.save({...draft,product_type_id:'shirts',product_type_name:'Poleras',product_type_slug:'poleras',model_code:'over'});
+ const rows=store.read(),renamed=products.map(product=>product.id==='new-product'?{...product,name:'Imanes personalizados',active:false}:product);
+ assert.deepEqual(inventoryGroups(rows,'product',renamed).map(group=>group.name),['Poleras','Imanes personalizados']);
+ assert.equal(inventoryRows(rows,{product_type_id:'new-product'},renamed).length,1);
+ assert.equal(inventoryRows(rows,{query:'imanes personalizados'},renamed).length,1);
+ assert.deepEqual(inventoryModelOptions(products[2]),[]);
+ assert.deepEqual(inventoryModelOptions(products[0]).map(model=>model.name),['Unisex','Oversize','Mujer','Niños']);
+ const copy=inventoryStore(setup());copy.restore(inventoryBackup(rows));
+ assert.deepEqual(copy.read(),rows);assert.ok(inventoryCsv(copy.read(),renamed).includes('Imanes personalizados'));
+ assert.throws(()=>store.save({...draft,product_type_id:'shirts',product_type_slug:'poleras',model_code:'body'}),/no corresponde/);
+});
+test('clasificación anterior se conserva bajo su producto y los productos eliminados no ocultan lotes',()=>{
+ const legacy={...draft,id:'old',model_code:'over'};
+ assert.equal(inventoryProduct(legacy,products).id,'shirts');
+ assert.equal(inventoryGroups([legacy],'product',products)[0].name,'Poleras');
+ const deleted={...draft,id:'deleted',product_type_id:'deleted-product',product_type_slug:'afiches',product_type_name:'Afiches'};
+ assert.equal(inventoryProduct(deleted,products).missing,true);
+ assert.equal(inventoryGroups([deleted],'product',products)[0].items.length,1);
+ assert.equal(inventoryGroups([{...draft,id:'unknown'}],'product',products)[0].name,'Sin clasificar');
 });

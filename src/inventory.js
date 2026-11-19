@@ -1,21 +1,38 @@
 export const INVENTORY_STORAGE_KEY='droska-admin-inventory';
 export const inventoryToday=(now=new Date())=>new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 export const inventoryText=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('es-CL');
-// Same model codes used by the shop; inventory classification is manual.
-export const INVENTORY_PRODUCT_TYPES=[{code:'basic',name:'Unisex'},{code:'over',name:'Oversize'},{code:'woman',name:'Mujer'},{code:'kid',name:'Niños'},{code:'body',name:'Body bebé'},{code:'tote',name:'Tote bag'},{code:'other',name:'Otro producto'}];
-export const inventoryProductType=item=>INVENTORY_PRODUCT_TYPES.find(type=>type.code===item.model_code)?.name||'Sin clasificar';
-export function inventoryGroups(items,groupBy='model'){
- const definitions=groupBy==='none'?[{code:'all',name:'Todos los lotes'}]:[...INVENTORY_PRODUCT_TYPES,{code:'',name:'Sin clasificar'}];
- return definitions.map(type=>{
-  const rows=groupBy==='none'?items:items.filter(item=>(item.model_code||'')===type.code);
-  return {code:type.code,name:type.name,items:rows,units:rows.reduce((sum,row)=>sum+row.quantity,0),value:rows.reduce((sum,row)=>sum+row.price*row.quantity,0)};
- }).filter(group=>group.items.length);
+export const INVENTORY_MODELS=[{code:'basic',name:'Unisex'},{code:'over',name:'Oversize'},{code:'woman',name:'Mujer'},{code:'kid',name:'Niños'},{code:'body',name:'Body bebé'},{code:'tote',name:'Tote bag'},{code:'other',name:'Otro modelo'}];
+export const inventoryModelLabel=item=>INVENTORY_MODELS.find(model=>model.code===item.model_code)?.name||'Sin modelo';
+export const inventoryModelOptions=product=>product?.slug==='poleras'?INVENTORY_MODELS.slice(0,4):[];
+export function inventoryProduct(item,products=[]){
+ if(item.product_type_id){
+  const current=products.find(product=>String(product.id)===String(item.product_type_id));
+  return current||{id:item.product_type_id,name:item.product_type_name||'Producto anterior',slug:item.product_type_slug||'',missing:true};
+ }
+ // Old versions stored garment models, not catalog products. Preserve those
+ // explicit model selections and resolve only their known parent family.
+ const slug=({basic:'poleras',over:'poleras',woman:'poleras',kid:'poleras',body:'bodys',tote:'totebags'})[item.model_code];
+ return slug?products.find(product=>product.slug===slug)||null:null;
+}
+export const inventoryProductType=(item,products=[])=>inventoryProduct(item,products)?.name||'Sin clasificar';
+export function inventoryGroups(items,groupBy='product',products=[]){
+ const groups=new Map();
+ for(const item of items){
+  const product=inventoryProduct(item,products),id=String(product?.id||'');
+  const key=groupBy==='none'?'all':groupBy==='model'?JSON.stringify([id,item.model_code||'']):id;
+  if(!groups.has(key)){
+   const name=groupBy==='none'?'Todos los lotes':`${product?.name||'Sin clasificar'}${product?.missing?' (eliminado)':''}${groupBy==='model'&&product?.slug==='poleras'?` · ${inventoryModelLabel(item)}`:''}`;
+   groups.set(key,{code:`g-${groups.size}`,name,items:[],units:0,value:0,order:groupBy==='none'?0:product?products.findIndex(row=>String(row.id)===id):-1});
+  }
+  const group=groups.get(key);group.items.push(item);group.units+=item.quantity;group.value+=item.price*item.quantity;
+ }
+ return [...groups.values()].sort((a,b)=>(a.order<0?Infinity:a.order)-(b.order<0?Infinity:b.order));
 }
 export const INVENTORY_SUGGESTION_FIELDS=['name','brand','color','size','location'];
 export function inventorySuggestions(items,field,values={}){
  if(!INVENTORY_SUGGESTION_FIELDS.includes(field))return [];
  const dependencies={name:['brand'],brand:['name'],color:['name','brand'],size:['name','brand','color'],location:['name','brand','color','size']}[field];
- const context=['model_code',...dependencies].filter(key=>inventoryText(values[key]));
+ const context=['product_type_id','model_code',...dependencies].filter(key=>inventoryText(values[key]));
  const words=inventoryText(values[field]).split(/\s+/).filter(Boolean),options=new Map();
  for(const item of items){
   const value=String(item[field]??'').trim(),key=inventoryText(value);
@@ -33,7 +50,12 @@ export function validateInventoryItem(input){
  if(!input||typeof input!=='object')throw new Error('El registro de inventario no es válido.');
  const item={};
  item.model_code=String(input.model_code??'').trim();
- if(item.model_code&&!INVENTORY_PRODUCT_TYPES.some(type=>type.code===item.model_code))throw new Error('Selecciona un tipo de producto válido.');
+ if(item.model_code&&!INVENTORY_MODELS.some(type=>type.code===item.model_code))throw new Error('Selecciona un modelo válido.');
+ for(const key of ['product_type_id','product_type_name','product_type_slug']){
+  item[key]=String(input[key]??'').trim();
+  if(item[key].length>120)throw new Error('La referencia de producto no es válida.');
+ }
+ if(item.product_type_slug==='poleras'&&item.model_code&&!inventoryModelOptions({slug:'poleras'}).some(model=>model.code===item.model_code))throw new Error('El modelo no corresponde a Poleras.');
  for(const [key,max] of Object.entries(limits)){
   item[key]=String(input[key]??'').trim();
   if(item[key].length>max)throw new Error(`El campo ${key} supera el largo permitido.`);
@@ -91,15 +113,15 @@ export function inventoryStore(storage){
   }
  };
 }
-export function inventoryRows(items,{query='',brand='',color='',location='',stock='',model_code='',sort='date_desc'}={}){
+export function inventoryRows(items,{query='',brand='',color='',location='',stock='',product_type_id='',model_code='',sort='date_desc'}={},products=[]){
  const words=inventoryText(query).split(/\s+/).filter(Boolean),[field,direction]=sort.split('_');
- return items.filter(item=>(!model_code||(model_code==='unclassified'?!item.model_code:item.model_code===model_code))&&words.every(word=>inventoryText([inventoryProductType(item),item.name,item.brand,item.color,item.size,item.location,item.notes,item.price,item.date].join(' ')).includes(word))&&['brand','color','location'].every(key=>!({brand,color,location}[key])||inventoryText(item[key])===inventoryText({brand,color,location}[key]))&&(!stock||(stock==='available'?item.quantity>0:item.quantity===0))).sort((a,b)=>{
+ return items.filter(item=>(!product_type_id||(product_type_id==='unclassified'?!inventoryProduct(item,products):String(inventoryProduct(item,products)?.id)===product_type_id))&&(!model_code||(model_code==='unclassified'?!item.model_code:item.model_code===model_code))&&words.every(word=>inventoryText([inventoryProductType(item,products),inventoryModelLabel(item),item.name,item.brand,item.color,item.size,item.location,item.notes,item.price,item.date].join(' ')).includes(word))&&['brand','color','location'].every(key=>!({brand,color,location}[key])||inventoryText(item[key])===inventoryText({brand,color,location}[key]))&&(!stock||(stock==='available'?item.quantity>0:item.quantity===0))).sort((a,b)=>{
   const result=['price','quantity'].includes(field)?a[field]-b[field]:String(a[field]??'').localeCompare(String(b[field]??''),'es-CL',{numeric:true,sensitivity:'base'});
   return result*(direction==='desc'?-1:1)||a.name.localeCompare(b.name,'es-CL')||a.id.localeCompare(b.id);
  });
 }
 export function inventoryBackup(items){return JSON.stringify({format:'droska-inventory',version:1,exported_at:new Date().toISOString(),items},null,2)}
-export function inventoryCsv(items){
+export function inventoryCsv(items,products=[]){
  const cell=value=>`"${String(value??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')}"`;
- return '\uFEFF'+[['Tipo de producto','Producto / modelo','Marca','Color','Talla','Precio unitario CLP','Cantidad','Fecha de ingreso','Ubicación','Notas'],...items.map(row=>[inventoryProductType(row),...['name','brand','color','size','price','quantity','date','location','notes'].map(key=>row[key])])].map(row=>row.map(cell).join(';')).join('\r\n');
+ return '\uFEFF'+[['Producto','Modelo','Nombre / referencia','Marca','Color','Talla','Precio unitario CLP','Cantidad','Fecha de ingreso','Ubicación','Notas'],...items.map(row=>[inventoryProductType(row,products),inventoryModelLabel(row),...['name','brand','color','size','price','quantity','date','location','notes'].map(key=>row[key])])].map(row=>row.map(cell).join(';')).join('\r\n');
 }
