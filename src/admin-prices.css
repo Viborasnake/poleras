@@ -5,17 +5,6 @@
 .admin-prices-page .admin-page-heading h1{font-size:clamp(32px,3vw,42px);line-height:1.05;margin:7px 0 10px}
 .admin-prices-page .admin-page-heading p{font-size:15px;line-height:1.5}
 .admin-prices-page .admin-page-heading>a{flex:none;font-size:14px}
-.price-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.price-overview button{position:relative;display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px 12px;min-width:0;padding:18px 20px;border:1px solid var(--ds-border-control);border-radius:14px;background:var(--ds-surface-raised);color:var(--ds-text-primary);text-align:left}
-.price-overview button>span{font-size:14px;font-weight:700}
-.price-overview button>strong{font:700 30px/1 var(--ds-font-display);font-variant-numeric:tabular-nums}
-.price-overview button>small{grid-column:1/-1;color:var(--ds-text-secondary);font-size:14px;line-height:1.4}
-.price-overview button>i{display:none}
-.price-overview button:hover{background:var(--ds-surface-subtle)}
-.price-overview button[aria-pressed="true"]{border-color:var(--ds-brand-primary);background:var(--ds-lime-500);color:var(--ds-brand-primary);box-shadow:inset 0 0 0 1px var(--ds-brand-primary)}
-.price-overview button[aria-pressed="true"]>small{color:var(--ds-brand-primary)}
-.price-overview button[aria-pressed="true"]>i{font-size:0}
-.price-overview button[aria-pressed="true"]>i::after{content:'✓';font-size:18px}
 .admin-prices-page :is(button,summary,input,.admin-table-wrap):focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:3px}
 .price-services{min-width:0;border:1px solid var(--ds-border-control);border-radius:14px;background:var(--ds-surface-raised)}
 .price-services>summary{display:flex;align-items:center;gap:14px;min-height:72px;padding:14px 20px;cursor:pointer;list-style:none;border-radius:14px}
@@ -86,6 +75,6 @@
 .price-products-panel .admin-table-wrap{scrollbar-gutter:stable}
 @media(max-width:1100px){.price-overview button{padding:16px}.price-overview{gap:10px}.price-services-grid{grid-template-columns:1fr}.price-service-card+section{padding:20px 0 0;border-left:0;border-top:1px solid var(--ds-border-subtle)}.price-print-fields{grid-template-columns:repeat(4,minmax(0,1fr))}.price-help>div{grid-template-columns:1fr 1fr}}
 @media(max-width:1440px){.price-overview button>small{display:none}}
-@media(max-width:760px){.price-overview{grid-template-columns:1fr 1fr}.admin-prices-page .admin-page-heading{align-items:flex-start;flex-direction:column;gap:14px}.price-overview button>small{font-size:14px}.price-print-fields{grid-template-columns:1fr 1fr}.price-services>summary{flex-wrap:wrap;padding:16px}.price-services>summary>span:nth-child(2){flex:1;min-width:0}.price-services-toggle{margin-left:54px}.price-services-content{padding:0 16px 16px}.price-products-panel .price-table-heading{align-items:flex-start;flex-direction:column;padding:18px 16px 12px;gap:16px}.price-help{padding:8px 16px}}
+@media(max-width:760px){.admin-prices-page .admin-page-heading{align-items:flex-start;flex-direction:column;gap:14px}.price-print-fields{grid-template-columns:1fr 1fr}.price-services>summary{flex-wrap:wrap;padding:16px}.price-services>summary>span:nth-child(2){flex:1;min-width:0}.price-services-toggle{margin-left:54px}.price-services-content{padding:0 16px 16px}.price-products-panel .price-table-heading{align-items:flex-start;flex-direction:column;padding:18px 16px 12px;gap:16px}.price-help{padding:8px 16px}}
 @media(max-width:420px){.price-overview button{padding:14px 12px;gap:6px}.price-overview button>span{font-size:14px;line-height:1.4}.price-overview button>i{right:10px;top:10px}.price-overview button>small{display:none}.price-help>div{grid-template-columns:1fr}.price-print-fields{grid-template-columns:1fr}.price-service-card footer{align-items:stretch;flex-direction:column}.price-service-card .admin-form-status{flex:auto}.price-service-card footer>button{width:100%}}
 @media(max-width:760px){.price-services-toggle{margin-left:0;gap:0}.price-services-toggle>span,.price-services[open] .price-services-open{display:none}.price-services>summary>span:nth-child(2){flex:1 1 0}.price-services-icon{width:36px;height:36px}}

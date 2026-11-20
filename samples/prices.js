@@ -3,7 +3,7 @@ import '../src/admin.css';
 import '../src/admin-dark.css';
 import '../src/admin-prices.css';
 import '../src/admin-workspace.css';
-import {prepareAdminTable} from '../src/admin-ui.js';
+import {bindAdminActions,prepareAdminTable} from '../src/admin-ui.js';
 import {wirePriceFilters,wirePriceSettingForm} from '../src/admin-prices-panel.js';
 import {markup,prepared,children} from './price-fixture.js';
 
@@ -11,6 +11,7 @@ const root=document.querySelector('#fixture');
 document.documentElement.classList.toggle('admin-theme-dark',new URL(location.href).searchParams.get('theme')!=='light');
 root.innerHTML=`<div class="admin-layout"><aside class="admin-sidebar"><a class="admin-brand" href="/samples/prices.html">droska<span> SHIRT</span></a><nav aria-label="Administración de muestra"><a href="#">Resumen</a><a href="#">Productos</a><a href="#">Categorías</a><a href="#">Colecciones</a><a href="#">Diseños</a><a href="#">Insumos</a><a href="#" class="active" aria-current="page">Precios</a><a href="#">Inventario</a><a href="#">Pedidos</a><a href="#">Configuración</a></nav></aside><div class="admin-workspace"><header class="admin-topbar"><span>Vista de prueba · datos ficticios</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="admin-secondary" id="sample-theme">Cambiar tema de muestra</button><button type="button" class="admin-secondary" id="sample-error">Simular error al guardar</button><button type="button" class="admin-secondary" id="sample-tests">Evaluar interacciones</button></div></header><main class="admin-main">${markup}<pre id="sample-results" role="status" style="white-space:pre-wrap"></pre></main></div></div>`;
 root.querySelectorAll('.admin-table').forEach(prepareAdminTable);
+bindAdminActions(root);
 wirePriceFilters(root,prepared,children);
 const prices={quality_review_fee_clp:2990,front_large_clp:2990,front_pocket_clp:1990,back_large_clp:3990,arm_clp:1990};
 let fail=false;

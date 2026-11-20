@@ -1,4 +1,4 @@
-import {adminActionTrigger,bindAdminActions,prepareAdminTable} from './admin-ui.js';
+import {adminActionTrigger,bindAdminActions,prepareAdminTable,updateAdminFilterCount} from './admin-ui.js';
 import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,inventoryText,INVENTORY_STORAGE_KEY,inventoryProduct,inventoryModelOptions} from './inventory.js';
 import {inventoryListMarkup} from './admin-inventory-list.js';
 import {inventoryPageMarkup} from './admin-inventory-page.js';
@@ -31,7 +31,7 @@ export function renderInventory(context){
  const filter=(key,label,all)=>{
   const values=[...new Map(items.map(row=>[inventoryText(row[key]),row[key]])).values()].sort((a,b)=>a.localeCompare(b,'es-CL'));
   if(state[key]&&!values.some(value=>inventoryText(value)===inventoryText(state[key])))state[key]='';
-  return `<label>${label}<select data-inventory-filter="${key}"><option value="">${all}</option>${values.map(value=>`<option value="${safe(value)}" ${inventoryText(value)===inventoryText(state[key])?'selected':''}>${safe(value)}</option>`).join('')}</select></label>`;
+  return `<label class="admin-filter-field">${label}<select data-inventory-filter="${key}"><option value="">${all}</option>${values.map(value=>`<option value="${safe(value)}" ${inventoryText(value)===inventoryText(state[key])?'selected':''}>${safe(value)}</option>`).join('')}</select></label>`;
  };
  const content=inventoryPageMarkup({state,products,filter,sortOptions,editor:editorMarkup(products)});
  shell(content,'inventario');
@@ -46,17 +46,19 @@ export function renderInventory(context){
   root.querySelector('.inventory-metrics').hidden=Boolean(loadError);
   const count=`${rows.length} de ${items.length} lotes · ${rows.reduce((sum,row)=>sum+row.quantity,0)} unidades en esta vista`;
   root.querySelector('#inventory-count').textContent=loadError?'Carga pendiente':count;
-  root.querySelector('#inventory-clear').disabled=!['query','product_type_id','model_code','brand','color','location','stock'].some(key=>state[key]);
+  const activeFilters=Array.from(root.querySelectorAll('[data-inventory-filter]')).filter(field=>field.value&&!field.disabled).length;
+  updateAdminFilterCount(root,'inventory-filter-options',activeFilters);
+  root.querySelector('#inventory-clear').disabled=!activeFilters&&!state.query;
   root.querySelector('#inventory-results').innerHTML=loadError?`<div class="admin-empty" role="alert"><strong>No pudimos cargar el inventario.</strong><p>${safe(loadError)}</p><button type="button" class="admin-secondary" id="inventory-retry">Reintentar</button></div>`:!rows.length?`<div class="admin-empty"><strong>${items.length?'No hay lotes que coincidan.':'Aún no hay prendas registradas.'}</strong><p>${items.length?'Prueba otra búsqueda o limpia los filtros.':'Agrega tu primer lote para empezar a organizar tus prendas.'}</p></div>`:inventoryListMarkup(rows,state.groupBy,products);
   root.querySelectorAll('.inventory-table').forEach(prepareAdminTable);
   for(const id of ['new-inventory-item','inventory-export'])root.querySelector(`#${id}`).disabled=Boolean(loadError)||(id==='inventory-export'&&!rows.length);
   root.querySelector('#inventory-retry')?.addEventListener('click',()=>renderInventory(context));
  }
- updateResults();
  root.querySelector('#inventory-sort').onchange=event=>{state.sort=event.target.value;updateResults()};
  root.querySelector('#inventory-group-by').onchange=event=>{state.groupBy=event.target.value;updateResults()};
  function syncModelFilter(){const selected=products.find(product=>String(product.id)===state.product_type_id),filter=root.querySelector('[data-inventory-filter="model_code"]');filter.disabled=Boolean(selected&&selected.slug!=='poleras');if(filter.disabled){state.model_code='';filter.value=''}}
  syncModelFilter();
+ updateResults();
  root.querySelectorAll('[data-inventory-filter]').forEach(select=>select.onchange=()=>{state[select.dataset.inventoryFilter]=select.value;if(select.dataset.inventoryFilter==='product_type_id'){state.model_code='';root.querySelector('[data-inventory-filter="model_code"]').value='';syncModelFilter()}updateResults()});
  root.querySelector('#inventory-clear').onclick=()=>{for(const key of ['query','brand','color','location','stock','product_type_id','model_code'])state[key]='';query.value='';root.querySelectorAll('[data-inventory-filter]').forEach(select=>select.value='');syncModelFilter();updateResults();query.focus()};
  const dialog=root.querySelector('#inventory-dialog'),form=dialog.querySelector('form'),deletion=root.querySelector('#inventory-delete-dialog');let editing=null,removing=null,opener=null;

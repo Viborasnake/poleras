@@ -46,6 +46,7 @@
   letter-spacing: -.04em;
   overflow-wrap: anywhere;
 }
+.admin-main :is(h1, .admin-settings-panel)[tabindex="-1"]:focus { outline: none; }
 .admin-page-heading-actions {
   flex: none;
   justify-content: flex-end;
@@ -80,8 +81,9 @@
   color: var(--ds-text-primary);
   font-size: 13px;
   font-weight: 700;
+  line-height: 18px;
 }
-.admin-filter-field select,
+.admin-filter-field :is(select,input[type=date]),
 .admin-search-field {
   width: 100%;
   min-width: 0;
@@ -92,8 +94,7 @@
   color: var(--ds-text-primary);
   font: 500 14px var(--ds-font-body);
 }
-.admin-filter-field select { padding: 8px 12px; }
-.admin-list-toolbar > .admin-filter-field { flex: 0 1 220px; }
+.admin-filter-field :is(select,input[type=date]) { padding: 8px 12px; }
 .admin-search-field {
   display: flex;
   align-items: center;
@@ -125,10 +126,15 @@
   font-size: 14px;
 }
 .admin-list-toolbar.price-table-tools { width: auto; }
-.admin-list-toolbar.price-table-tools > .price-reset { align-self: center; }
-.admin-list-toolbar.inventory-toolbar { display: flex; }
-.inventory-toolbar .inventory-view-controls { width: auto; max-width: 100%; }
-.inventory-toolbar .inventory-sort { font-size: 13px; }
+.admin-list-toolbar:has(> .admin-filters) {
+  display: grid;
+  grid-template-columns: minmax(0, 400px) auto;
+  justify-content: start;
+}
+.admin-list-toolbar > .admin-filters { margin-top: 24px; }
+.admin-dialog .admin-archive-history-filters { padding-inline: 0; }
+.admin-archive-history-filters[hidden] { display: none; }
+.admin-dialog .admin-list-search input:focus-visible { outline: none; }
 
 .admin-actions { display: inline-flex; min-width: 0; }
 .admin-actions .admin-actions-trigger {
@@ -196,6 +202,35 @@
   color: var(--ds-text-secondary);
   font-size: 13px;
 }
+
+.admin-filters .admin-filter-popover { padding: 10px; }
+.admin-filter-popover:popover-open {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  align-items: end;
+  gap: 10px;
+}
+.admin-filter-popover:popover-open > :only-child,
+.admin-filter-popover > :is(button,.price-overview) { grid-column: 1/-1; }
+.admin-filters .admin-filter-popover > button { border: 1px solid var(--ds-border-control); }
+.admin-filter-popover .price-overview { display: grid; gap: 4px; }
+.admin-filters .price-overview button {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 2px 8px;
+}
+.admin-filters .price-overview button[aria-pressed="true"] {
+  background: var(--ds-lime-500);
+  color: var(--ds-brand-primary);
+  box-shadow: inset 0 0 0 1px var(--ds-brand-primary);
+}
+.admin-filters .price-overview small {
+  grid-column: 1/-1;
+  font-size: 12px;
+  font-weight: 500;
+}
+.admin-filters .price-overview button > i { display: none; }
+.admin-filters .price-overview button > strong { font-variant-numeric: tabular-nums; }
 
 .admin-workspace .admin-table-wrap { max-width: 100%; }
 .admin-table-wrap[tabindex]:focus-visible {
@@ -325,13 +360,11 @@ body:has(dialog.admin-dialog[open]) { overflow: hidden; }
   .admin-page-heading-actions > :is(a,button,.admin-actions) { flex: 1 1 auto; justify-content: center; }
   .admin-page-heading-actions .admin-actions-trigger { width: 100%; }
   .admin-page-heading .admin-page-heading-actions > .admin-primary { width: auto; }
-  .admin-list-toolbar { gap: 12px; }
+  .admin-list-toolbar { gap: 10px; }
   .admin-list-search { flex-basis: 100%; max-width: none; }
-  .admin-list-toolbar > .admin-filter-field { flex: 1 1 140px; }
-  .admin-filter-field select, .admin-search-field, .admin-dialog :is(input:not([type=checkbox],[type=radio]), select, textarea) {
+  .admin-filter-field :is(select,input[type=date]), .admin-search-field, .admin-dialog :is(input:not([type=checkbox],[type=radio]), select, textarea) {
     font-size: 16px;
   }
-  .inventory-toolbar .inventory-view-controls { width: 100%; }
   .admin-kanban { grid-template-columns: minmax(0,1fr); overflow: visible; }
   .admin-orders-toolbar { flex-wrap: wrap; justify-content: flex-start; gap: 6px 14px; }
 
@@ -418,6 +451,14 @@ body:has(dialog.admin-dialog[open]) { overflow: hidden; }
   .admin-dialog .dialog-actions > :is(button,a) { flex: 1 1 125px; }
 }
 
+.admin-order-tools .admin-actions-popover > :is(button,a) {
+  align-items: center;
+  justify-content: flex-start;
+  height: auto;
+  min-width: 0;
+}
+.admin-order-tools .admin-actions-popover > :is(button,a):not(:has(> svg)) { padding-inline-start: 36px; }
+.admin-order-tools .admin-actions-popover > :is(button,a) > svg { flex-shrink: 0; }
 .admin-order-tools .admin-actions-popover .admin-icon-action span {
   position: static;
   width: auto;
@@ -434,15 +475,13 @@ body:has(dialog.admin-dialog[open]) { overflow: hidden; }
   .admin-order-dialog .admin-order-progress-actions { width: 100%; }
   .admin-order-dialog .admin-order-progress-actions > div > :is(button,label) { flex: 1 1 180px; }
 }
-@media (max-width: 640px) {
-  .admin-list-toolbar > .admin-filter-field { flex-basis: 100%; }
-}
 @media (max-width: 360px) {
   .collections-table tbody td:nth-child(2) { grid-column: 1/-1; }
 }
 @supports not selector(:popover-open) {
   .admin-actions { display: block; }
   .admin-actions .admin-actions-trigger { display: none; }
+  .admin-list-toolbar > .admin-filters { margin-top: 0; }
   .admin-actions-popover {
     position: static;
     border: 0;

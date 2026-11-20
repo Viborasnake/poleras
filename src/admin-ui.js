@@ -8,9 +8,23 @@ export function adminSearch({label, placeholder, input, output = ''}) {
   return `<div class="admin-list-search"><label class="admin-filter-field"><span>${escapeHtml(label)}</span><span class="admin-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" autocomplete="off" ${input} placeholder="${escapeHtml(placeholder)}"></span></label>${output}</div>`;
 }
 
+function adminPopover({id, label, name, items, filters = false}) {
+  const target = escapeHtml(id);
+  const count = filters ? '<span data-active-filter-count></span>' : '';
+  return `<div class="admin-actions${filters ? ' admin-filters' : ''}"><button type="button" class="admin-secondary admin-actions-trigger" popovertarget="${target}"${name === label ? '' : ` aria-label="${escapeHtml(name)}"`}><span>${escapeHtml(label)}${count}</span>${chevron}</button><div id="${target}" class="admin-actions-popover${filters ? ' admin-filter-popover' : ''}" popover>${items}</div></div>`;
+}
+
 export function adminActions({id, label = 'Más acciones', name = label, items}) {
-  id = escapeHtml(id);
-  return `<div class="admin-actions"><button type="button" class="admin-secondary admin-actions-trigger" popovertarget="${id}"${name === label ? '' : ` aria-label="${escapeHtml(name)}"`}><span>${escapeHtml(label)}</span>${chevron}</button><div id="${id}" class="admin-actions-popover" popover>${items}</div></div>`;
+  return adminPopover({id, label, name, items});
+}
+
+export function adminFilters(id, items) {
+  return adminPopover({id, label: 'Filtros', name: 'Filtros', items, filters: true});
+}
+
+export function updateAdminFilterCount(root, id, count) {
+  const badge = root.querySelector(`[popovertarget="${id}"] [data-active-filter-count]`);
+  if (badge) badge.textContent = count ? ` (${count})` : '';
 }
 
 export function adminActionTrigger(action) {
@@ -28,18 +42,24 @@ export function bindAdminActions(root) {
     const trigger = adminActionTrigger(popover);
     const bounds = trigger.getBoundingClientRect();
     const viewport = window.visualViewport;
-    const left = (viewport?.offsetLeft || 0) + 8;
-    const right = left + (viewport?.width || document.documentElement.clientWidth) - 16;
-    const top = (viewport?.offsetTop || 0) + 8;
-    const bottom = top + (viewport?.height || window.innerHeight) - 16;
-    const width = Math.min(256, right - left);
+    const dialog = trigger.closest('dialog')?.getBoundingClientRect();
+    const viewportLeft = viewport?.offsetLeft || 0;
+    const viewportTop = viewport?.offsetTop || 0;
+    const viewportRight = viewportLeft + (viewport?.width || document.documentElement.clientWidth);
+    const viewportBottom = viewportTop + (viewport?.height || window.innerHeight);
+    const left = Math.max(viewportLeft, dialog?.left ?? viewportLeft) + 8;
+    const right = Math.min(viewportRight, dialog?.right ?? viewportRight) - 8;
+    const top = Math.max(viewportTop, dialog?.top ?? viewportTop) + 8;
+    const bottom = Math.min(viewportBottom, dialog?.bottom ?? viewportBottom) - 8;
+    const width = Math.min(popover.classList.contains('admin-filter-popover') ? 340 : 256, right - left);
+    const anchorLeft = dialog ? bounds.left : bounds.right - width;
     const below = bottom - bounds.bottom - 6;
     const above = bounds.top - top - 6;
     const opensDown = below >= Math.min(260, above);
     Object.assign(popover.style, {
       width: `${width}px`,
       maxHeight: `${Math.max(opensDown ? below : above, 0)}px`,
-      left: `${Math.max(left, Math.min(bounds.right - width, right - width))}px`,
+      left: `${Math.max(left, Math.min(anchorLeft, right - width))}px`,
       top: opensDown ? `${bounds.bottom + 6}px` : 'auto',
       bottom: opensDown ? 'auto' : `${document.documentElement.clientHeight - bounds.top + 6}px`
     });

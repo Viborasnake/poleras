@@ -1,6 +1,6 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {priceOverviewMarkup,priceGuideMarkup,priceServicesMarkup,priceTableToolsMarkup} from '../src/admin-prices-panel.js';
+import {priceGuideMarkup,priceServicesMarkup,priceTableToolsMarkup} from '../src/admin-prices-panel.js';
 
 // Run only the real price view with synthetic records and inert integrations.
 // The browser fixture never imports authentication or a database client.
@@ -17,7 +17,7 @@ const products=[
 ].map(product=>({...product,kind:'garment',vat_percent:19}));
 const variantFor=product=>[{id:`variant-${product.id}`,size:product.id===3?'L':'M',price_clp:product.confirmed_price_clp||0}];
 let markup='';
-const sandbox=vm.createContext({safe,priceOverviewMarkup,priceGuideMarkup,priceServicesMarkup,priceTableToolsMarkup,
+const sandbox=vm.createContext({safe,priceGuideMarkup,priceServicesMarkup,priceTableToolsMarkup,
  adminData:{supplierProducts:products,supplierCategories:categories},
  supplierProductCalculation:product=>({base:product.base,suggested:Math.ceil(product.base*2.4/10)*10}),
  supplierProductVariants:variantFor,priceCreatesVariants:()=>true,

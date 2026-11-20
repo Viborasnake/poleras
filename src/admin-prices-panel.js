@@ -1,5 +1,5 @@
-import {adminSearch} from './admin-ui.js';
-export function priceOverviewMarkup({total,review,published,missingBase}){
+import {adminFilters,adminSearch,updateAdminFilterCount} from './admin-ui.js';
+function priceOverviewMarkup({total,review,published,missingBase}){
  return `<div class="price-overview" role="group" aria-label="Filtrar productos por estado">${[
   ['all','Todos los productos',total,'con receta configurada'],
   ['review','Por revisar',review,'precios que necesitan atención'],
@@ -17,8 +17,9 @@ export function priceServicesMarkup(){
  return `<details class="price-services"><summary><span class="price-services-icon" aria-hidden="true">+</span><span><strong>Servicios y estampados</strong><small>Configura los cobros adicionales de los pedidos personalizados.</small></span><span class="price-services-toggle"><span class="price-services-closed">Editar valores</span><span class="price-services-open">Cerrar ajustes</span><i aria-hidden="true">⌄</i></span></summary><div class="price-services-content"><p class="price-services-note">Valores en pesos chilenos, con IVA incluido. Usa $0 para ofrecer un servicio sin costo.</p><div class="price-services-grid"><section class="price-service-card" aria-labelledby="review-price-title"><header><span class="admin-eyebrow">SERVICIO ADICIONAL</span><h2 id="review-price-title">Revisión técnica</h2><p>Se cobra por producto solo si el archivo necesita corrección antes de imprimir.</p></header><form id="admin-review-price-form" aria-busy="true"><label for="admin-review-price">Valor por producto</label><div class="admin-currency-field"><span aria-hidden="true">$</span><input id="admin-review-price" name="quality_review_fee_clp" type="number" min="0" max="1000000" step="1" inputmode="numeric" required disabled></div><footer><p class="admin-form-status" role="status" aria-live="polite">Cargando valor…</p><button class="admin-primary" type="submit" disabled>Guardar revisión</button></footer></form></section><section class="price-service-card" aria-labelledby="print-prices-title"><header><span class="admin-eyebrow">ESTAMPADOS</span><h2 id="print-prices-title">Precios por ubicación</h2><p>Se suma cada ubicación añadida. Ambos brazos cuestan el doble del valor por brazo.</p></header><form id="admin-print-prices-form" aria-busy="true"><div class="price-print-fields">${printFields.map(([key,label,detail])=>`<label for="price-${key}"><strong>${label}</strong><small id="price-${key}-help">${detail}</small><span class="admin-currency-field"><span aria-hidden="true">$</span><input id="price-${key}" aria-describedby="price-${key}-help" name="${key}" type="number" min="0" max="1000000" step="1" inputmode="numeric" required disabled></span></label>`).join('')}</div><footer><p class="admin-form-status" role="status" aria-live="polite">Cargando valores…</p><button class="admin-primary" type="submit" disabled>Guardar estampados</button></footer></form></section></div></div></details>`;
 }
 
-export function priceTableToolsMarkup(total){
- return `<div class="admin-panel-head price-table-heading"><div><h2 id="price-products-title">Precios de productos</h2><p>Define cuánto cobrar en cada tipo de pedido.</p><span class="price-tax-label">IVA incluido · CLP</span></div></div><div class="admin-list-toolbar price-table-tools">${adminSearch({label:'Buscar producto',placeholder:'Nombre, categoría o precio',input:'data-price-search',output:`<output data-price-results aria-live="polite">${total} productos</output>`})}<button type="button" class="price-reset" data-price-reset hidden>Limpiar filtros</button></div>`;
+export function priceTableToolsMarkup(counts){
+ const {total}=counts;
+ return `<div class="admin-panel-head price-table-heading"><div><h2 id="price-products-title">Precios de productos</h2><p>Define cuánto cobrar en cada tipo de pedido.</p><span class="price-tax-label">IVA incluido · CLP</span></div></div><div class="admin-list-toolbar price-table-tools">${adminSearch({label:'Buscar producto',placeholder:'Nombre, categoría o precio',input:'data-price-search',output:`<output data-price-results aria-live="polite">${total} productos</output>`})}${adminFilters('price-filter-options',`${priceOverviewMarkup(counts)}<button type="button" data-price-reset hidden>Limpiar filtros</button>`)}</div>`;
 }
 
 export function matchesPriceFilter(row,query,filter='all'){
@@ -43,6 +44,7 @@ export function wirePriceFilters(root,prepared,children){
   if(empty)empty.hidden=visibleIds.size>0;
   if(output)output.textContent=`${visibleIds.size} de ${prepared.length} productos`;
   if(reset)reset.hidden=selected==='all'&&!search?.value;
+  updateAdminFilterCount(root,'price-filter-options',Number(selected!=='all'));
   root.querySelectorAll('[data-price-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.priceFilter===selected)));
  };
  root.querySelectorAll('[data-price-filter]').forEach(button=>button.addEventListener('click',()=>{selected=button.dataset.priceFilter;filter()}));
