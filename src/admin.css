@@ -788,3 +788,8 @@
 .admin-print-layout-controls input{width:100%;accent-color:var(--ds-brand-accent)}
 .admin-print-layout-controls p{font-size:12px;color:var(--ds-text-secondary);line-height:1.5}
 @media(max-width:680px){.admin-print-layout-grid{grid-template-columns:1fr}.admin-print-layout-preview{min-height:320px}}
+
+.admin-mockup-video{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--ds-border-subtle)}
+.admin-mockup-video [hidden]{display:none}
+.admin-mockup-video video{display:block;width:100%;max-height:280px;background:var(--ds-surface-subtle);border:1px solid var(--ds-border-subtle);border-radius:var(--ds-radius-control)}
+.admin-mockup-video output[data-tone=error]{color:var(--ds-text-primary);font-weight:700}

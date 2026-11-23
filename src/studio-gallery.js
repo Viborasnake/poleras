@@ -13,6 +13,6 @@ export function studioGalleryItems(design, products=[]){
    if(!src||seen.has(src))return false;
    seen.add(src);
    return true;
-  }).map(({src,hover})=>({src,label:product.name,productSlug:slug,focusX:hover?entry.hoverFocusX:entry.focusX,focusY:hover?entry.hoverFocusY:entry.focusY}));
+  }).map(({src,hover})=>({src,label:product.name,productSlug:slug,focusX:hover?entry.hoverFocusX:entry.focusX,focusY:hover?entry.hoverFocusY:entry.focusY,...(!hover&&entry.videoPath?{videoPath:entry.videoPath}:{})}));
  });
 }

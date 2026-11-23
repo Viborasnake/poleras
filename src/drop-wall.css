@@ -1184,3 +1184,6 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
  cursor:pointer;
 }
 .drop-featured-video-control.ds-secondary-button:not(:hover){background:var(--ds-surface-raised)}
+
+.studio-stage-video.is-playing{z-index:3}
+.drop-featured-video:not([data-legacy-video-autoplay]){object-fit:contain;object-position:center;background:var(--ds-brand-primary)}

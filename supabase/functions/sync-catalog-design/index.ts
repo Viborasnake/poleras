@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
+import { isCatalogVideoPath, isCatalogMp4, MAX_CATALOG_VIDEO_BYTES } from '../_shared/catalog-video.js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://droska.frontbook.cl',
@@ -94,7 +95,16 @@ Deno.serve(async request => {
     const contentType = request.headers.get('content-type') || ''
     if (contentType.startsWith('multipart/form-data')) {
       const form = await request.formData(), path = String(form.get('path') || ''), file = form.get('file')
-      if (!isCatalogPath(path)) return json({ error: 'La ruta de la imagen no es válida.' }, 400)
+      if (isCatalogVideoPath(path)) {
+        if (!(file instanceof File) || file.type !== 'video/mp4' || !file.size || file.size > MAX_CATALOG_VIDEO_BYTES) {
+          return json({ error: 'El video optimizado debe ser MP4 y no superar 3 MB.' }, 400)
+        }
+        const buffer = await file.arrayBuffer()
+        if (!isCatalogMp4(buffer)) return json({ error: 'El archivo de video no es un MP4 válido.' }, 400)
+        await r2Request('PUT', path, buffer, file.type)
+        return json({ path, url: `https://images.frontbook.cl/${path}` })
+      }
+      if (!isCatalogPath(path)) return json({ error: 'La ruta del archivo no es válida.' }, 400)
       const limit = /\/[^/]+-artwork-[^/]+\.(?:png|jpe?g|webp)$/i.test(path) ? maxArtworkBytes : maxImageBytes
       if (!(file instanceof File) || !imageTypes.has(file.type) || !imageExtensions[file.type]?.test(path) || file.size > limit) return json({ error: `La imagen optimizada debe ser JPG, PNG o WebP, coincidir con la extensión y no superar ${Math.round(limit / 1024 / 1024 * 10) / 10} MB.` }, 400)
       await r2Request('PUT', path, await file.arrayBuffer(), file.type)
@@ -103,7 +113,7 @@ Deno.serve(async request => {
     const body = await request.json().catch(() => ({}))
     if (body.action === 'delete') {
       const paths = Array.isArray(body.paths) ? [...new Set(body.paths.map(String))] : []
-      if (!paths.length || paths.length > 20 || paths.some(path => !isCatalogPath(path))) return json({ error: 'Las rutas de eliminación no son válidas.' }, 400)
+      if (!paths.length || paths.length > 20 || paths.some(path => !isCatalogPath(path) && !isCatalogVideoPath(path))) return json({ error: 'Las rutas de eliminación no son válidas.' }, 400)
       for (const path of paths) await r2Request('DELETE', path)
       return json({ deleted: paths.length })
     }
@@ -113,6 +123,6 @@ Deno.serve(async request => {
     return json({ path, url: `https://images.frontbook.cl/${path}` })
   } catch (error) {
     console.error(error)
-    return json({ error: 'No pudimos publicar la imagen en Cloudflare.' }, 502)
+    return json({ error: 'No pudimos procesar el archivo en Cloudflare.' }, 502)
   }
 })

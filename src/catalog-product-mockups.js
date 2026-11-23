@@ -1,9 +1,15 @@
 import {designProductArtworks} from './catalog-product-artworks.js';
+import {isCatalogVideoPath} from '../supabase/functions/_shared/catalog-video.js';
+
+const videoOrigin='https://images.frontbook.cl/';
+const normalizeVideoPath=value=>typeof value==='string'&&value.startsWith(videoOrigin)&&isCatalogVideoPath(value.slice(videoOrigin.length))?value:'';
+
 
 const coordinate=value=>Number.isFinite(Number(value))?Math.max(0,Math.min(100,Number(value))):50;
 const normalize=entry=>({
  path:typeof entry?.path==='string'?entry.path:'',
  focusX:coordinate(entry?.focusX??50),focusY:coordinate(entry?.focusY??50),
+ ...(entry && Object.hasOwn(entry,'videoPath') ? {videoPath:normalizeVideoPath(entry.videoPath)} : {}),
  hoverPath:typeof entry?.hoverPath==='string'?entry.hoverPath:'',
  hoverFocusX:coordinate(entry?.hoverFocusX??50),hoverFocusY:coordinate(entry?.hoverFocusY??50),
 });
@@ -35,7 +41,7 @@ export function designWithProductMockup(design,slug='all',defaultSlug='poleras',
  const photo=mockups[product]||normalize({});
  return {...design,productMockups:mockups,previewProductSlug:product,
   artworkPath:designProductArtworks(design)[product]||design.artworkPath,
-  featuredPhoto:photo.path,featuredPhotoHover:photo.hoverPath,
+  featuredPhoto:photo.path,featuredPhotoHover:photo.hoverPath,featuredVideo:photo.videoPath,
   mockupFocus:{x:photo.focusX,y:photo.focusY},mockupHoverFocus:{x:photo.hoverFocusX,y:photo.hoverFocusY},
  };
 }

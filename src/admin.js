@@ -1,8 +1,10 @@
 import {adminActions,adminFilters,adminSearch,updateAdminFilterCount,bindAdminActions,observeAdminDialogs,prepareAdminTable} from './admin-ui.js';
 import {priceGuideMarkup,priceServicesMarkup,priceTableToolsMarkup,wirePriceFilters,wirePriceSettingForm} from './admin-prices-panel.js';
 import {collectionsPanelMarkup} from './admin-collections-panel.js';
-import {productMockupFields,productMockupDraft,mockupInputName} from './admin-product-mockups.js';
+import {productMockupFields,productMockupDraft,mockupInputName,mockupVideoInputName} from './admin-product-mockups.js';
 import {designProductMockups} from './catalog-product-mockups.js';
+import {catalogVideoFileError,optimizeCatalogVideo} from './video-optimization.js';
+import {legacyFeaturedVideoUrl} from './featured-design-video.js';
 import {wireStoreSettings as bindStoreSettings,wireAdminNotifications as bindAdminNotifications} from './admin-store-settings.js';
 import {mountCouponDisclosure,mountPaymentInstructionsDisclosure} from './admin-settings-disclosure.js';
 import {mountAdminOrderDisclosure} from './admin-order-disclosure.js';
@@ -623,13 +625,17 @@ const fileSizeLabel=bytes=>bytes<1024*1024?`${Math.round(bytes/1024)} KB`:`${(by
 async function optimizeCatalogArtwork(file,baseName='diseño',policy=CATALOG_IMAGE_POLICY){
  return optimizeImage(file,{policy,baseName});
 }
-async function uploadCatalogArtworkToR2(path,file){
- const feedback=beginUploadFeedback(file.name,'Publicando imagen');
+async function uploadCatalogFileToR2(path,file){
+ const label=file.type==='video/mp4'?'video':'imagen';
+ const feedback=beginUploadFeedback(file.name,`Publicando ${label}`);
  try{
  const body=new FormData();body.set('path',path);body.set('file',file,file.name);
  const {data,error}=await supabase.functions.invoke('sync-catalog-design',{body});
- if(error)throw new Error(`No pudimos publicar la imagen en Cloudflare: ${error.message}`);
- if(!data?.url)throw new Error('No pudimos confirmar la publicación de la imagen en Cloudflare.');
+ if(error){
+  const detail=await error.context?.json?.().catch(()=>null);
+  throw new Error(detail?.error||`No pudimos publicar ${label} en Cloudflare: ${error.message}`);
+ }
+ if(!data?.url)throw new Error(`No pudimos confirmar la publicación de ${label} en Cloudflare.`);
  return data.url;
  }finally{feedback.done()}
 }
@@ -639,10 +645,40 @@ async function removeCatalogAssets(urls){
  const uniqueUrls=[...new Set(urls.filter(Boolean))],storagePaths=uniqueUrls.map(storagePathFromUrl).filter(Boolean),r2Paths=uniqueUrls.map(r2PathFromUrl).filter(Boolean);
  const failures=[];
  if(storagePaths.length){const {error}=await supabase.storage.from(CATALOG_BUCKET).remove(storagePaths);if(error)failures.push(error)}
- if(r2Paths.length){const {data,error}=await supabase.functions.invoke('sync-catalog-design',{body:{action:'delete',paths:r2Paths}});if(error||data?.error)failures.push(error||new Error(data.error))}
+ for(let start=0;start<r2Paths.length;start+=20){
+  const {data,error}=await supabase.functions.invoke('sync-catalog-design',{body:{action:'delete',paths:r2Paths.slice(start,start+20)}});
+  if(error||data?.error)failures.push(error||new Error(data.error));
+ }
  return failures[0]||null;
 }
 const mockupFileLabel=(file,fallback,label='Imagen')=>file?`${label} · ${fileSizeLabel(file.size)}`:fallback;
+function storedMockupVideo(design,slug){
+ const configured=designProductMockups(design||{})[slug]?.videoPath;
+ return configured ?? (design?.slug==='zelda-ocarina-of-time'&&slug==='poleras'?legacyFeaturedVideoUrl:'');
+}
+function showMockupVideo(input,stored=''){
+ const group=input.closest('.admin-mockup-video'),video=group.querySelector('video');
+ const section=input.closest('[data-mockup-product]'),clear=section.querySelector('[data-remove-mockup-video]'),remove=clear.querySelector('input');
+ const previous=video.getAttribute('src');
+ if(previous?.startsWith('blob:'))URL.revokeObjectURL(previous);
+ const file=input.files[0],error=file?catalogVideoFileError(file):'';
+ const src=remove.checked?'':file&&!error?URL.createObjectURL(file):stored;
+ video.pause();
+ video.preload=file&&!error?'metadata':'none';
+ if(src)video.src=src;else{video.removeAttribute('src');video.load()}
+ video.hidden=!src;
+ const output=group.querySelector('output');
+ output.textContent=error|| (remove.checked?'Se quitará al guardar.':file?`${file.name} · ${fileSizeLabel(file.size)}. Se optimizará al guardar.`:stored?'Video actual guardado. Puedes reemplazarlo.':'Sin video cargado.');
+ output.dataset.tone=error?'error':'';
+ clear.hidden=!stored;
+}
+function clearMockupVideoPreviews(form){
+ form.querySelectorAll('.admin-mockup-video video').forEach(video=>{
+  const source=video.getAttribute('src');
+  video.pause();video.removeAttribute('src');video.load();video.hidden=true;
+  if(source?.startsWith('blob:'))URL.revokeObjectURL(source);
+ });
+}
 function showMockupPreview(form,name,src=''){
  const preview=form.querySelector(`[data-preview="${name}"]`);if(!preview)return;
  const image=preview.querySelector('img');if(src){image.src=src;preview.hidden=false}else{image.removeAttribute('src');preview.hidden=true}
@@ -774,11 +810,12 @@ function openDesignDialog(design){
   const name=mockupInputName(product.slug),photo=photos[product.slug];
   form.querySelector(`[data-mockup-name="${name}"]`).textContent=photo?.path?'Mockup actual; puedes reemplazarlo.':'Mockup pendiente para este producto.';
   showMockupPreview(form,name,photo?.path||'');setMockupFocus(form,name,photo?.focusX??50,photo?.focusY??50);
+  showMockupVideo(form.elements[mockupVideoInputName(product.slug)],storedMockupVideo(design,product.slug));
  }
  const personalizationArrow=normalizeMockupFocus(design?.personalization_arrow_x,design?.personalization_arrow_y);
  setPersonalizationArrow(form,personalizationArrow.x,personalizationArrow.y);syncPersonalizationArrowPicker(form,photos.poleras?.path||'');
  syncProductMockupFields(form);
- dialog.showModal();mountAdminFormDisclosure(form,'design',{validateFile:file=>validateArtwork(file,false),editableSections:Boolean(design)});
+ dialog.showModal();mountAdminFormDisclosure(form,'design',{validateFile:(file,field)=>field.name.startsWith('mockup_video_')?catalogVideoFileError(file):validateArtwork(file,false),editableSections:Boolean(design)});
 }
 function currentProductArtworks(design){
  const collection=adminData.collections.find(item=>item.id===design?.collection_id);
@@ -850,6 +887,14 @@ async function submitDesign(form,event){
  const missing=validateProductArtworks(selected,existing,productFiles);if(missing){status.textContent=missing;return}
  const files={...Object.fromEntries(Object.entries(productFiles).map(([slug,file])=>[`product:${slug}`,file])),...Object.fromEntries(selected.map(product=>[`mockup:${product.slug}`,values.get(`clear_${mockupInputName(product.slug)}`)==='on'?null:form.elements[mockupInputName(product.slug)].files[0]]))};
  for(const file of Object.values(files)){const validation=validateArtwork(file,false);if(validation){status.textContent=validation;return}}
+ const videos=selected.flatMap(product=>{
+  const name=mockupVideoInputName(product.slug),file=form.elements[name].files[0];
+  return file&&values.get(`clear_${name}`)!=='on'?[{product,file}]:[];
+ });
+ for(const {product,file} of videos){
+  const validation=catalogVideoFileError(file);
+  if(validation){status.textContent=`Video de ${product.name}: ${validation}`;return}
+ }
  const personalizationArrow=normalizeMockupFocus(values.get('personalization_arrow_x'),values.get('personalization_arrow_y'));
  const payload={collection_id:Number(values.get('collection_id')),name:String(values.get('name')).trim(),slug:slugify(values.get('slug')),caption:String(values.get('caption')).trim()||null,sample_color:sampleColor,allowed_colors:allowedColors.length?allowedColors:null,allowed_product_colors:Object.fromEntries(colorProductSlugs.map(slug=>[slug,allowedProductColors[slug]])),personalization_arrow_x:personalizationArrow.x,personalization_arrow_y:personalizationArrow.y,accepts_customer_image:values.get('accepts_customer_image')==='on',customer_photo_subject:values.get('accepts_customer_image')==='on'&&values.get('customer_photo_subject')==='people'?'people':'pets',is_featured:values.get('is_featured')==='on',active:values.get('active')==='on'};if(!payload.collection_id||!payload.name||!payload.slug){status.textContent='Completa colección, nombre y slug.';return}
  payload.product_mockups=productMockupDraft(current,adminData.productTypes,values);
@@ -870,11 +915,31 @@ async function submitDesign(form,event){
   status.textContent=`${imageLabel}: ${fileSizeLabel(file.size)} · ${result.width} × ${result.height} px`;
   prepared.push({kind,suffix,file,imageLabel});
  }
+ const preparedVideos=[];
+ for(const {product,file} of videos){
+  const label=`Video de ${product.name}`,baseName=`${payload.slug}-video-${product.slug}`;
+  button.textContent='Optimizando video…';
+  status.textContent=`Preparando ${label.toLowerCase()}…`;
+  let lastProgress='';
+  try{
+   const result=await optimizeCatalogVideo(file,baseName,(percentage,attempt)=>{
+    const progress=`${label} · ${attempt>1?'Ajustando peso · ':''}${Math.floor(percentage/10)*10}%`;
+    if(progress!==lastProgress){lastProgress=progress;status.textContent=progress}
+   });
+   preparedVideos.push({slug:product.slug,label,file:result.file});
+  }catch(error){throw new Error(`${label}: ${error.message}`)}
+ }
  for(const {kind,suffix,file,imageLabel} of prepared){
   button.textContent=`Publicando ${imageLabel.toLowerCase()}…`;
-  const extension=file.name.split('.').pop().toLowerCase(),path=`${collection.slug}/${payload.slug}-${suffix}-${Date.now()}.${extension}`,url=await uploadCatalogArtworkToR2(path,file);
+  const extension=file.name.split('.').pop().toLowerCase(),path=`${collection.slug}/${payload.slug}-${suffix}-${Date.now()}.${extension}`,url=await uploadCatalogFileToR2(path,file);
   if(kind.startsWith('product:'))payload.product_artworks[kind.slice(8)]=url;else payload.product_mockups[kind.slice(7)]={...payload.product_mockups[kind.slice(7)],path:url};
  }
+  for(const {slug:fileSlug,label,file} of preparedVideos){
+   button.textContent='Publicando video…';
+   status.textContent=`${label} optimizado · ${fileSizeLabel(file.size)}`;
+   const path=`${collection.slug}/${payload.slug}-video-${fileSlug}-${crypto.randomUUID()}.mp4`;
+   payload.product_mockups[fileSlug].videoPath=await uploadCatalogFileToR2(path,file);
+  }
   const collectionProduct=adminData.productTypes.find(product=>product.id===collection.product_type_id)?.slug;
   payload.artwork_path=payload.product_artworks[collectionProduct]||Object.values(payload.product_artworks)[0];
   payload.mockup_path=payload.product_mockups.poleras?.path||null;
@@ -905,7 +970,7 @@ function wireDesigns(){
  root.querySelectorAll('[data-toggle-design]').forEach(button=>button.onclick=async()=>{const design=adminData.designs.find(item=>item.id===Number(button.dataset.toggleDesign));if(!design.active){const slugs=Object.keys(currentProductArtworks(design)).filter(slug=>COLOR_PRODUCT_FAMILIES.some(family=>family.slug===slug)),colors=designProductColorMap(design,slugs),issues=invalidDesignProductColors(adminData.variants,colors,slugs);if(issues.length){const names=issues.map(slug=>adminData.productTypes.find(product=>product.slug===slug)?.name||slug);return toast(`No se puede activar: elige colores por producto para ${names.join(' y ')}.`,'error')}}button.disabled=true;const {error}=await supabase.from('catalog_designs').update({active:!design.active}).eq('id',design.id);if(error){button.disabled=false;return toast(`No se pudo cambiar el estado: ${error.message}`)}await refreshData('Estado del diseño actualizado.',true)});
  root.querySelectorAll('[data-delete-design]').forEach(button=>button.onclick=()=>{const design=adminData.designs.find(item=>item.id===Number(button.dataset.deleteDesign));if(!design)return;deleteForm.elements.design_id.value=design.id;deleteDialog.querySelector('[data-delete-design-name]').textContent=`“${design.name}”`;deleteDialog.showModal();deleteDialog.querySelector('[data-delete-design-cancel]').focus()});
  deleteDialog.querySelectorAll('[data-delete-design-cancel]').forEach(button=>button.onclick=()=>deleteDialog.close());
- deleteForm.onsubmit=async event=>{event.preventDefault();const button=event.submitter,status=deleteForm.querySelector('.admin-form-status'),id=Number(deleteForm.elements.design_id.value),design=adminData.designs.find(item=>item.id===id);button.disabled=true;button.textContent='Eliminando…';const {error}=await supabase.from('catalog_designs').delete().eq('id',id);if(error){button.disabled=false;button.textContent='Eliminar diseño';status.textContent=error.code==='23503'?'Este diseño está asociado a un carro o pedido y no se puede eliminar. Puedes ocultarlo.':error.message;return}const assetError=await removeCatalogAssets([design?.artwork_path,...Object.values(currentProductArtworks(design)),design?.mockup_path,design?.mockup_hover_path,...Object.values(designProductMockups(design||{})).flatMap(photo=>[photo.path,photo.hoverPath])]);deleteDialog.close();await refreshData(assetError?'Diseño eliminado; quedó un archivo pendiente de limpieza.':'Diseño eliminado.',true)};
+ deleteForm.onsubmit=async event=>{event.preventDefault();const button=event.submitter,status=deleteForm.querySelector('.admin-form-status'),id=Number(deleteForm.elements.design_id.value),design=adminData.designs.find(item=>item.id===id);button.disabled=true;button.textContent='Eliminando…';const {error}=await supabase.from('catalog_designs').delete().eq('id',id);if(error){button.disabled=false;button.textContent='Eliminar diseño';status.textContent=error.code==='23503'?'Este diseño está asociado a un carro o pedido y no se puede eliminar. Puedes ocultarlo.':error.message;return}const assetError=await removeCatalogAssets([design?.artwork_path,...Object.values(currentProductArtworks(design)),design?.mockup_path,design?.mockup_hover_path,...Object.values(designProductMockups(design||{})).flatMap(photo=>[photo.path,photo.hoverPath,photo.videoPath])]);deleteDialog.close();await refreshData(assetError?'Diseño eliminado; quedó un archivo pendiente de limpieza.':'Diseño eliminado.',true)};
  form.querySelectorAll('[data-design-product]').forEach(section=>{
   section.querySelector('[name="design_products"]').addEventListener('change',()=>{const previous=currentDesignProductColors(form);updateProductUpload(section);renderDesignProductColors(form,previous);syncDesignColorCompatibility(form)});
   section.querySelector('[type="file"]').addEventListener('change',event=>{
@@ -924,6 +989,19 @@ function wireDesigns(){
   output.textContent=mockupFileLabel(file,src?'Mockup actual conservado.':'Mockup pendiente para este producto.');
   showMockupPreview(form,name,src);if(slug==='poleras')syncPersonalizationArrowPicker(form,src);
  }));
+ adminData.productTypes.forEach(product=>{
+  const name=mockupVideoInputName(product.slug),input=form.elements[name],clear=form.elements[`clear_${name}`];
+  const current=()=>storedMockupVideo(adminData.designs.find(design=>design.id===Number(form.elements.id.value)),product.slug);
+  input.addEventListener('change',()=>{
+   if(input.files[0])clear.checked=false;
+   showMockupVideo(input,current());
+  });
+  clear.addEventListener('change',()=>{
+   if(clear.checked)input.value='';
+   showMockupVideo(input,current());
+  });
+ });
+ dialog.addEventListener('close',()=>clearMockupVideoPreviews(form));
  form.elements.accepts_customer_image.addEventListener('change',()=>{syncCustomerPhotoSubject(form);const image=form.querySelector('[data-preview="mockup_poleras"] img');syncPersonalizationArrowPicker(form,image?.getAttribute('src')||'')});
  form.elements.customer_photo_subject.addEventListener('change',()=>syncCustomerPhotoSubject(form));
  form.onsubmit=event=>submitDesign(form,event);

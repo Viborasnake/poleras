@@ -24,12 +24,12 @@ export function adminFieldSummary(node,{limit=180}={}){
   if(field.type==='checkbox')return ['design_products','allowed_colors'].includes(field.name)||field.name.startsWith('design_colors_')?label||field.value:`${label}: ${field.checked?'Sí':'No'}`;
   const value=field.tagName==='SELECT'?field.selectedOptions[0]?.textContent:field.value.trim();return value?`${label}: ${value}`:'';
  }).filter(Boolean);
- for(const field of controls(node).filter(field=>field.type==='file')){
+ for(const field of controls(node).filter(field=>field.type==='file'&&!field.disabled)){
   const current=field.closest('[data-design-product]');
   if(current&&!current.querySelector('[name="design_products"]')?.checked)continue;
   if(field.files.length)result.push(`${labelFor(field)}: ${[...field.files].map(file=>file.name).join(', ')}`);
   else if(current?.dataset.currentArtwork)result.push(`${labelFor(field)}: archivo actual conservado`);
-  else if(!current&&field.closest('label')?.querySelector('output')?.textContent.includes('actual'))result.push(`${labelFor(field)}: imagen actual conservada`);
+  else if(!current&&field.closest('label')?.querySelector('output')?.textContent.includes('actual'))result.push(`${labelFor(field)}: ${field.name.startsWith('mockup_video_')?'video actual conservado':'imagen actual conservada'}`);
  }
  return conciseSummary(result.join(' · ')||'Sin opciones adicionales',limit);
 }
@@ -81,7 +81,7 @@ export function mountAdminFormDisclosure(form,kind,{validateFile=()=>null,specs:
   for(const field of spec.nodes.filter(Boolean)){const marker=document.createComment('admin-field');field.before(marker);markers.push([field,marker]);node.append(field)}
   group.append(node);
   if(spec.advanced?.length){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Opciones avanzadas';details.append(summary);for(const name of spec.advanced){const field=form.elements.namedItem(name);if(field)details.append(field.closest('label'))}node.append(details)}
-  return {...spec,node,valid:()=> (!spec.valid||spec.valid())&&controls(node).filter(field=>field.type==='file'&&!field.disabled).every(field=>[...field.files].every(file=>!validateFile(file))),value:()=>spec.value?String(spec.value()):adminStepSnapshot(node),summary:()=>spec.summary?spec.summary():adminFieldSummary(node)};
+  return {...spec,node,valid:()=> (!spec.valid||spec.valid())&&controls(node).filter(field=>field.type==='file'&&!field.disabled).every(field=>[...field.files].every(file=>!validateFile(file,field))),value:()=>spec.value?String(spec.value()):adminStepSnapshot(node),summary:()=>spec.summary?spec.summary():adminFieldSummary(node)};
  });
  const review=document.createElement('section');review.className='admin-disclosure-review';const heading=document.createElement('h3'),list=document.createElement('dl');heading.textContent='Revisa antes de guardar';review.append(heading,list);actions.before(review);
  const state=createDisclosureState();if(editableSections)steps.forEach(step=>{state.confirmed[step.id]=step.value()});const initial=adminStepSnapshot(form),before=steps.map(step=>step.summary?step.summary():adminFieldSummary(step.node,{limit:Infinity}));let pending=false,destroyed=false;

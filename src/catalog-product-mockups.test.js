@@ -55,3 +55,16 @@ test('personalized designs require an admin product link even when a mockup exis
  assert.deepEqual(catalogProductDesigns([pet],'totebags'),[]);
  assert.deepEqual(catalogProductDesigns([pet],'poleras').map(x=>x.id),['pet']);
 });
+
+test('video stays with its product and can be removed independently of the photo',()=>{
+ const clip='https://images.frontbook.cl/retro/bird-video-poleras-v1.mp4';
+ const mapped={...design,productMockups:{poleras:{path:'/shirt.webp',videoPath:clip},totebags:{path:'/tote.webp'}}};
+ assert.equal(designWithProductMockup(mapped,'poleras').featuredVideo,clip);
+ assert.equal(designWithProductMockup(mapped,'totebags').featuredVideo,undefined);
+ const draft=productMockupDraft(mapped,[{slug:'poleras'},{slug:'totebags'}],new Map([['clear_mockup_video_poleras','on']]));
+ assert.equal(draft.poleras.path,'/shirt.webp');
+ assert.equal(draft.poleras.videoPath,'');
+ assert.equal(designWithProductMockup({...mapped,productMockups:draft},'poleras').featuredVideo,'');
+ assert.equal(designWithProductMockup({...mapped,productMockups:{poleras:{videoPath:'https://example.com/foreign.mp4'}}},'poleras').featuredVideo,'');
+ assert.match(productMockupFields([{slug:'poleras',name:'Poleras'}]),/name="mockup_video_poleras"/);
+});

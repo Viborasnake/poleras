@@ -9,3 +9,12 @@ test('gallery uses available design photographs across active products without c
  assert.equal(studioGalleryItems(design,products)[0].focusX,35);
  assert.equal(studioGalleryItems(null,products).length,0);
 });
+
+test('the gallery associates a configured video with its product’s main photo',()=>{
+ const clip='https://images.frontbook.cl/retro/bird-video-poleras-v1.mp4';
+ const design={productMockups:{poleras:{path:'/polera.webp',hoverPath:'/espalda.webp',videoPath:clip},totebags:{path:'/tote.webp'}}};
+ const gallery=studioGalleryItems(design,[{slug:'poleras',name:'Poleras'},{slug:'totebags',name:'Totebags'}]);
+ assert.deepEqual(gallery.map(item=>[item.src,item.videoPath]),[
+  ['/polera.webp',clip],['/espalda.webp',undefined],['/tote.webp',undefined],
+ ]);
+});
