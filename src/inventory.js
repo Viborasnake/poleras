@@ -130,9 +130,25 @@ export function inventoryStore(storage){
   }
  };
 }
-export function inventoryRows(items,{query='',brand='',color='',location='',stock='',product_type_id='',model_code='',sort='date_desc'}={},products=[]){
+export function inventoryRows(items, filters={}, products=[]){
+ const {query='',notesQuery='',stock='',product_type_id='',model_code='',sort='date_desc',
+  priceMin='',priceMax='',quantityMin='',quantityMax='',dateFrom='',dateTo=''}=filters;
  const words=inventoryText(query).split(/\s+/).filter(Boolean),[field,direction]=sort.split('_');
- return items.filter(item=>(!product_type_id||(product_type_id==='unclassified'?!inventoryProduct(item,products):String(inventoryProduct(item,products)?.id)===product_type_id))&&(!model_code||(model_code==='unclassified'?!item.model_code:item.model_code===model_code))&&words.every(word=>inventoryText([inventoryProductType(item,products),inventoryModelLabel(item),item.name,item.brand,item.color,item.size,item.location,item.notes,item.price,item.date].join(' ')).includes(word))&&['brand','color','location'].every(key=>!({brand,color,location}[key])||inventoryText(item[key])===inventoryText({brand,color,location}[key]))&&(!stock||(stock==='available'?item.quantity>0:item.quantity===0))).sort((a,b)=>{
+ const notesTerm=inventoryText(notesQuery);
+ const terms=['brand','color','size','location'].filter(key=>filters[key]).map(key=>[key,inventoryText(filters[key])]);
+ const within=(value,min,max)=>(min===''||value>=min)&&(max===''||value<=max);
+ return items.filter(item=>{
+  const product=inventoryProduct(item,products);
+  if(product_type_id&&(product_type_id==='unclassified'?product:String(product?.id)!==product_type_id))return false;
+  if(model_code&&(model_code==='unclassified'?item.model_code:item.model_code!==model_code))return false;
+  if(stock&&(stock==='available'?item.quantity<=0:item.quantity!==0))return false;
+  if(!within(item.price,priceMin,priceMax)||!within(item.quantity,quantityMin,quantityMax)||!within(item.date,dateFrom,dateTo))return false;
+  if(!terms.every(([key,term])=>term==='__no_size__'&&key==='size'?!item.size:inventoryText(item[key])===term))return false;
+  if(notesTerm&&!inventoryText(item.notes).includes(notesTerm))return false;
+  if(!words.length)return true;
+  const searchable=inventoryText([product?.name||'Sin clasificar',inventoryModelLabel(item),item.name,item.brand,item.color,item.size,item.location,item.notes,item.price,item.date].join(' '));
+  return words.every(word=>searchable.includes(word));
+ }).sort((a,b)=>{
   const result=['price','quantity'].includes(field)?a[field]-b[field]:String(a[field]??'').localeCompare(String(b[field]??''),'es-CL',{numeric:true,sensitivity:'base'});
   return result*(direction==='desc'?-1:1)||a.name.localeCompare(b.name,'es-CL')||a.id.localeCompare(b.id);
  });

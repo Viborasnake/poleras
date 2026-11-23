@@ -8,18 +8,18 @@ export function adminSearch({label, placeholder, input, output = ''}) {
   return `<div class="admin-list-search"><label class="admin-filter-field"><span>${escapeHtml(label)}</span><span class="admin-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" autocomplete="off" ${input} placeholder="${escapeHtml(placeholder)}"></span></label>${output}</div>`;
 }
 
-function adminPopover({id, label, name, items, filters = false}) {
+function adminPopover({id, label, name, items, filters = false, surfaceClass = '', width, preferredHeight, icon = ''}) {
   const target = escapeHtml(id);
   const count = filters ? '<span data-active-filter-count></span>' : '';
-  return `<div class="admin-actions${filters ? ' admin-filters' : ''}"><button type="button" class="admin-secondary admin-actions-trigger" popovertarget="${target}"${name === label ? '' : ` aria-label="${escapeHtml(name)}"`}><span>${escapeHtml(label)}${count}</span>${chevron}</button><div id="${target}" class="admin-actions-popover${filters ? ' admin-filter-popover' : ''}" popover>${items}</div></div>`;
+  return `<div class="admin-actions${filters ? ' admin-filters' : ''}"><button type="button" class="admin-secondary admin-actions-trigger" popovertarget="${target}"${name === label ? '' : ` aria-label="${escapeHtml(name)}"`}>${icon}<span>${escapeHtml(label)}${count}</span>${chevron}</button><div id="${target}" class="admin-actions-popover${filters ? ' admin-filter-popover' : ''} ${escapeHtml(surfaceClass)}"${width ? ` data-popover-width="${Number(width)}"` : ''}${preferredHeight ? ` data-popover-height="${Number(preferredHeight)}"` : ''} popover>${items}</div></div>`;
 }
 
 export function adminActions({id, label = 'Más acciones', name = label, items}) {
   return adminPopover({id, label, name, items});
 }
 
-export function adminFilters(id, items) {
-  return adminPopover({id, label: 'Filtros', name: 'Filtros', items, filters: true});
+export function adminFilters(id, items, options = {}) {
+  return adminPopover({id, label: 'Filtros', name: 'Filtros', items, filters: true, ...options});
 }
 
 export function updateAdminFilterCount(root, id, count) {
@@ -51,11 +51,12 @@ export function bindAdminActions(root) {
     const right = Math.min(viewportRight, dialog?.right ?? viewportRight) - 8;
     const top = Math.max(viewportTop, dialog?.top ?? viewportTop) + 8;
     const bottom = Math.min(viewportBottom, dialog?.bottom ?? viewportBottom) - 8;
-    const width = Math.min(popover.classList.contains('admin-filter-popover') ? 340 : 256, right - left);
+    const defaultWidth = popover.classList.contains('admin-filter-popover') ? 340 : 256;
+    const width = Math.min(Number(popover.dataset.popoverWidth) || defaultWidth, right - left);
     const anchorLeft = dialog ? bounds.left : bounds.right - width;
     const below = bottom - bounds.bottom - 6;
     const above = bounds.top - top - 6;
-    const opensDown = below >= Math.min(260, above);
+    const opensDown = below >= Math.min(Number(popover.dataset.popoverHeight) || 260, above);
     Object.assign(popover.style, {
       width: `${width}px`,
       maxHeight: `${Math.max(opensDown ? below : above, 0)}px`,
@@ -69,7 +70,7 @@ export function bindAdminActions(root) {
   }, true);
   root.addEventListener('click', event => {
     const item = event.target.closest('.admin-actions-popover :is(button, a)');
-    if (!item || item.disabled) return;
+    if (!item || item.disabled || (item.form && item.closest('.admin-filter-popover'))) return;
     const popover = item.closest('.admin-actions-popover');
     const trigger = adminActionTrigger(item);
     popover.hidePopover();
@@ -108,7 +109,7 @@ export function prepareAdminTable(table) {
           const label = document.createElement('span');
           label.className = 'admin-cell-label';
           label.ariaHidden = 'true';
-          label.textContent = headings[index].textContent;
+          label.textContent = (headings[index].querySelector('[data-admin-column-label]') || headings[index]).textContent;
           cell.prepend(label);
         }
       }

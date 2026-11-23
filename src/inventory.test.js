@@ -42,6 +42,16 @@ test('búsqueda sin tildes, filtros combinados y orden numérico preservan los d
  assert.deepEqual(inventoryRows(rows,{sort:'price_asc'}).map(row=>row.id),['b','a','c']);
  assert.deepEqual(inventoryRows(rows,{stock:'empty'}).map(row=>row.id),['b']);assert.equal(JSON.stringify(rows),before);
 });
+test('combina talla, rangos inclusivos y stock manteniendo el orden elegido',()=>{
+ const rows=[
+  {...draft,id:'a',price:3000,quantity:0,size:'',date:'2026-01-01'},
+  {...draft,id:'b',price:4000,quantity:2,size:'M',date:'2026-01-02'},
+  {...draft,id:'c',price:5000,quantity:4,size:'m',date:'2026-01-03'},
+ ];
+ assert.deepEqual(inventoryRows(rows,{size:'M',priceMin:'4000',priceMax:'5000',quantityMax:'4',dateFrom:'2026-01-02',dateTo:'2026-01-03',sort:'price_desc'}).map(row=>row.id),['c','b']);
+ assert.deepEqual(inventoryRows(rows,{size:'__no_size__',stock:'empty',quantityMax:'0',priceMax:'3000',dateTo:'2026-01-01',notesQuery:'algodon'}).map(row=>row.id),['a']);
+ assert.deepEqual(inventoryRows(rows,{priceMin:'3001',dateTo:'2026-01-01'}),[]);
+});
 test('falla de escritura se informa y mantiene el inventario anterior',()=>{
  const initial=JSON.stringify([{...draft,id:'a'}]);const store=inventoryStore({getItem:()=>initial,setItem:()=>{throw new Error('QuotaExceededError')}});
  assert.throws(()=>store.save(draft),/No pudimos guardar/);assert.deepEqual(store.read(),parseInventory(initial));

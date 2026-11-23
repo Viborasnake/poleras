@@ -148,7 +148,7 @@
   white-space: nowrap;
 }
 .admin-actions-trigger svg { flex: none; width: 16px; height: 16px; }
-.admin-actions:has(:popover-open) .admin-actions-trigger svg { transform: rotate(180deg); }
+.admin-actions:has(:popover-open) .admin-actions-trigger svg:last-child { transform: rotate(180deg); }
 .admin-actions-popover {
   position: fixed;
   inset: auto;
