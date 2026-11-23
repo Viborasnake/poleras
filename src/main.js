@@ -3,6 +3,7 @@ import {catalogPrintLayoutFor} from './catalog-print-layout.js';
 import {mountHomeSnow} from './home-snow.js';
 import {mountDropHeroSearch} from './drop-hero-search.js';
 import {planDropWall} from './drop-wall-layout.js';
+import {createFeaturedDesignVideo} from './featured-design-video.js';
 import {catalogFiltersMarkup,catalogProductToggleMarkup} from './catalog-filters.js';
 import {catalogProductDesigns,catalogProductOptions,designWithProductMockup,designAppliesToProduct} from './catalog-product-mockups.js';
 import {studioGalleryItems} from './studio-gallery.js';
@@ -957,6 +958,7 @@ function resetIdea(){
 function beginIdea(){resetIdea();openStudio('choose')}
 document.querySelector('[data-bring-design]')?.addEventListener('click',beginIdea);
 document.querySelectorAll('[data-start]').forEach(button=>button.onclick=()=>beginIdea());
+const syncFeaturedDesignVideo=createFeaturedDesignVideo();
 const catalogSection=document.createElement('section');
 catalogSection.id='catalogo';
 catalogSection.className='section ready-catalog';
@@ -1056,7 +1058,10 @@ function catalogDesignCard(design,index,collection,preferredProduct='',wall=fals
  if(wall){
   const price=priceLabel(productSlug==='totebags'?productPrice('tote','M',null,design):productSlug==='bodys'?productPrice('body',null,null,design):productSlug==='poleras'?productPrice('basic','M',null,design):null);
   const personalizationStory=petStory&&design.featuredPhoto?catalogPetStory(personalizationArrow,design.customerPhotoSubject):'';
-  return `<article class="catalog-card drop-collection drop-design-card${petStory?' catalog-card--pet-story':''}${design.featured||wallFeatured?' drop-collection--featured':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}"><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}"><button type="button" class="drop-collection-link" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}"><span class="drop-card-media">${visual.replaceAll('<img ',`<img loading="${index<3?'eager':'lazy'}" decoding="async" `)}${personalizationStory}</span><span class="drop-labels">${petStory?'<span class="drop-personalizable">Diseño personalizable</span>':`<span class="drop-collection-type">${wallFeatured?'✦ Diseño destacado':design.featured?'✦ Destacado':'Diseño original'}</span>`}</span><span class="drop-design-price">${price}</span><span class="drop-caption"><span><small>${safe(collection?.label||'Diseño original')}</small><strong>${safe(design.name)}</strong>${commerceSupported?'':'<small>Próximamente</small>'}</span>${dropArrowMarkup('Ver diseño')}</span></button></div></article>`;
+  const hasVideo=wallFeatured&&design.id==='zelda-ocarina-of-time'&&collection?.id==='retro-games'&&productSlug==='poleras'&&Boolean(design.featuredPhoto);
+  const video=hasVideo?'<video class="drop-featured-video" data-featured-design-video muted playsinline preload="none" aria-hidden="true" disablepictureinpicture></video>':'';
+  const videoControl=hasVideo?'<button type="button" class="ds-secondary-button drop-featured-video-control" data-featured-video-control hidden>Ver video</button>':'';
+  return `<article class="catalog-card drop-collection drop-design-card${petStory?' catalog-card--pet-story':''}${design.featured||wallFeatured?' drop-collection--featured':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}"><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}"><button type="button" class="drop-collection-link" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}"><span class="drop-card-media">${visual.replaceAll('<img ',`<img loading="${index<3?'eager':'lazy'}" decoding="async" `)}${video}${personalizationStory}</span><span class="drop-labels">${petStory?'<span class="drop-personalizable">Diseño personalizable</span>':`<span class="drop-collection-type">${wallFeatured?'✦ Diseño destacado':design.featured?'✦ Destacado':'Diseño original'}</span>`}</span><span class="drop-design-price">${price}</span><span class="drop-caption"><span><small>${safe(collection?.label||'Diseño original')}</small><strong>${safe(design.name)}</strong>${commerceSupported?'':'<small>Próximamente</small>'}</span>${dropArrowMarkup('Ver diseño')}</span></button>${videoControl}</div></article>`;
  }
 
  return `<article class="catalog-card catalog-design-card${petStory?' catalog-card--pet-story':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}"><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}">${design.featured?'<span class="catalog-featured-pill">Destacado</span>':''}<span class="catalog-design-kicker"><span aria-hidden="true">✦</span> Diseño original</span><span class="catalog-design-number" aria-hidden="true">${String(index+1).padStart(2,'0')}</span>${visual}${petStory&&design.featuredPhoto?catalogPetStory(personalizationArrow,design.customerPhotoSubject):''}<span class="catalog-price">${priceLabel(productSlug==='totebags'?productPrice('tote','M',null,design):productSlug==='bodys'?productPrice('body',null,null,design):productSlug==='poleras'?productPrice('basic','M',null,design):null)}</span></div><div class="catalog-card-info"><div>${inDialog?catalogProductBadges([sourceDesign],productChoice.selected,cardKey):''}${collection?`<span class="catalog-design-collection">${safe(collection.label)}</span>`:''}<h3>${safe(design.name)}</h3><details class="catalog-description"><summary><span class="catalog-description-show">Ver descripción</span><span class="catalog-description-hide">Ocultar descripción</span></summary><p>${safe(design.caption)}</p></details></div></div><div class="catalog-card-actions"><button type="button" class="catalog-choose ds-cta" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}">${chooseLabel} <span aria-hidden="true">→</span></button>${shareCollection?`<button type="button" class="catalog-share share-button" data-share-url="${safe(shareUrl)}" data-share-title="Colección ${safe(collection.label)} · Droska" data-share-text="Mira esta colección de Droska.">${shareIcon}<span>Compartir colección</span></button>`:''}</div></article>`;
@@ -1199,6 +1204,7 @@ function renderCatalog(){
   grid.classList.toggle('drop-design-wall',isDesignView);
   }
   grid.classList.toggle('drop-collection-sections',useDropWall&&!isDesignView);
+  syncFeaturedDesignVideo(grid);
   grid.classList.toggle('catalog-grid--filtering',animateCatalogChange);
   grid.classList.toggle('catalog-grid--four',catalogGridColumns===4);
   grid.querySelectorAll('.catalog-card').forEach((card,index)=>{
