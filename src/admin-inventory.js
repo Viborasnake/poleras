@@ -1,5 +1,5 @@
 import {adminActionTrigger,bindAdminActions,prepareAdminTable,updateAdminFilterCount} from './admin-ui.js';
-import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,inventoryText,INVENTORY_STORAGE_KEY,inventoryProduct,inventoryModelOptions} from './inventory.js';
+import {inventoryStore,inventoryRows,inventoryToday,inventoryBackup,inventoryCsv,inventoryText,INVENTORY_STORAGE_KEY,INVENTORY_DEFAULT_GROUP,inventoryProduct,inventoryModelOptions} from './inventory.js';
 import {inventoryListMarkup} from './admin-inventory-list.js';
 import {inventoryPageMarkup} from './admin-inventory-page.js';
 import {buildInventoryFilterField,inventoryFilterKeys,inventoryRangeKeys} from './admin-inventory-filters.js';
@@ -10,8 +10,8 @@ import './admin-inventory.css';
 
 const safe=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const money=value=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(value);
-const state={query:'',groupBy:'product',sort:'date_desc',...Object.fromEntries(inventoryFilterKeys.map(key=>[key,'']))};
-const sortOptions=[['date_desc','Ingreso reciente'],['date_asc','Ingreso antiguo'],...['name','brand','color','size','location'].map(key=>[`${key}_asc`,`${{name:'Producto',brand:'Marca',color:'Color',size:'Talla',location:'Ubicación'}[key]} · A–Z`]),['price_asc','Precio · menor a mayor'],['price_desc','Precio · mayor a menor'],['quantity_asc','Cantidad · menor a mayor'],['quantity_desc','Cantidad · mayor a menor']];
+const state={query:'',groupBy:INVENTORY_DEFAULT_GROUP,sort:'date_desc',...Object.fromEntries(inventoryFilterKeys.map(key=>[key,'']))};
+const sortOptions=[['date_desc','Ingreso reciente'],['date_asc','Ingreso antiguo'],...['name','brand','color','size','location'].map(key=>[`${key}_asc`,`${{name:'Nombre',brand:'Marca',color:'Color',size:'Talla',location:'Ubicación'}[key]} · A–Z`]),['price_asc','Precio · menor a mayor'],['price_desc','Precio · mayor a menor'],['quantity_asc','Cantidad · menor a mayor'],['quantity_desc','Cantidad · mayor a menor']];
 function download(content,name,type){
  const url=URL.createObjectURL(new Blob([content],{type})),link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }

@@ -63,7 +63,7 @@ export function inventoryColumnFilter(column, group, state, field) {
   const id = `inventory-column-${group.code}-${column.key}`;
   const active = column.fields.some(key => state[key] !== '');
   return `<div class="admin-actions admin-filters inventory-column-filter">
-    <button type="button" class="inventory-column-trigger" popovertarget="${id}" data-inventory-column="${column.key}" data-inventory-group="${escapeHtml(group.name)}" aria-label="Filtrar por ${column.label}${active ? ' (activo)' : ''}">
+    <button type="button" class="inventory-column-trigger" popovertarget="${id}" data-inventory-column="${column.key}" data-inventory-group="${escapeHtml(group.key)}" aria-label="Filtrar por ${column.label}${active ? ' (activo)' : ''}">
       <span>${column.label}</span>${inventoryFilterIcon}${active ? '<span class="inventory-column-active" aria-hidden="true">✓</span>' : ''}
     </button>
     <div class="admin-actions-popover admin-filter-popover inventory-filter-surface inventory-column-popover" id="${id}" popover>

@@ -1,5 +1,8 @@
 import {adminSearch,adminActions,adminFilters} from './admin-ui.js';
 import {inventoryFilterIcon,inventoryRangeKeys} from './admin-inventory-filters.js';
+import {INVENTORY_DEFAULT_GROUP} from './inventory.js';
+
+const groupingOptions=[[INVENTORY_DEFAULT_GROUP,'Nombre / marca'],['product','Producto'],['model','Producto y modelo'],['none','Sin agrupar']];
 
 export function inventoryPageMarkup({state,field,sortOptions,editor,shared=false,localBackup=false}){
  const options=`
@@ -15,7 +18,7 @@ export function inventoryPageMarkup({state,field,sortOptions,editor,shared=false
    <fieldset class="inventory-filter-view">
     <legend>Vista de la tabla</legend>
     <div>
-     <label class="admin-filter-field">Agrupar por<select id="inventory-group-by"><option value="product" ${state.groupBy==='product'?'selected':''}>Producto</option><option value="model" ${state.groupBy==='model'?'selected':''}>Producto y modelo</option><option value="none" ${state.groupBy==='none'?'selected':''}>Sin agrupar</option></select></label>
+     <label class="admin-filter-field">Agrupar por<select id="inventory-group-by">${groupingOptions.map(([value,label])=>`<option value="${value}"${value===state.groupBy?' selected':''}>${label}</option>`).join('')}</select></label>
      <label class="admin-filter-field">Ordenar por<select id="inventory-sort">${sortOptions.map(([value,label])=>`<option value="${value}" ${value===state.sort?'selected':''}>${label}</option>`).join('')}</select></label>
     </div>
    </fieldset>

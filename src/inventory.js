@@ -19,18 +19,31 @@ export function inventoryShirtName(value){
  const original=String(value??'').trim(),cleaned=original.replace(/^poleras?\b[\s·:–—-]+/i,'').trim();
  return cleaned||original;
 }
-export function inventoryGroups(items,groupBy='product',products=[]){
+export const INVENTORY_DEFAULT_GROUP='name-brand';
+export function inventoryGroups(items,groupBy=INVENTORY_DEFAULT_GROUP,products=[]){
  const groups=new Map();
+ const byNameBrand=groupBy===INVENTORY_DEFAULT_GROUP;
  for(const item of items){
-  const product=inventoryProduct(item,products),id=String(product?.id||'');
-  const key=groupBy==='none'?'all':groupBy==='model'?JSON.stringify([id,item.model_code||'']):id;
-  if(!groups.has(key)){
-   const name=groupBy==='none'?'Todos los lotes':`${product?.name||'Sin clasificar'}${product?.missing?' (eliminado)':''}${groupBy==='model'&&product?.slug==='poleras'?` · ${inventoryModelLabel(item)}`:''}`;
-   groups.set(key,{code:`g-${groups.size}`,name,items:[],units:0,value:0,order:groupBy==='none'?0:product?products.findIndex(row=>String(row.id)===id):-1});
+  let key,name,order;
+  if(byNameBrand){
+   key=JSON.stringify([item.name,item.brand].map(value=>inventoryText(value).replace(/\s+/g,' ')));
+   name=`${item.name} · ${item.brand}`;
+  }else if(groupBy==='none'){
+   key='all';name='Todos los lotes';order=0;
+  }else{
+   const product=inventoryProduct(item,products),id=String(product?.id||'');
+   key=groupBy==='model'?JSON.stringify([id,item.model_code||'']):id;
+   name=`${product?.name||'Sin clasificar'}${product?.missing?' (eliminado)':''}${groupBy==='model'&&product?.slug==='poleras'?` · ${inventoryModelLabel(item)}`:''}`;
+   const index=products.findIndex(row=>String(row.id)===id);
+   order=index<0?Infinity:index;
   }
+  if(!groups.has(key))groups.set(key,{key,code:`g-${groups.size}`,name,items:[],units:0,value:0,order});
   const group=groups.get(key);group.items.push(item);group.units+=item.quantity;group.value+=item.price*item.quantity;
  }
- return [...groups.values()].sort((a,b)=>(a.order<0?Infinity:a.order)-(b.order<0?Infinity:b.order));
+ const result=[...groups.values()];
+ return byNameBrand
+  ?result.sort((a,b)=>a.name.localeCompare(b.name,'es-CL',{numeric:true,sensitivity:'base'}))
+  :result.sort((a,b)=>a.order-b.order);
 }
 export const INVENTORY_SUGGESTION_FIELDS=['name','brand','color','size','location'];
 export function inventorySuggestions(items,field,values={}){

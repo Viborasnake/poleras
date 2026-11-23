@@ -90,6 +90,26 @@ test('agrupa distintos modelos comerciales por tipo y calcula totales de la vist
  assert.deepEqual(inventoryRows(rows,{model_code:'unclassified'}).map(row=>row.id),['d']);
  assert.equal(inventoryRows(rows,{query:'unisex'}).length,2);
 });
+test('la agrupación predeterminada reúne nombre y marca y suma solo los lotes visibles',()=>{
+ const rows=[
+  {...draft,id:'new',name:'Dogo Premium',brand:'Roly',size:'S',quantity:2,price:2980,model_code:'basic',date:'2026-11-23'},
+  {...draft,id:'euro',name:'Básica',brand:'Euro Cotton',size:'L',quantity:1,price:4300,date:'2026-11-19'},
+  {...draft,id:'generic',name:'Básica',brand:'Genérica',size:'L',quantity:3,price:4300,date:'2026-11-19'},
+  {...draft,id:'kids',name:'DOGO  PREMIUM',brand:'roly',size:'3/4 Años',quantity:2,price:1980,model_code:'kid',date:'2026-11-19'},
+ ];
+ const ordered=inventoryRows(rows,{sort:'date_desc'},products);
+ const groups=inventoryGroups(ordered);
+ assert.deepEqual(groups.map(({name})=>name),['Básica · Euro Cotton','Básica · Genérica','Dogo Premium · Roly']);
+ const dogo=groups[2];
+ assert.deepEqual(dogo.items.map(({id})=>id),['new','kids']);
+ assert.equal(dogo.value,9920);
+ assert.equal(dogo.units,4);
+ const [filtered]=inventoryGroups(inventoryRows(rows,{size:'3/4 Años'},products));
+ assert.deepEqual(filtered.items.map(({id})=>id),['kids']);
+ assert.equal(filtered.key,dogo.key);
+ assert.equal(filtered.value,3960);
+ assert.equal(filtered.units,2);
+});
 test('lotes históricos y respaldos conservan clasificación sin inferirla del nombre',()=>{
  const store=inventoryStore(setup(JSON.stringify([{...draft,id:'old'}])));
  assert.equal(store.read()[0].model_code,'');

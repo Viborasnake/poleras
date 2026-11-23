@@ -37,7 +37,7 @@ export function inventoryListMarkup(rows,state,products,field){
   }).join('');
   return `<section class="inventory-product-group" aria-labelledby="${titleId}">
    <header class="inventory-group-heading">
-    <div><h3 id="${titleId}">${safe(group.name)}</h3><p>${group.items.length} ${group.items.length===1?'lote':'lotes'} · ${group.units} unidades</p></div>
+    <div><h3 id="${titleId}">${safe(group.name)}</h3><p>${group.items.length} ${group.items.length===1?'lote':'lotes'} · ${group.units} ${group.units===1?'unidad':'unidades'}</p></div>
     <span>Valor registrado <strong>${money(group.value)}</strong></span>
    </header>
    <div class="admin-table-wrap" aria-labelledby="${titleId}">
