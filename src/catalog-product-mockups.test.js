@@ -58,7 +58,7 @@ test('personalized designs require an admin product link even when a mockup exis
 
 test('video stays with its product and can be removed independently of the photo',()=>{
  const clip='https://images.frontbook.cl/retro/bird-video-poleras-v1.mp4';
- const mapped={...design,productMockups:{poleras:{path:'/shirt.webp',videoPath:clip},totebags:{path:'/tote.webp'}}};
+ const mapped={...design,productMockups:{poleras:{path:'/shirt.webp',videoPath:clip,autoplaySecond:false},totebags:{path:'/tote.webp'}}};
  assert.equal(designWithProductMockup(mapped,'poleras').featuredVideo,clip);
  assert.equal(designWithProductMockup(mapped,'totebags').featuredVideo,undefined);
  const draft=productMockupDraft(mapped,[{slug:'poleras'},{slug:'totebags'}],new Map([['clear_mockup_video_poleras','on']]));
@@ -67,17 +67,4 @@ test('video stays with its product and can be removed independently of the photo
  assert.equal(designWithProductMockup({...mapped,productMockups:draft},'poleras').featuredVideo,'');
  assert.equal(designWithProductMockup({...mapped,productMockups:{poleras:{videoPath:'https://example.com/foreign.mp4'}}},'poleras').featuredVideo,'');
  assert.match(productMockupFields([{slug:'poleras',name:'Poleras'}]),/name="mockup_video_poleras"/);
-});
-
-test('the second home card preference is saved and cleared independently per product',()=>{
- const products=[{slug:'poleras',name:'Poleras'},{slug:'totebags',name:'Totebags'}];
- const current={product_mockups:{poleras:{path:'/shirt.webp'},totebags:{path:'/tote.webp',autoplaySecond:true}}};
- const draft=productMockupDraft(current,[products[0]],new Map([['autoplay_second_mockup_video_poleras','on']]));
- const configured={...current,product_mockups:draft};
- assert.equal(designWithProductMockup(configured,'poleras').autoplaySecond,true);
- assert.equal(designWithProductMockup(configured,'totebags').autoplaySecond,true);
- const unchecked=productMockupDraft(configured,products,new Map());
- assert.equal(unchecked.poleras.autoplaySecond,false);
- assert.equal(unchecked.totebags.autoplaySecond,false);
- assert.match(productMockupFields(products),/name="autoplay_second_mockup_video_poleras"/);
 });

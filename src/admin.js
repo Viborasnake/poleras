@@ -1,10 +1,10 @@
 import {adminActions,adminFilters,adminSearch,updateAdminFilterCount,bindAdminActions,observeAdminDialogs,prepareAdminTable} from './admin-ui.js';
 import {priceGuideMarkup,priceServicesMarkup,priceTableToolsMarkup,wirePriceFilters,wirePriceSettingForm} from './admin-prices-panel.js';
 import {collectionsPanelMarkup} from './admin-collections-panel.js';
-import {productMockupFields,productMockupDraft,mockupInputName,mockupVideoInputName,mockupVideoAutoplayName} from './admin-product-mockups.js';
+import {productMockupFields,productMockupDraft,mockupInputName,mockupVideoInputName} from './admin-product-mockups.js';
 import {designProductMockups} from './catalog-product-mockups.js';
 import {catalogVideoFileError,optimizeCatalogVideo} from './video-optimization.js';
-import {legacyFeaturedVideoUrl} from './featured-design-video.js';
+import {catalogDesignVideoUrl} from './featured-design-video.js';
 import {wireStoreSettings as bindStoreSettings,wireAdminNotifications as bindAdminNotifications} from './admin-store-settings.js';
 import {mountCouponDisclosure,mountPaymentInstructionsDisclosure} from './admin-settings-disclosure.js';
 import {mountAdminOrderDisclosure} from './admin-order-disclosure.js';
@@ -653,8 +653,7 @@ async function removeCatalogAssets(urls){
 }
 const mockupFileLabel=(file,fallback,label='Imagen')=>file?`${label} · ${fileSizeLabel(file.size)}`:fallback;
 function storedMockupVideo(design,slug){
- const configured=designProductMockups(design||{})[slug]?.videoPath;
- return configured ?? (design?.slug==='zelda-ocarina-of-time'&&slug==='poleras'?legacyFeaturedVideoUrl:'');
+ return catalogDesignVideoUrl(design?.slug,slug,designProductMockups(design||{})[slug]?.videoPath);
 }
 function showMockupVideo(input,stored=''){
  const group=input.closest('.admin-mockup-video'),video=group.querySelector('video');
@@ -810,7 +809,6 @@ function openDesignDialog(design){
   const name=mockupInputName(product.slug),photo=photos[product.slug];
   form.querySelector(`[data-mockup-name="${name}"]`).textContent=photo?.path?'Mockup actual; puedes reemplazarlo.':'Mockup pendiente para este producto.';
   showMockupPreview(form,name,photo?.path||'');setMockupFocus(form,name,photo?.focusX??50,photo?.focusY??50);
-  form.elements[mockupVideoAutoplayName(product.slug)].checked=photo?.autoplaySecond===true;
   showMockupVideo(form.elements[mockupVideoInputName(product.slug)],storedMockupVideo(design,product.slug));
  }
  const personalizationArrow=normalizeMockupFocus(design?.personalization_arrow_x,design?.personalization_arrow_y);

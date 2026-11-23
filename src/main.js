@@ -3,7 +3,7 @@ import {catalogPrintLayoutFor} from './catalog-print-layout.js';
 import {mountHomeSnow} from './home-snow.js';
 import {mountDropHeroSearch} from './drop-hero-search.js';
 import {planDropWall} from './drop-wall-layout.js';
-import {createFeaturedDesignVideo,legacyFeaturedVideoUrl} from './featured-design-video.js';
+import {createFeaturedDesignVideo,catalogDesignVideoUrl} from './featured-design-video.js';
 import {catalogFiltersMarkup,catalogProductToggleMarkup} from './catalog-filters.js';
 import {catalogProductDesigns,catalogProductOptions,designWithProductMockup,designAppliesToProduct} from './catalog-product-mockups.js';
 import {studioGalleryItems} from './studio-gallery.js';
@@ -715,6 +715,7 @@ function showStagePhoto(index){
   image.style.zIndex='2';
   if(currentImage)currentImage.style.zIndex='1';
   image.classList.add('is-visible');activePhotoImage=image;
+  syncFeaturedDesignVideo(stagePhoto);
   photoFadeTimer=window.setTimeout(()=>{if(transitionVersion===photoTransitionVersion){currentImage?.classList.remove('is-visible');currentImage?.style.removeProperty('z-index')}},430);
  };
  const preload=new Image();
@@ -724,18 +725,15 @@ function showStagePhoto(index){
   image.alt=`${item.label} con el diseño ${selectedCatalogDesign()?.name||'elegido'}`;
   if(image.complete)revealPhoto();else image.onload=revealPhoto;
  };
- preload.onerror=()=>{if(transitionVersion===photoTransitionVersion)image.removeAttribute('src')};
- preload.src=item.src;
+ preload.onerror=()=>{if(transitionVersion===photoTransitionVersion){image.removeAttribute('src');syncFeaturedDesignVideo(stagePhoto)}};
  stagePhoto.dataset.kind=state.kind;stagePhoto.dataset.step=String(state.step);
  stagePhoto.hidden=false;
  syncFeaturedDesignVideo(stagePhoto,false);
  const stageVideo=stagePhoto.querySelector('video');
- stageVideo.pause();stageVideo.removeAttribute('src');stageVideo.load();
- stageVideo.classList.remove('is-playing');
  stageVideo.dataset.featuredDesignVideo=item.videoPath||'';
  stagePhoto.querySelector('[data-featured-video-control]').dataset.videoLabel=item.label;
- syncFeaturedDesignVideo(stagePhoto);
  livePreview.classList.add('is-photo-open');
+ preload.src=item.src;
  stagePhoto.querySelectorAll('.studio-stage-photo-dots span').forEach((dot,dotIndex)=>dot.classList.toggle('is-active',dotIndex===index));
 }
 function schedulePhotoRotation(){
@@ -1051,8 +1049,7 @@ function catalogMissingMockup(design){
  return `<div class="catalog-missing-mockup">${productFamilyIcon(catalogProductFamily(design.previewProductSlug))}<strong>${safe(product)}</strong><span>Mockup pendiente</span><small>Vista del diseño para este producto</small>${artworkUrl(design)?`<img src="${safe(artworkUrl(design))}" alt="Diseño ${safe(design.name)} sin mockup de ${safe(product)}" loading="lazy">`:''}</div>`;
 }
 function catalogPreviewDesign(design,defaultSlug,productSlug=selectedCatalogProduct){return designWithProductMockup(design,productSlug,defaultSlug,catalogProducts.filter(product=>product.active!==false).map(product=>product.slug))}
-function catalogDesignCard(design,index,collection,preferredProduct='',wall=false,homePosition=0,inDialog=false,shareCollection=false){
- const wallFeatured=wall&&homePosition===1;
+function catalogDesignCard(design,index,collection,preferredProduct='',wall=false,wallFeatured=false,inDialog=false,shareCollection=false){
  const sourceDesign=design;
  const cardKey=`design:${design.id}`;
  const productChoice=catalogCardProduct([design],cardKey,preferredProduct||collection?.productSlug);
@@ -1068,10 +1065,8 @@ function catalogDesignCard(design,index,collection,preferredProduct='',wall=fals
  const petStory=Boolean(design.acceptsCustomerImage);
  const visual=design.featuredPhoto?`<img class="catalog-3d catalog-featured-photo${productSlug==='totebags'?' catalog-featured-photo--tote':''}" style="${mainFocusStyle}" src="${design.featuredPhoto}" alt="Foto principal del diseño ${safe(design.name)}">${design.featuredPhotoHover?`<img class="catalog-3d catalog-featured-photo-hover${productSlug==='totebags'?' catalog-featured-photo--tote':''}" style="${hoverFocusStyle}" src="${design.featuredPhotoHover}" alt="" aria-hidden="true">`:''}`:catalogMissingMockup(design);
  const shareUrl=collection?catalogCollectionDialogPath(collection.id):'';
- const autoVideo=wall&&(wallFeatured||homePosition===2&&design.autoplaySecond);
- const legacyVideo=autoVideo&&design.featuredVideo===undefined&&design.id==='zelda-ocarina-of-time'&&collection?.id==='retro-games'&&productSlug==='poleras'&&Boolean(design.featuredPhoto);
- const clip=design.featuredVideo||(legacyVideo?legacyFeaturedVideoUrl:'');
- const video=clip?`<video class="drop-featured-video" data-featured-design-video="${safe(clip)}"${autoVideo?' data-featured-video-autoplay':''} muted playsinline preload="none" aria-hidden="true" disablepictureinpicture></video>`:'';
+ const clip=catalogDesignVideoUrl(design.id,productSlug,design.featuredVideo);
+ const video=clip?`<video class="drop-featured-video" data-featured-design-video="${safe(clip)}" muted playsinline preload="none" aria-hidden="true" disablepictureinpicture></video>`:'';
  const videoControl=clip?`<button type="button" class="ds-secondary-button drop-featured-video-control" data-featured-video-control data-video-label="${safe(design.name)}" hidden>Ver video</button>`:'';
  if(wall){
   const price=priceLabel(productSlug==='totebags'?productPrice('tote','M',null,design):productSlug==='bodys'?productPrice('body',null,null,design):productSlug==='poleras'?productPrice('basic','M',null,design):null);
@@ -1101,7 +1096,7 @@ function catalogCollectionCard(item,index,productDesigns){
  return `<article class="catalog-card catalog-collection-card drop-collection${petStory?' catalog-card--pet-story':''}${item.featured?' drop-collection--featured':''}" data-collection-id="${safe(item.id)}" data-product-slug="${safe(productSlug)}"${preview}><div class="catalog-visual catalog-visual--${safe(cover?.surface||'pink')} catalog-theme-${index%4}"><button type="button" class="drop-collection-link" data-open-collection="${safe(item.id)}" data-product="${safe(productSlug)}" aria-label="Ver colección ${safe(item.label)}, ${countText}, en ${safe(catalogProductName(productSlug))}"><span class="drop-card-media">${dropCoverVisual}</span><span class="drop-labels">${petStory?'':'<span class="drop-collection-type">Colección</span>'}${item.isNewCollection?'<span class="drop-new">Nueva colección</span>':''}${petStory?'<span class="drop-personalizable">Diseño personalizable</span>':''}</span>${item.featured?`<span class="drop-featured-count">${countText}</span>`:''}<span class="drop-caption">${item.featured?'<span class="drop-photo-badge"><i aria-hidden="true">✦</i> Colección destacada</span>':''}<span><small class="drop-featured-overline">${item.featured?'✦ SELECCIÓN DESTACADA':countText}</small><strong>${safe(item.label)}</strong>${item.featured?`<span class="drop-featured-description">${petStory?(cover?.customerPhotoSubject==='people'?'De la foto de alguien especial a un diseño único.':'De tu foto de mascota a un diseño único.'):'Diseños originales para llevar a tu manera.'}</span>`:''}</span>${item.featured?'':dropArrowMarkup('')}</span></button></div></article>`;
 }
 function featuredDropDesignCard(design,collection){
- let markup=catalogDesignCard(design,0,collection,'',true,1);
+ let markup=catalogDesignCard(design,0,collection,'',true,true);
  markup=markup.replace(`data-design-id="${safe(design.id)}"`, `data-collection-id="${safe(collection.id)}" data-design-id="${safe(design.id)}"`);
  return markup;
 }
@@ -1113,7 +1108,7 @@ function renderDropCollectionSections(shownCollections,productDesigns){
   const compatibleDesigns=productChoice.selected?allDesigns.filter(design=>designAppliesToProduct(design,productChoice.selected)):allDesigns;
   const coverDesign=[...compatibleDesigns].sort(compareCatalogPriority)[0];
   const designLimit=Math.max(1,Math.min(12,Number(collection.homeDesignLimit)||4));
-  const designs=allDesigns.filter(design=>design.id!==coverDesign?.id).slice(0,Math.max(0,designLimit-1)).map((design,index)=>catalogDesignCard(design,index+1,collection,'',true,index+2));
+  const designs=allDesigns.filter(design=>design.id!==coverDesign?.id).slice(0,Math.max(0,designLimit-1)).map((design,index)=>catalogDesignCard(design,index+1,collection,'',true));
   const entries=[featuredDropDesignCard(coverDesign,collection),...designs];
   const plan=planDropWall(entries.length),sectionId=`drop-section-${String(collection.id).replace(/[^a-z0-9_-]/gi,'-')}`;
   const createTile=plan.filler?`<button type="button" class="drop-create-tile${plan.filler.columns<=3?' drop-create-tile--narrow':''}${plan.filler.rows===1?' drop-create-tile--short':''}" data-drop-create><span class="drop-create-eyebrow">¿TIENES UNA IDEA?</span><strong>Trae tu<br> diseño</strong><span class="drop-create-tile-copy">Tu foto, tu dibujo o un diseño de IA.<br>Hazlo a tu pinta.</span><span class="drop-create-tile-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 18 18 6M6 6h12v12"/></svg></span></button>`:'';
@@ -1303,7 +1298,7 @@ function openCatalogCollection(collectionId,productSlug=''){
  catalogDialog.querySelector('#catalog-dialog-title').textContent=collection.label;
  catalogDialog.querySelector('.catalog-dialog-count').textContent=`${designCountLabel(designs.length)} en esta colección`;
  catalogDialog.querySelector('.catalog-dialog-note').textContent=designs.some(design=>design.acceptsCustomerImage)?'Elige un diseño. Si se personaliza con una foto, podrás subirla y enviar tus indicaciones al equipo.':'Elige un diseño para abrirlo en el estudio. Después podrás seleccionar modelo, talla y ubicación del estampado.';
- catalogDialog.querySelector('.catalog-dialog-grid').innerHTML=designs.length?designs.map((design,index)=>catalogDesignCard(design,index,collection,activeProduct==='all'?'':activeProduct,false,0,true)).join(''):`<div class="catalog-empty-collection"><span aria-hidden="true">+</span><h3>Esta colección aún no tiene diseños.</h3><p>Cuando agregues el primero desde el panel, aparecerá aquí automáticamente.</p></div>`;
+ catalogDialog.querySelector('.catalog-dialog-grid').innerHTML=designs.length?designs.map((design,index)=>catalogDesignCard(design,index,collection,activeProduct==='all'?'':activeProduct,false,false,true)).join(''):`<div class="catalog-empty-collection"><span aria-hidden="true">+</span><h3>Esta colección aún no tiene diseños.</h3><p>Cuando agregues el primero desde el panel, aparecerá aquí automáticamente.</p></div>`;
  arrangeSingleCatalogDialog(catalogDialog);
  syncFeaturedDesignVideo(catalogDialog);
  if(!catalogDialog.open)catalogDialog.showModal();document.body.classList.add('locked');
@@ -1313,7 +1308,7 @@ function openCatalogDesign(design,collection,preferredProduct=''){
   designDialog.dataset.designId=design.id;
   designDialog.querySelector('#catalog-design-dialog-title').textContent=design.name;
   designDialog.querySelector('.catalog-design-dialog-collection').textContent=collection.label;
-  designDialog.querySelector('.catalog-dialog-grid').innerHTML=catalogDesignCard(design,0,collection,preferredProduct,false,0,true,true);
+  designDialog.querySelector('.catalog-dialog-grid').innerHTML=catalogDesignCard(design,0,collection,preferredProduct,false,false,true,true);
   arrangeSingleCatalogDialog(designDialog);
   syncFeaturedDesignVideo(designDialog);
   designDialog.querySelector('[data-view-collection]').dataset.collectionId=collection.id;
