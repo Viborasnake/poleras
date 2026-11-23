@@ -31,8 +31,8 @@ export type HalftoneSettings = {
 }
 
 // Clustered ordered screening: retain the source detail inside each dot.
-// Partial alpha uses four subpixel samples; solid alpha samples the pixel
-// center. Promoting ANY subpixel hit to opaque would dilate every dot.
+// Screened dots sample the pixel center so their alpha is binary without
+// expanding the dot to every pixel touched by a subpixel sample.
 export function halftone(data: Uint8ClampedArray, width: number, height: number, s: HalftoneSettings, selectionSource=data, protectionSource=selectionSource) {
   if(s.separateBackground){
     const clean=removeBackground(data,width,height,s,selectionSource)
@@ -67,11 +67,18 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   })
   const angle = s.angle * Math.PI / 180
   const cos = Math.cos(angle), sin = Math.sin(angle)
-  const solidAlpha=s.solidAlpha === true || (s.enabled !== false && s.solidAlpha !== false)
-  const offsets = solidAlpha ? [.5] : [.25, .75]
-  const samples = offsets.length ** 2
+  const screening=s.enabled!==false
+  const solidAlpha=screening||s.solidAlpha===true
   const organic=Math.max(0,Math.min(100,s.organic??0))/100*.18
   const hash=(a:number,b:number)=>{const n=Math.sin(a*127.1+b*311.7)*43758.5453;return n-Math.floor(n)}
+  const dotThreshold=(x:number,y:number)=>{
+    const rx=((x+.5)*cos+(y+.5)*sin)/pitch
+    const ry=(-(x+.5)*sin+(y+.5)*cos)/pitch
+    const cellX=Math.floor(rx), cellY=Math.floor(ry)
+    const u=Math.abs(rx-cellX-.5-(organic?(hash(cellX,cellY)-.5)*organic:0))*2
+    const v=Math.abs(ry-cellY-.5-(organic?(hash(cellX+19,cellY+47)-.5)*organic:0))*2
+    return s.shape==='line'?v:s.shape==='square'?Math.max(u,v)**2:circleRanks[Math.min(4096,Math.round((u*u+v*v)*2048))]
+  }
   // Never promote barely-visible export residue to fully opaque DTF ink. This
   // matters for both continuous and screened output: many cutout PNGs contain
   // colourful alpha 1–8 pixels that are invisible on dark backgrounds but turn
@@ -198,23 +205,15 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     if(s.enabled!==false&&screenAmount<1)coverage=coverage*screenAmount+(s.prepared?data[i+3]/255*edgeAlpha:retainedCoverage>0?1:0)*(1-screenAmount)
     const keepIsolatedSolid = isolatedTransition && colorAlpha >= .999 && data[i + 3] === 255 && edgeAlpha >= .999
     const continuousSelection=s.prepared&&screenAmount===0
-    let hits = s.enabled === false || continuousSelection ? coverage * samples : keepIsolatedSolid ? samples : 0
-    if (s.enabled !== false && !keepIsolatedSolid && !continuousSelection) for (const oy of offsets) for (const ox of offsets) {
-      const rx = ((x + ox) * cos + (y + oy) * sin) / pitch
-      const ry = (-(x + ox) * sin + (y + oy) * cos) / pitch
-      const cellX=Math.floor(rx),cellY=Math.floor(ry)
-      const u = Math.abs(rx - cellX - .5 - (organic?(hash(cellX,cellY)-.5)*organic:0)) * 2
-      const v = Math.abs(ry - cellY - .5 - (organic?(hash(cellX+19,cellY+47)-.5)*organic:0)) * 2
-      // Circular dots join smoothly into solids in highlights.
-      const threshold = s.shape === 'line' ? v : s.shape === 'square' ? Math.max(u, v) ** 2 : circleRanks[Math.min(4096, Math.round((u * u + v * v) * 2048))]
-      if (coverage >= 1 || coverage > threshold) hits++
-    }
-    if (!hits) { transparent++; continue }
+    const alpha=!screening||continuousSelection
+      ?coverage
+      :keepIsolatedSolid||coverage>=1||coverage>dotThreshold(x,y)?1:0
+    if(!alpha){transparent++;continue}
     const mono = (s.prepared?s.screenBase:s.background) === 'black' ? 255 : 0
     output[i] = s.preserveColor ? r * 255 : mono
     output[i + 1] = s.preserveColor ? g * 255 : mono
     output[i + 2] = s.preserveColor ? b * 255 : mono
-    output[i + 3] = solidAlpha ? 255 : hits * 255 / samples
+    output[i + 3] = solidAlpha ? 255 : alpha * 255
   }
   // Apply the corner radius to the final alpha mask as a second pass. Doing
   // this after screening/background removal guarantees that the visible design
@@ -240,8 +239,10 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
         const signedDistance=outside+inside-rx
         const rounded=((x+.5-cx)/rx)**2+((y+.5-cy)/ry)**2<=1
         const mask=feather>0?clamp(-signedDistance/feather):rounded?1:0
-        if (!mask) { output[i]=output[i+1]=output[i+2]=output[i+3]=0; transparent++ }
-        else if (mask<1) {
+        if (!mask||(screening&&mask<1&&mask<=dotThreshold(x,y))) {
+          output[i]=output[i+1]=output[i+2]=output[i+3]=0
+          transparent++
+        } else if (!screening&&mask<1) {
           output[i+3]=Math.round(output[i+3]*mask)
           if (!output[i+3]) transparent++
         }

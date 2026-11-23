@@ -8,7 +8,7 @@ La aplicación forma parte del repositorio de Droska y se compila con la ruta ba
 
 ## Rango de color (cambio local)
 
-En **Eliminar fondo → Gotero · Rango de color…**, haz clic en el original para seleccionar el color real del fondo. Puedes reemplazar la muestra, añadir hasta ocho o quitar muestras individuales, y ajustar tolerancia y suavidad. La máscara muestra en blanco lo que se elimina, en negro lo que se conserva y en gris las transiciones; también puedes previsualizar el recorte sin semitono. Cancelar no modifica el diseño.
+En **Eliminar fondo → Gotero · Color del sustrato…**, haz clic en el original para seleccionar el color real del fondo. Puedes añadir hasta ocho colores, editar o quitar cada muestra por separado y recuperar el último cambio con Deshacer. Ajusta Tolerancia y Suavidad junto a las muestras. Los diálogos de trama y protección usan los mismos controles y conservan los trazos al quitar colores. La máscara muestra en blanco lo que se elimina, en negro lo que se conserva y en gris las transiciones; también puedes previsualizar el recorte sin semitono. Cancelar no modifica el diseño.
 
 Al aplicar se activa Color personalizado, sin modificar los modos Negro y Blanco. La selección global se calcula desde los colores originales remuestreados, antes de las correcciones, y su máscara no se puede rellenar con Conservar detalle, brillo o inversión. Los colores no seleccionados se conservan; con ajustes neutros y tamaño 100%, el semitono actúa sobre las transiciones de transparencia, no perfora uniformemente todo el interior. El rango queda incluido en el historial, el autoguardado, los presets personalizados y el documento editable de Gang Sheet. La tolerancia usa distancia RGB, no la escala propietaria de Photoshop. Puede eliminar detalles interiores del mismo color: no es selección semántica ni eliminación exclusiva de fondo conectado.
 
@@ -36,7 +36,7 @@ Desde la raíz del repositorio, `npm run build` compila la tienda y deja este ed
 - Resultado en color o monocromo, con opción de inversión.
 - Comparación interactiva original/resultado.
 - Exportación PNG con transparencia.
-- Trama por píxel con suavizado de bordes, conservación de detalles y eliminación del color de fondo de los bordes.
+- Trama por píxel, conservación de detalles y eliminación del color de fondo de los bordes. Los semitonos usan alfa binario en todo el PNG.
 - Vista sobre damero y prendas negra, blanca, gris, azul marino, azul oscuro, café oscuro o rojo fuerte; el fondo de vista previa no se incluye en el PNG.
 - Escala manual en porcentaje y botones 100%, 200%, 300% y 400%.
 - Ancho/alto en centímetros con proporciones bloqueadas; 150, 300 o 600 ppp.
@@ -50,17 +50,17 @@ Desde la raíz del repositorio, `npm run build` compila la tienda y deja este ed
 | Clara | Semitono | Trama tonal (32 LPI, detalle 0%), Trama fina (45 LPI, detalle 30%), Trama marcada (24 LPI), Reducir ruido (45 LPI, limpieza 35%), Un color (negro, 45 LPI) |
 | Clara | Sin semitono | Color original, Quitar fondo blanco, Un color (negro) |
 
-Son puntos de partida, no perfiles de impresión certificados. Negro y blanco son los fondos de referencia; sobre prendas de otros colores la apariencia cambia. «Color original» no elimina fondo y conserva el alfa original. «Quitar negro» afecta a todos los negros y usa alfa parcial sin generar puntos; revisa su tratamiento en el RIP. Se recomienda una prueba física con el proveedor.
+Son puntos de partida, no perfiles de impresión certificados. Negro y blanco son los fondos de referencia; sobre prendas de otros colores la apariencia cambia. «Color original» no elimina fondo y conserva el alfa original. «Quitar negro» afecta a todos los negros y mantiene la tinta visible opaca sin generar puntos. Se recomienda una prueba física con el proveedor.
 
 **Trama marcada** hace más visible el patrón con 24 LPI y cobertura tonal neutra. **Reducir ruido** atenúa residuos de color cercanos al negro o al blanco mediante limpieza al 35%; también puede reducir detalle real en esas zonas. En blanco utiliza detalle 0% para conservar la trama tonal. Los cinco presets de semitono conservan tamaño físico, ppp, recorte y bordes; puedes afinar sus controles y guardarlos como preset propio.
 
-**Un color** convierte todos los píxeles impresos a blanco para prenda oscura o negro para clara. Con semitono genera puntos opacos; sin semitono conserva transiciones mediante alfa parcial, sin puntos. Conserva las transparencias del original y elimina el fondo negro/blanco según la categoría. No es una limpieza selectiva de ruido en imágenes a color: también convierte sus colores reales. Los presets a color no cambian.
+**Un color** convierte todos los píxeles impresos a blanco para prenda oscura o negro para clara. Con semitono genera puntos opacos. En modo continuo, los presets de un color mantienen la tinta visible opaca. Conserva las transparencias del original y elimina el fondo negro/blanco según la categoría. No es una limpieza selectiva de ruido en imágenes a color: también convierte sus colores reales. Los presets a color no cambian.
 
 - Correcciones automáticas: Tono automático, Contraste automático y Color automático. Son reversibles, combinables y se calculan a partir del original antes de la trama.
 - Flujo recomendado desde Gang Sheet: nombrar trabajo y escoger formato, importar para ajustar, enviar al Gang Sheet, repetir y exportar.
 - Guardar preset con nombre: almacena los ajustes de trama, color, fondo, nitidez y bordes en este navegador. Aparecen en “Mis presets” al recargar. No incluye imagen, tamaño ni zoom; los nombres repetidos reciben un sufijo para conservar los anteriores.
 - “Enviar a Gang Sheet” añade el resultado procesado a la plancha y la abre; el botón también está visible en pantallas pequeñas.
-- Desvanecido y eliminación de margen en milímetros, por lado. Se aplican antes de generar la trama y no recortan el tamaño del archivo.
+- Desvanecido y eliminación de margen en milímetros, por lado. El selector ofrece 18 máscaras orgánicas, texturizadas y geométricas. La profundidad de la máscara y su patrón se ajustan a la resolución de salida.
 - Zoom independiente del tamaño de impresión, 100% real y Ajustar a pantalla, siempre accesibles.
 - Herramienta Mano junto al zoom: arrastra para desplazarte por una imagen ampliada. Atajos: mantener Espacio o arrastrar con el botón central. Desactiva Mano para volver a arrastrar el divisor de comparación.
 - Gang Sheet: diseños desde el editor o imágenes importadas, copias, tamaño proporcional, separación, margen, giro opcional y distribución automática por filas. No es un optimizador de anidado irregular.
@@ -69,7 +69,7 @@ Para un diseño con fondo negro, selecciona **Eliminar fondo → Negro**. Ajusta
 
 Para semitono sobre blanco, selecciona **Prenda clara → Semitono → Trama tonal**: 32 LPI, tamaño 100%, gamma 1, umbral 255, puntos opacos y detalle 0%. La cobertura varía con el tono. **Trama fina** usa 45 LPI y detalle 30%. El control **Conservar detalle** refuerza la cobertura proporcionalmente al tono y compensa el color para conservar aproximadamente el promedio sobre blanco con ajustes neutros. Ya no impone una cobertura mínima casi sólida: incluso al 100% conserva variación tonal. Para color continuo, elige **Sin semitono**. El cambio afecta al cálculo sobre blanco, incluido el gotero con base blanca; no modifica el modo negro. Los proyectos guardados conservan sus valores, pero su semitono blanco se recalcula con la curva corregida; los PNG ya generados no cambian automáticamente.
 
-El alfa sólido muestrea el centro del píxel para evitar engordar los puntos. Aumentar tamaño, gamma o densidad de tinta puede oscurecer el resultado; subir LPI cambia la frecuencia, no es por sí solo un control de oscuridad.
+Los semitonos aplican alfa sólido a cada píxel de tinta, incluidas las zonas protegidas y las máscaras de borde. Los huecos conservan alfa 0 y la tinta usa alfa 255. En Sin semitono puedes elegir alfa continuo o sólido. Aumentar tamaño, gamma o densidad de tinta puede oscurecer el resultado; subir LPI cambia la frecuencia, no es por sí solo un control de oscuridad.
 
 En semitono a color, **Eliminar fondo → Limpiar ruido en sombras** (negro) o **Limpiar ruido en blancos** (blanco global) atenúa los puntos cromáticos residuales cercanos al fondo. La intensidad va de 0 a 100%; **0% está apagado y conserva exactamente el procesamiento anterior**. Reduce cobertura y amplificación de color solo en tonos próximos al negro/blanco, sin desaturar globalmente. No distingue ruido de detalle real: al subirla puede quitar sombras profundas o detalles claros, incluido pelaje. No actúa en «Un color», sin semitono ni eliminación blanca conectada al borde. Se guarda en presets y proyectos; cambiar a un preset incluido vuelve a 0%.
 

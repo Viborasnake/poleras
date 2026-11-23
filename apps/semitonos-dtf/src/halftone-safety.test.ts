@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {assessHalftoneSafety} from './halftone-safety.ts'
 
-const base = {dpi:300,sourceDpi:300,lpi:32,size:100,minDotSize:0,solidAlpha:true,enabled:true}
+const base = {dpi:300,sourceDpi:300,lpi:32,size:100,minDotSize:0,enabled:true}
 
 test('accepts a 300 ppp, 32 LPI solid halftone without warnings',()=>{
   const report=assessHalftoneSafety(base)
@@ -40,5 +40,5 @@ test('explains when the selected Neural method fell back to Lanczos',()=>{
 })
 
 test('does not issue screening warnings for continuous output',()=>{
-  assert.equal(assessHalftoneSafety({...base,enabled:false,solidAlpha:false}).issues.length,0)
+  assert.equal(assessHalftoneSafety({...base,enabled:false}).issues.length,0)
 })

@@ -10,7 +10,6 @@ export type HalftoneSafetyInput = {
   lpi: number
   size: number
   minDotSize: number
-  solidAlpha: boolean
   enabled: boolean
 }
 
@@ -82,12 +81,6 @@ export function assessHalftoneSafety(input: HalftoneSafetyInput): HalftoneSafety
     issues.push({
       title: 'El filtro puede borrar toda la trama fina',
       message: `El tamaño mínimo configurado (${input.minDotSize.toFixed(1)} px) es igual o mayor que el punto máximo estimado (${maximumDotPixels.toFixed(1)} px). Esto puede crear huecos blancos en el degradado.`,
-    })
-  }
-  if (!input.solidAlpha) {
-    issues.push({
-      title: 'Alfa parcial activo',
-      message: 'Los bordes de los puntos conservan transparencia parcial. Para DTF, Alfa sólido ofrece una trama más predecible; valida el alfa parcial con tu RIP antes de producir.',
     })
   }
   return {sourceDpi, generatedResolution, cellPixels, maximumDotPixels, recommendedMinimumDotPixels, recommendedMinimumDotMm, maxRecommendedLpi, issues}

@@ -15,8 +15,9 @@ export function processImage(resized:Uint8ClampedArray,width:number,height:numbe
   for(let p=0;p<result.protectedMask.length;p++)if(result.protectedMask[p])result.data.fill(0,p*4,p*4+4)
   removeTinyDots(result.data,width,height,settings.minDotSize??0)
   removeSmallParticles(result.data,width,height,settings.particleMinSize??0)
-  restoreProtectedPixels(result.data,flattened,resized,result.protectedMask,settings.solidAlpha,settings.protectSmoothEdge!==false)
-  applyEdgeMask(result.data,width,height,{style:settings.edgeMask??'none',sizeMm:settings.edgeMaskSizeMm??5,dpi:settings.dpi??300,sides:settings.edgeSides,solidAlpha:settings.solidAlpha})
+  const solidAlpha=settings.enabled!==false||settings.solidAlpha
+  restoreProtectedPixels(result.data,flattened,resized,result.protectedMask,solidAlpha,settings.protectSmoothEdge!==false)
+  applyEdgeMask(result.data,width,height,{style:settings.edgeMask??'none',sizeMm:settings.edgeMaskSizeMm??5,dpi:settings.dpi??300,sides:settings.edgeSides,solidAlpha})
   if (settings.enabled === false) shrinkAlphaMask(result.data,width,height,settings.contourShrinkPx??0)
   let transparent=0
   for(let i=3;i<result.data.length;i+=4)if(!result.data[i])transparent++

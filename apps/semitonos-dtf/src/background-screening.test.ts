@@ -18,13 +18,13 @@ test('explicit painted selection produces tonal dots even when the old scope was
   assert.ok(holes>0)
   for(let y=0;y<64;y++){const i=(y*64+60)*4;assert.deepEqual(out.slice(i,i+4),input.slice(i,i+4))}
 })
-test('protection wins but never restores deleted background or expands a softened alpha',()=>{
+test('protection wins but never restores deleted background and uses opaque ink when screening',()=>{
   const input=fixture(),range={colors:['#000000'],tolerance:100,softness:0}
   const protectedResult=halftone(input,64,64,{...settings,affectedColors:range,protectedColors:range}).data
   assert.equal(protectedResult[3],0)
   assert.deepEqual(protectedResult.slice(60*4,60*4+4),input.slice(60*4,60*4+4))
   const partial=new Uint8ClampedArray([128,128,128,90])
-  assert.equal(halftone(partial,1,1,{...settings,background:'none',protectedColors:range}).data[3],90)
+  assert.equal(halftone(partial,1,1,{...settings,background:'none',protectedColors:range}).data[3],255)
 })
 test('background stage is identical for screening on/off and either substrate',()=>{
   const input=fixture()

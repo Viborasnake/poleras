@@ -9,8 +9,8 @@ function rectangle(width=160,height=120,left=12,top=8,right=147,bottom=111) {
 }
 const alpha=(data:Uint8ClampedArray,x:number,y:number,width=160)=>data[(y*width+x)*4+3]
 
-test('ten distinct masks cut visible artwork bounds and preserve its center and canvas',()=>{
-  assert.equal(edgeMaskStyles.length,10)
+test('each mask cuts visible artwork bounds and preserves its center and canvas',()=>{
+  assert.equal(edgeMaskStyles.length,18)
   const signatures=new Set<string>()
   for(const style of edgeMaskStyles){
     const data=rectangle()
@@ -19,11 +19,15 @@ test('ten distinct masks cut visible artwork bounds and preserve its center and 
     assert.equal(alpha(data,80,60),255,style.id)
     assert.equal(alpha(data,0,0),0,style.id)
     assert.equal(alpha(data,80,8),0,style.id)
-    const signature=Array.from({length:136},(_,x)=>alpha(data,x+12,17)).join(',')
+    const signature=Array.from({length:136},(_,x)=>{
+      let y=8
+      while(y<60&&!alpha(data,x+12,y))y++
+      return y
+    }).join(',')
     signatures.add(signature)
     for(let i=3;i<data.length;i+=4)assert.ok(data[i]===0||data[i]===255,style.id)
   }
-  assert.equal(signatures.size,10)
+  assert.equal(signatures.size,edgeMaskStyles.length)
 })
 test('selected sides and transparent padding are respected',()=>{
   const data=rectangle()
@@ -41,4 +45,18 @@ test('no mask leaves bytes unchanged and soft mode can produce partial alpha',()
   const soft=original.slice()
   applyEdgeMask(soft,160,120,{style:'scallop',sizeMm:4,dpi:150,solidAlpha:false})
   assert.ok(soft.some((value,index)=>index%4===3&&value>0&&value<255))
+})
+test('mask details keep their physical scale between 150 and 300 DPI',()=>{
+  for(const {id} of edgeMaskStyles){
+    const standard=rectangle()
+    const high=rectangle(320,240,24,16,295,223)
+    for(const [data,dpi] of [[standard,150],[high,300]] as const){
+      applyEdgeMask(data,160*dpi/150,120*dpi/150,{style:id,sizeMm:3,dpi,solidAlpha:true})
+    }
+    let differences=0
+    for(let y=8;y<28;y++)for(let x=32;x<=127;x++){
+      if(alpha(standard,x,y)!==alpha(high,x*2,y*2,320))differences++
+    }
+    assert.ok(differences<40,`${id}: ${differences} differences across 1,920 samples`)
+  }
 })

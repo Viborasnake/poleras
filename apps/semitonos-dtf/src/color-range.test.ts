@@ -1,6 +1,7 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {colorRangeRetention,validColorRange,type ColorRange} from './color-range.ts'
+import {removeBackground} from './background-stage.ts'
 import {halftone} from './halftone.ts'
 import {autoAdjust} from './auto-adjust.ts'
 import {garmentPresets} from './garment-presets.ts'
@@ -36,8 +37,8 @@ test('removed colors never return with detail, brightness, inversion, DPI or alp
 test('unselected full-color pixels and original transparency survive at neutral settings',()=>{
   const data=new Uint8ClampedArray([255,20,10,255,20,40,255,255,255,255,255,255,245,236,210,255,90,60,30,0])
   for(const enabled of [true,false]){
-    const result=halftone(data,5,1,{...settings,enabled,solidAlpha:false}).data
-    assert.ok(result.slice(0,8).some(v=>v!==0));assert.ok(result.slice(8,16).every(v=>v===0));assert.ok(result.slice(16).every(v=>v===0))
+    const result=halftone(data,5,1,{...settings,enabled,solidAlpha:false,separateBackground:true,affectedColors:range}).data
+    assert.deepEqual(result.slice(0,12),data.slice(0,12));assert.ok(result.slice(12).every(v=>v===0))
   }
   const partial=new Uint8ClampedArray([255,0,0,90])
   assert.equal(halftone(partial,1,1,{...settings,enabled:false,solidAlpha:false}).data[3],90)
@@ -52,8 +53,16 @@ test('custom settings do not change legacy black, white or none output',()=>{
 test('color range persists in project documents and rejects malformed configuration',()=>{
   const p:ProjectFile={format:'trama-dtf',version:1,name:'Range',sheet:{width:58,height:100,dpi:300,gap:5,rotate:true},background:'white',items:[],editor:{name:'Test',document:{version:1,original:'data:image/png;base64,AAAA',crop:null,widthCm:10,dpi:300,settings:{...settings,trimMm:0,featherMm:0,cornerRadiusMm:0,edgeSides:[true,true,true,true]}}}}
   assert.deepEqual(parseProject(JSON.stringify(p)).editor?.document.settings.colorRange,range)
+  const empty={...range,colors:[],useColors:false,tolerance:100} satisfies ColorRange
+  const editor=p.editor!
+  assert.deepEqual(parseProject(JSON.stringify({...p,editor:{...editor,document:{...editor.document,settings:{...editor.document.settings,colorRange:empty}}}})).editor?.document.settings.colorRange,empty)
   for(const invalid of [null,{}, {...range,colors:[]},{...range,colors:['red']},{...range,colors:Array(9).fill('#ffffff')},{...range,tolerance:101},{...range,softness:-1},{...range,tolerance:'5'}]){
     assert.equal(validColorRange(invalid),false)
     assert.throws(()=>parseProject(JSON.stringify({...p,editor:{...p.editor,document:{...p.editor!.document,settings:{...p.editor!.document.settings,colorRange:invalid}}}})))
   }
+})
+test('removing the last sample retains the image even at maximum tolerance',()=>{
+  const pixels=new Uint8ClampedArray([245,236,210,255,0,0,0,255,90,30,15,90])
+  const empty={colors:[],useColors:false,tolerance:100,softness:100} satisfies ColorRange
+  assert.deepEqual(removeBackground(pixels,3,1,{...settings,colorRange:empty}),pixels)
 })

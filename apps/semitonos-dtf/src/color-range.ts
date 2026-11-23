@@ -5,7 +5,7 @@ export const defaultColorRange:ColorRange = {colors:['#ffffff'],tolerance:8,soft
 export function validColorRange(value:unknown):value is ColorRange {
   if(!value||typeof value!=='object')return false
   const v=value as ColorRange
-  return Array.isArray(v.colors)&&v.colors.length>0&&v.colors.length<=8
+  return Array.isArray(v.colors)&&(v.colors.length>0||v.useColors===false)&&v.colors.length<=8
     &&v.colors.every(c=>typeof c==='string'&&/^#[\da-f]{6}$/i.test(c))
     &&[v.tolerance,v.softness].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=100)
     &&(v.useColors===undefined||typeof v.useColors==='boolean')
@@ -35,6 +35,7 @@ export function selectionCoverage(range:ColorRange,retention:number,override:num
 // RGB maximum-channel distance: tolerance is a percentage of 255, not an
 // emulation of Adobe's proprietary Color Range scale. Compile once per frame.
 export function colorRangeRetention(range:ColorRange) {
+  if(!range.colors.length)return ()=>1
   const colors=range.colors.map(c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16)))
   const radius=range.tolerance*2.55, feather=range.softness*2.55
   return (r:number,g:number,b:number)=>{

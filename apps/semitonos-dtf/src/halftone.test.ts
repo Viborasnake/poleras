@@ -2,6 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { halftone } from './halftone.ts'
 import type { HalftoneSettings } from './halftone.ts'
+import {processImage} from './process-image.ts'
+import type {Settings} from './App'
 import {whiteGarmentHalftone} from './white-garment.ts'
 const settings: HalftoneSettings = { lpi: 30, angle: 22.5, shape: 'circle', size: 100, contrast: 100, brightness: 100, whiteCutoff: 245, preserveColor: true, invert: false, background: 'black', tolerance: 25 }
 function image(r: number, g: number, b: number, a = 255) {
@@ -252,11 +254,11 @@ test('solid alpha exports opaque dots and transparent holes',()=>{
   for(let i=3;i<result.data.length;i+=4)alpha.add(result.data[i])
   assert.ok(alpha.has(0));assert.ok(alpha.has(255));assert.equal([...alpha].some(a=>a>0&&a<255),false)
 })
-test('fractional alpha remains available when solid alpha is disabled',()=>{
-  const result=halftone(image(110,110,110),64,64,{...settings,solidAlpha:false})
+test('screened output stays binary with a legacy soft flag and feathered corners',()=>{
+  const result=halftone(image(110,110,110),64,64,{...settings,solidAlpha:false,cornerRadiusMm:3,featherMm:1})
   const alpha=new Set<number>()
   for(let i=3;i<result.data.length;i+=4)alpha.add(result.data[i])
-  assert.ok([...alpha].some(a=>a>0&&a<255))
+  assert.deepEqual([...alpha].sort((a,b)=>a-b),[0,255])
 })
 test('solid alpha handles semitransparent originals with and without screening',()=>{
  for(const enabled of [true,false]){
@@ -266,6 +268,19 @@ test('solid alpha handles semitransparent originals with and without screening',
   assert.ok(alpha.includes(255));assert.ok(alpha.every(a=>a===0||a===255));assert.equal(alpha[0],0)
  }
  assert.equal(halftone(image(255,0,0,100),64,64,{...settings,enabled:false,solidAlpha:false}).data[3],100)
+})
+test('the full screened render keeps refined edges and protected ink binary',()=>{
+  const input=image(128,128,128,140)
+  for(let y=24;y<40;y++)for(let x=24;x<40;x++)input.set([255,255,255,120],(y*64+x)*4)
+  const config={
+    ...whiteGarmentHalftone,enabled:true,background:'none',separateBackground:true,
+    solidAlpha:false,protectSolid:true,protectSolidColor:'#ffffff',protectSmoothEdge:true,
+    edgeMask:'bevel',edgeMaskSizeMm:.5,cornerRadiusMm:1,featherMm:.3,
+  } as Settings
+  const result=processImage(input,64,64,config).data
+  const alpha=new Set(result.filter((_,index)=>index%4===3))
+  assert.deepEqual([...alpha].sort((a,b)=>a-b),[0,255])
+  assert.equal(result[(32*64+32)*4+3],255)
 })
 test('continuous solid alpha without removal ignores near-transparent export residue',()=>{
  const data=new Uint8ClampedArray([
