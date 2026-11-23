@@ -1,7 +1,7 @@
 import {adminActions,adminFilters,adminSearch,updateAdminFilterCount,bindAdminActions,observeAdminDialogs,prepareAdminTable} from './admin-ui.js';
 import {priceGuideMarkup,priceServicesMarkup,priceTableToolsMarkup,wirePriceFilters,wirePriceSettingForm} from './admin-prices-panel.js';
 import {collectionsPanelMarkup} from './admin-collections-panel.js';
-import {productMockupFields,productMockupDraft,mockupInputName,mockupVideoInputName} from './admin-product-mockups.js';
+import {productMockupFields,productMockupDraft,mockupInputName,mockupVideoInputName,mockupVideoAutoplayName} from './admin-product-mockups.js';
 import {designProductMockups} from './catalog-product-mockups.js';
 import {catalogVideoFileError,optimizeCatalogVideo} from './video-optimization.js';
 import {legacyFeaturedVideoUrl} from './featured-design-video.js';
@@ -311,7 +311,7 @@ function filterCurrentView(query){
  if(empty)empty.hidden=visible>0;
 }
 
-function inventoryView(){renderInventory({root,shell,toast,products:adminData.productTypes})}
+function inventoryView(){renderInventory({root,shell,toast,products:adminData.productTypes,client:supabase})}
 
 function summaryView(){
  const activeModels=new Set(adminData.variants.filter(item=>item.active).map(item=>item.product_models?.code)).size;
@@ -810,6 +810,7 @@ function openDesignDialog(design){
   const name=mockupInputName(product.slug),photo=photos[product.slug];
   form.querySelector(`[data-mockup-name="${name}"]`).textContent=photo?.path?'Mockup actual; puedes reemplazarlo.':'Mockup pendiente para este producto.';
   showMockupPreview(form,name,photo?.path||'');setMockupFocus(form,name,photo?.focusX??50,photo?.focusY??50);
+  form.elements[mockupVideoAutoplayName(product.slug)].checked=photo?.autoplaySecond===true;
   showMockupVideo(form.elements[mockupVideoInputName(product.slug)],storedMockupVideo(design,product.slug));
  }
  const personalizationArrow=normalizeMockupFocus(design?.personalization_arrow_x,design?.personalization_arrow_y);
@@ -897,7 +898,7 @@ async function submitDesign(form,event){
  }
  const personalizationArrow=normalizeMockupFocus(values.get('personalization_arrow_x'),values.get('personalization_arrow_y'));
  const payload={collection_id:Number(values.get('collection_id')),name:String(values.get('name')).trim(),slug:slugify(values.get('slug')),caption:String(values.get('caption')).trim()||null,sample_color:sampleColor,allowed_colors:allowedColors.length?allowedColors:null,allowed_product_colors:Object.fromEntries(colorProductSlugs.map(slug=>[slug,allowedProductColors[slug]])),personalization_arrow_x:personalizationArrow.x,personalization_arrow_y:personalizationArrow.y,accepts_customer_image:values.get('accepts_customer_image')==='on',customer_photo_subject:values.get('accepts_customer_image')==='on'&&values.get('customer_photo_subject')==='people'?'people':'pets',is_featured:values.get('is_featured')==='on',active:values.get('active')==='on'};if(!payload.collection_id||!payload.name||!payload.slug){status.textContent='Completa colección, nombre y slug.';return}
- payload.product_mockups=productMockupDraft(current,adminData.productTypes,values);
+ payload.product_mockups=productMockupDraft(current,selected,values);
  payload.product_artworks=Object.fromEntries(selected.filter(product=>existing[product.slug]).map(product=>[product.slug,existing[product.slug]]));
  button.disabled=true;status.textContent='';
  try{

@@ -1,4 +1,4 @@
-export const MAX_CATALOG_VIDEO_BYTES = 3 * 1024 * 1024;
+export const MAX_CATALOG_VIDEO_BYTES = 5 * 1024 * 1024;
 const videoPath = /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*-video-[a-z0-9][a-z0-9-]*\.mp4$/i;
 export const isCatalogVideoPath = path => typeof path === 'string' && path.length <= 500 && videoPath.test(path);
 export const isCatalogMp4 = buffer => {

@@ -86,6 +86,15 @@ export function parseInventory(raw){
   ids.add(id);return {...item,id,updated_at:String(input.updated_at??'')};
  });
 }
+export function parseInventoryBackup(raw){
+ let backup;try{backup=JSON.parse(raw)}catch{throw new Error('Selecciona un respaldo JSON válido.');}
+ return parseInventory(JSON.stringify(Array.isArray(backup)?backup:backup?.format==='droska-inventory'&&backup.version===1?backup.items:null));
+}
+export function inventoryRecord(draft,previous){
+ const item=validateInventoryItem(draft);
+ if(item.product_type_slug==='poleras')item.name=inventoryShirtName(item.name);
+ return {...item,id:previous?.id||globalThis.crypto.randomUUID(),updated_at:new Date().toISOString()};
+}
 export function inventoryStore(storage){
  const read=()=>{try{return parseInventory(storage.getItem(INVENTORY_STORAGE_KEY))}catch(error){throw new Error(error.message||'No pudimos leer el inventario de este navegador.')}};
  const write=items=>{try{storage.setItem(INVENTORY_STORAGE_KEY,JSON.stringify(items))}catch{throw new Error('No pudimos guardar. Revisa el espacio y los permisos del navegador; tus cambios siguen en el formulario.')}};
@@ -104,13 +113,11 @@ export function inventoryStore(storage){
    return changes.size;
   },
   save(draft,previous=null){
-   const item=validateInventoryItem(draft),items=read();
-   if(item.product_type_slug==='poleras')item.name=inventoryShirtName(item.name);
+   const record=inventoryRecord(draft,previous),items=read();
    if(previous){
     const current=items.find(row=>row.id===previous.id);
     if(!current||JSON.stringify(current)!==JSON.stringify(previous))throw new Error('Este registro cambió en otra pestaña. Cierra y vuelve a abrirlo para editar la versión actual.');
    }
-   const record={...item,id:previous?.id||globalThis.crypto.randomUUID(),updated_at:new Date().toISOString()};
    write(previous?items.map(row=>row.id===previous.id?record:row):[record,...items]);return record;
   },
   remove(previous){
@@ -119,8 +126,7 @@ export function inventoryStore(storage){
    write(items.filter(row=>row.id!==previous.id));
   },
   restore(raw){
-   let backup;try{backup=JSON.parse(raw)}catch{throw new Error('Selecciona un respaldo JSON válido.');}
-   const restored=parseInventory(JSON.stringify(Array.isArray(backup)?backup:backup?.format==='droska-inventory'&&backup.version===1?backup.items:null));
+   const restored=parseInventoryBackup(raw);
    const items=read(),known=new Map(items.map(row=>[row.id,row]));let added=0;
    for(const row of restored){
     if(known.has(row.id)){if(JSON.stringify(known.get(row.id))!==JSON.stringify(row))throw new Error('El respaldo tiene versiones distintas de registros existentes. No se modificó el inventario.');continue;}

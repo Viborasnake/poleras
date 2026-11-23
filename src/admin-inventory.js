@@ -5,6 +5,7 @@ import {inventoryPageMarkup} from './admin-inventory-page.js';
 import {buildInventoryFilterField,inventoryFilterKeys,inventoryRangeKeys} from './admin-inventory-filters.js';
 import {mountAdminFormDisclosure,unmountAdminFormDisclosure,adminFormData} from './admin-form-disclosure.js';
 import {bindInventorySuggestions} from './admin-inventory-suggestions.js';
+import {sharedInventoryStore} from './shared-inventory.js';
 import './admin-inventory.css';
 
 const safe=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -23,14 +24,25 @@ export function renderInventory(context){
  const storage=context.storage||{getItem:key=>window.localStorage.getItem(key),setItem:(key,value)=>window.localStorage.setItem(key,value)};
  // Order notifications may refresh the shell; keep an inventory draft intact.
  if(root.querySelector('#inventory-dialog[open],#inventory-delete-dialog[open]'))return;
- const store=inventoryStore(storage);
- let items=[],loadError='';try{items=store.read()}catch(error){loadError=error.message}
- let maintenanceNotice='';
- if(!loadError)try{const renamed=store.removeShirtPrefixes(context.products||[]);if(renamed){items=store.read();maintenanceNotice=`${renamed} ${renamed===1?'nombre actualizado':'nombres actualizados'}: se quitó el prefijo Polera. Los demás datos se conservaron.`}}catch(error){maintenanceNotice=`No pudimos actualizar los nombres: ${error.message}`}
+ if(context.client&&!context.store){
+  if(root.querySelector('[data-inventory-loading]'))return;
+  const store=sharedInventoryStore(context.client,storage,context.products||[]);
+  shell('<section class="admin-panel admin-empty" data-inventory-loading aria-busy="true"><h1>Inventario</h1><p role="status">Cargando inventario…</p></section>','inventario');
+  const loading=root.querySelector('[data-inventory-loading]');
+  const finish=loadError=>{
+   if(loading.isConnected)renderInventory({...context,store,loadError});
+  };
+  void store.open().then(()=>finish(''),error=>finish(error.message));
+  return;
+ }
+ const store=context.store||inventoryStore(storage);
+ let items=[],loadError=context.loadError||'',maintenanceNotice=store.notice||'';
+ if(!loadError)try{items=store.read()}catch(error){loadError=error.message}
+ if(!loadError&&!context.client)try{const renamed=store.removeShirtPrefixes(context.products||[]);if(renamed){items=store.read();maintenanceNotice=`${renamed} ${renamed===1?'nombre actualizado':'nombres actualizados'}: se quitó el prefijo Polera. Los demás datos se conservaron.`}}catch(error){maintenanceNotice=`No pudimos actualizar los nombres: ${error.message}`}
  const products=[...(context.products||[])];
  for(const item of items){if(item.product_type_id&&!products.some(product=>String(product.id)===item.product_type_id))products.push(inventoryProduct(item,products))}
  const field=buildInventoryFilterField(items,products,state);
- shell(inventoryPageMarkup({state,field,sortOptions,editor:editorMarkup(products)}),'inventario');
+ shell(inventoryPageMarkup({state,field,sortOptions,editor:editorMarkup(products),shared:Boolean(context.client),localBackup:Boolean(store.localBackup)}),'inventario');
  bindAdminActions(root);
  const query=root.querySelector('#admin-search-input');
  const filters=root.querySelector('#inventory-filter-options');
@@ -79,7 +91,7 @@ export function renderInventory(context){
   results.innerHTML=loadError?`<div class="admin-empty" role="alert"><strong>No pudimos cargar el inventario.</strong><p>${safe(loadError)}</p><button type="button" class="admin-secondary" id="inventory-retry">Reintentar</button></div>`:!rows.length?`<div class="admin-empty"><strong>${items.length?'No hay lotes que coincidan.':'Aún no hay prendas registradas.'}</strong><p>${items.length?'Prueba otra búsqueda o limpia los filtros.':'Agrega tu primer lote para empezar a organizar tus prendas.'}</p></div>`:inventoryListMarkup(rows,state,products,field);
   root.querySelectorAll('.inventory-table').forEach(prepareAdminTable);
   for(const id of ['new-inventory-item','inventory-export'])root.querySelector(`#${id}`).disabled=Boolean(loadError)||(id==='inventory-export'&&!rows.length);
-  root.querySelector('#inventory-retry')?.addEventListener('click',()=>renderInventory(context));
+  root.querySelector('#inventory-retry')?.addEventListener('click',()=>renderInventory({...context,store:null,loadError:''}));
  }
  root.querySelector('#inventory-sort').onchange=event=>{state.sort=event.target.value;updateResults()};
  root.querySelector('#inventory-group-by').onchange=event=>{state.groupBy=event.target.value;updateResults()};
@@ -143,7 +155,9 @@ export function renderInventory(context){
  }
  form.elements.product_type_id.onchange=()=>{suggestions.close();syncEditorProduct()};
  for(const modal of [dialog,deletion]){
-  modal.querySelectorAll('.dialog-close,.dialog-cancel').forEach(button=>button.onclick=()=>modal.close());
+  const saving=()=>modal.querySelector('form').getAttribute('aria-busy')==='true';
+  modal.addEventListener('cancel',event=>{if(saving())event.preventDefault()});
+  modal.querySelectorAll('.dialog-close,.dialog-cancel').forEach(button=>button.onclick=()=>{if(!saving())modal.close()});
   modal.addEventListener('close',()=>{if(modal===dialog)unmountAdminFormDisclosure(form);if(!modal.isConnected)return;if(opener?.isConnected)opener.focus();else root.querySelector('#new-inventory-item')?.focus()});
  }
  function openEditor(item=null,trigger){
@@ -163,18 +177,41 @@ export function renderInventory(context){
    else{removing=item;opener=adminActionTrigger(trigger)||trigger;deletion.querySelector('[data-delete-description]').textContent=`${item.name} · ${item.brand} · ${item.color}${item.size?` · ${item.size}`:''} · ${item.quantity} unidades · ${item.location}`;deletion.querySelector('.admin-form-status').textContent='';deletion.showModal();deletion.querySelector('.dialog-cancel').focus()}
   }catch(error){toast(error.message)}
  };
- form.onsubmit=event=>{event.preventDefault();try{
+ function submitInventory(dialog,action,done){
+  const form=dialog.querySelector('form'),status=form.querySelector('.admin-form-status');
+  form.onsubmit=async event=>{
+   event.preventDefault();
+   const managesBusy=dialog===deletion;
+   if(managesBusy&&form.getAttribute('aria-busy')==='true')return;
+   const button=event.submitter||form.querySelector('[type="submit"]');
+   status.textContent='';
+   if(managesBusy){form.setAttribute('aria-busy','true');button.disabled=true}
+   try{
+    const result=await action(form);
+    if(!dialog.isConnected)return;
+    dialog.close();renderInventory(context);done(result);
+   }catch(error){status.textContent=error.message}
+   finally{if(managesBusy){form.removeAttribute('aria-busy');button.disabled=false}}
+  };
+ }
+ submitInventory(dialog,()=>{
   const draft=Object.fromEntries(adminFormData(form)),product=products.find(row=>String(row.id)===draft.product_type_id);
   if(!product)throw new Error('Selecciona un producto de la lista de Productos.');
   Object.assign(draft,{product_type_name:product.name,product_type_slug:product.slug,model_code:inventoryModelOptions(product).length?draft.model_code:({bodys:'body',totebags:'tote'}[product.slug]||'')});
-  const record=store.save(draft,editing);dialog.close();renderInventory(context);root.querySelector(`[data-edit-inventory="${CSS.escape(record.id)}"]`)?.focus();toast(editing?'Lote actualizado.':'Lote agregado al inventario.');
- }catch(error){form.querySelector('.admin-form-status').textContent=error.message}};
- deletion.querySelector('form').onsubmit=event=>{event.preventDefault();try{store.remove(removing);deletion.close();renderInventory(context);root.querySelector('#new-inventory-item').focus();toast('Lote eliminado.')}catch(error){deletion.querySelector('.admin-form-status').textContent=error.message}};
+  return store.save(draft,editing);
+ },record=>{
+  root.querySelector(`[data-edit-inventory="${CSS.escape(record.id)}"]`)?.focus();
+  toast(editing?'Lote actualizado.':'Lote agregado al inventario.');
+ });
+ submitInventory(deletion,()=>store.remove(removing),()=>{
+  root.querySelector('#new-inventory-item').focus();toast('Lote eliminado.');
+ });
  root.querySelector('#inventory-export').onclick=()=>{try{download(inventoryCsv(inventoryRows(store.read(),state,products),products),`inventario-${inventoryToday()}.csv`,'text/csv;charset=utf-8')}catch(error){toast(error.message)}};
  root.querySelector('#inventory-backup').onclick=()=>{try{download(loadError?storage.getItem(INVENTORY_STORAGE_KEY):inventoryBackup(store.read()),`respaldo-inventario-${inventoryToday()}.json`,'application/json')}catch(error){toast(error.message)}};
+ root.querySelector('#inventory-local-backup')?.addEventListener('click',()=>download(store.localBackup,`respaldo-local-inventario-${inventoryToday()}.json`,'application/json'));
  root.querySelector('#inventory-restore').onclick=()=>root.querySelector('#inventory-import').click();
  root.querySelector('#inventory-import').onchange=async event=>{
   const input=event.target,file=input.files[0],status=root.querySelector('#inventory-status');if(!file)return;
-  try{if(file.size>5*1024*1024)throw new Error('El respaldo debe pesar menos de 5 MB.');const added=store.restore(await file.text());renderInventory(context);toast(`${added} lotes restaurados. Los registros existentes se conservaron.`)}catch(error){status.textContent=error.message}finally{input.value=''}
+  try{if(file.size>5*1024*1024)throw new Error('El respaldo debe pesar menos de 5 MB.');const added=await store.restore(await file.text());if(!input.isConnected)return;renderInventory(context);toast(`${added} lotes restaurados. Los registros existentes se conservaron.`)}catch(error){status.textContent=error.message}finally{input.value=''}
  };
 }

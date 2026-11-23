@@ -1,7 +1,7 @@
 import {adminSearch,adminActions,adminFilters} from './admin-ui.js';
 import {inventoryFilterIcon,inventoryRangeKeys} from './admin-inventory-filters.js';
 
-export function inventoryPageMarkup({state,field,sortOptions,editor}){
+export function inventoryPageMarkup({state,field,sortOptions,editor,shared=false,localBackup=false}){
  const options=`
    <h2 class="inventory-filter-title">Filtrar lotes</h2>
    <div class="inventory-filter-content">
@@ -25,8 +25,8 @@ export function inventoryPageMarkup({state,field,sortOptions,editor}){
     <button type="button" class="admin-primary" popovertarget="inventory-filter-options" popovertargetaction="hide">Ver lotes</button>
    </div>`;
  return `<div class="inventory-page">
-  <div class="admin-page-heading inventory-heading"><div><span class="admin-eyebrow">PRODUCTOS</span><h1>Inventario</h1><p>Stock, precios y ubicaciones de tus productos.</p></div><div class="admin-page-heading-actions"><button type="button" class="admin-primary" id="new-inventory-item">＋ Agregar lote</button>${adminActions({id:'inventory-tools',items:`<button type="button" id="inventory-export">Exportar CSV</button><button class="admin-secondary" type="button" id="inventory-backup">Descargar respaldo</button><button type="button" id="inventory-restore">Restaurar respaldo</button>`})}</div></div>
-  <div class="inventory-local-bar"><span><i aria-hidden="true"></i>Guardado en este navegador</span><input type="file" accept="application/json,.json" id="inventory-import" hidden></div>
+  <div class="admin-page-heading inventory-heading"><div><span class="admin-eyebrow">PRODUCTOS</span><h1>Inventario</h1><p>Stock, precios y ubicaciones de tus productos.</p></div><div class="admin-page-heading-actions"><button type="button" class="admin-primary" id="new-inventory-item">＋ Agregar lote</button>${adminActions({id:'inventory-tools',items:`<button type="button" id="inventory-export">Exportar CSV</button><button class="admin-secondary" type="button" id="inventory-backup">Descargar respaldo</button>${localBackup?'<button type="button" id="inventory-local-backup">Descargar copia de este navegador</button>':''}<button type="button" id="inventory-restore">Restaurar respaldo</button>`})}</div></div>
+  <div class="inventory-local-bar"><span><i aria-hidden="true"></i>${shared?'Inventario compartido entre dispositivos':'Guardado en este navegador'}</span><input type="file" accept="application/json,.json" id="inventory-import" hidden></div>
   <p id="inventory-status" class="inventory-feedback" role="status" aria-live="polite"></p>
   <section class="inventory-metrics" aria-label="Resumen de todo el inventario"></section>
   <section class="admin-panel inventory-panel" aria-label="Lotes del inventario">

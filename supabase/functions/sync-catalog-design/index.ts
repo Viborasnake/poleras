@@ -97,7 +97,7 @@ Deno.serve(async request => {
       const form = await request.formData(), path = String(form.get('path') || ''), file = form.get('file')
       if (isCatalogVideoPath(path)) {
         if (!(file instanceof File) || file.type !== 'video/mp4' || !file.size || file.size > MAX_CATALOG_VIDEO_BYTES) {
-          return json({ error: 'El video optimizado debe ser MP4 y no superar 3 MB.' }, 400)
+          return json({ error: `El video optimizado debe ser MP4 y no superar ${MAX_CATALOG_VIDEO_BYTES / 1024 ** 2} MB.` }, 400)
         }
         const buffer = await file.arrayBuffer()
         if (!isCatalogMp4(buffer)) return json({ error: 'El archivo de video no es un MP4 válido.' }, 400)

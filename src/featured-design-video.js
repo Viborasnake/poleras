@@ -5,21 +5,33 @@ export const legacyFeaturedVideoUrl = videoUrl;
 export function createFeaturedDesignVideo() {
  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
  const mounts = new WeakMap();
- const tryLegacy = new Set();
- let played = false;
+ const candidates = new Set(), played = new Set();
+ let queued = false;
  let active = null;
+
+ function queueAutoplay() {
+  if (queued || active || document.hidden || reducedMotion.matches) return;
+  queued = true;
+  requestAnimationFrame(() => {
+   queued = false;
+   if (!active && !document.hidden && !reducedMotion.matches && !document.querySelector('dialog[open]')) {
+    for (const autoplay of candidates) if (autoplay()) break;
+   }
+  });
+ }
 
  document.addEventListener('visibilitychange', () => {
   if (document.hidden) active?.stop();
-  else tryLegacy.forEach(autoplay => autoplay());
+  else queueAutoplay();
  });
+ document.addEventListener('close', queueAutoplay, true);
  document.addEventListener('focusin', event => {
   const dialog = event.target.closest('dialog[open]');
   if (dialog && active && active.dialog !== dialog) active.stop();
  });
  reducedMotion.addEventListener('change', () => {
   if (reducedMotion.matches && active?.automatic) active.stop();
-  else if (!reducedMotion.matches) tryLegacy.forEach(autoplay => autoplay());
+  else queueAutoplay();
  });
 
  return (scope, enabled = true) => {
@@ -36,7 +48,7 @@ export function createFeaturedDesignVideo() {
    if (!control || !url || !video.canPlayType('video/mp4')) continue;
    let attempt = 0, ratio = 0;
    const entry = {dialog:video.closest('dialog'),automatic:false,stop};
-   const auto = video.hasAttribute('data-legacy-video-autoplay');
+   const auto = video.hasAttribute('data-featured-video-autoplay');
    const label = control.dataset.videoLabel || '';
    function controlText(text) {
     control.textContent = text;
@@ -44,7 +56,10 @@ export function createFeaturedDesignVideo() {
    }
    function stop() {
     attempt++;
-    if (active === entry) active = null;
+    if (active === entry) {
+     active = null;
+     queueAutoplay();
+    }
     video.pause();
     if (video.currentTime) video.currentTime = 0;
     video.classList.remove('is-playing');
@@ -61,7 +76,7 @@ export function createFeaturedDesignVideo() {
     if (active && active !== entry) active.stop();
     active = entry;
     host.dataset.videoActive = '';
-    if (auto) played = true;
+    if (auto) played.add(url);
     entry.automatic = automatic;
     const currentAttempt = ++attempt;
     controlText('Detener video');
@@ -87,21 +102,22 @@ export function createFeaturedDesignVideo() {
    entry.dialog?.addEventListener('close',stop,{signal});
 
    const autoplay = () => {
-    if (!played && !active && ratio >= .35 && !document.hidden &&
-        !reducedMotion.matches && !document.querySelector('dialog[open]')) void play(true);
+    if (played.has(url) || ratio < .35) return false;
+    void play(true);
+    return true;
    };
-   if (auto) tryLegacy.add(autoplay);
+   if (auto) candidates.add(autoplay);
    const observer = typeof IntersectionObserver === 'function'
     ? new IntersectionObserver(([position]) => {
       ratio = position.intersectionRatio;
       if (!position.isIntersecting && active === entry) stop();
-      if (auto) autoplay();
+      if (auto) queueAutoplay();
      },{threshold:[0,.35]})
     : null;
    observer?.observe(host);
    cleanup.push(() => {
     observer?.disconnect();
-    if (auto) tryLegacy.delete(autoplay);
+    if (auto) candidates.delete(autoplay);
     if (active === entry) stop();
     if (video.hasAttribute('src')) {
      video.removeAttribute('src');

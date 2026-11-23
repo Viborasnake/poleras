@@ -68,3 +68,16 @@ test('video stays with its product and can be removed independently of the photo
  assert.equal(designWithProductMockup({...mapped,productMockups:{poleras:{videoPath:'https://example.com/foreign.mp4'}}},'poleras').featuredVideo,'');
  assert.match(productMockupFields([{slug:'poleras',name:'Poleras'}]),/name="mockup_video_poleras"/);
 });
+
+test('the second home card preference is saved and cleared independently per product',()=>{
+ const products=[{slug:'poleras',name:'Poleras'},{slug:'totebags',name:'Totebags'}];
+ const current={product_mockups:{poleras:{path:'/shirt.webp'},totebags:{path:'/tote.webp',autoplaySecond:true}}};
+ const draft=productMockupDraft(current,[products[0]],new Map([['autoplay_second_mockup_video_poleras','on']]));
+ const configured={...current,product_mockups:draft};
+ assert.equal(designWithProductMockup(configured,'poleras').autoplaySecond,true);
+ assert.equal(designWithProductMockup(configured,'totebags').autoplaySecond,true);
+ const unchecked=productMockupDraft(configured,products,new Map());
+ assert.equal(unchecked.poleras.autoplaySecond,false);
+ assert.equal(unchecked.totebags.autoplaySecond,false);
+ assert.match(productMockupFields(products),/name="autoplay_second_mockup_video_poleras"/);
+});
