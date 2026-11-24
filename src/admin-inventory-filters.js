@@ -4,15 +4,6 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[char]);
 
-export const inventoryColumns = [
-  {key:'product', label:'Producto / marca', fields:['product_type_id','model_code','brand']},
-  {key:'variant', label:'Color / talla', fields:['color','size']},
-  {key:'price', label:'Precio unitario', fields:['priceMin','priceMax']},
-  {key:'quantity', label:'Cantidad', fields:['stock','quantityMin','quantityMax']},
-  {key:'date', label:'Ingreso', fields:['dateFrom','dateTo']},
-  {key:'location', label:'Ubicación / notas', fields:['location','notesQuery']},
-];
-
 const inputFields = {
   priceMin:['Precio desde','number'], priceMax:['Precio hasta','number'],
   quantityMin:['Unidades desde','number'], quantityMax:['Unidades hasta','number'],
@@ -26,7 +17,7 @@ const selectFields = {
 };
 
 export const inventoryRangeKeys = Object.keys(inputFields).filter(key => inputFields[key][1] !== 'search');
-export const inventoryFilterKeys = inventoryColumns.flatMap(column => column.fields);
+export const inventoryFilterKeys = ['product_type_id','model_code','stock',...Object.keys(selectFields),...Object.keys(inputFields)];
 export const inventoryFilterIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6 7v4l-4 2v-6z"/></svg>';
 
 export function buildInventoryFilterField(items, products, state) {
@@ -57,23 +48,4 @@ export function buildInventoryFilterField(items, products, state) {
     const [label,empty,choices] = options[key];
     return `<label class="admin-filter-field">${label}<select aria-label="${label}" ${attrs}><option value="">${empty}</option>${choices.map(([value,text]) => `<option value="${escapeHtml(value)}"${inventoryText(state[key]) === inventoryText(value) ? ' selected' : ''}>${escapeHtml(text)}</option>`).join('')}</select></label>`;
   };
-}
-
-export function inventoryColumnFilter(column, group, state, field) {
-  const id = `inventory-column-${group.code}-${column.key}`;
-  const active = column.fields.some(key => state[key] !== '');
-  return `<div class="admin-actions admin-filters inventory-column-filter">
-    <button type="button" class="inventory-column-trigger" popovertarget="${id}" data-inventory-column="${column.key}" data-inventory-group="${escapeHtml(group.key)}" aria-label="Filtrar por ${column.label}${active ? ' (activo)' : ''}">
-      <span>${column.label}</span>${inventoryFilterIcon}${active ? '<span class="inventory-column-active" aria-hidden="true">✓</span>' : ''}
-    </button>
-    <div class="admin-actions-popover admin-filter-popover inventory-filter-surface inventory-column-popover" id="${id}" popover>
-      <form class="inventory-column-form" aria-label="${column.label}" data-inventory-column-form="${column.key}">
-        <p class="inventory-filter-title">${column.label}</p>
-        <div class="inventory-column-fields">${column.fields.map(field).join('')}</div>
-        <div class="inventory-filter-actions">
-          <button type="button" data-inventory-clear-column${active ? '' : ' disabled'}>Limpiar</button>
-          <button type="submit" class="admin-primary" value="apply">Aplicar</button>
-        </div>
-      </form>
-    </div></div>`;
 }

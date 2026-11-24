@@ -47,32 +47,21 @@ export function renderInventory(context){
  const query=root.querySelector('#admin-search-input');
  const filters=root.querySelector('#inventory-filter-options');
  const results=root.querySelector('#inventory-results');
- const fields=scope=>[...scope.querySelectorAll('[data-inventory-filter]')];
- const filterTrigger=root.querySelector('[popovertarget="inventory-filter-options"]');
- function syncModelFilter(scope){
-  const productField=scope.querySelector('[name="product_type_id"]');
-  if(!productField)return;
-  const model=scope.querySelector('[name="model_code"]');
+ const fields=[...filters.querySelectorAll('[data-inventory-filter]')];
+ function syncModelFilter(){
+  const productField=filters.querySelector('[name="product_type_id"]');
+  const model=filters.querySelector('[name="model_code"]');
   const product=products.find(option=>String(option.id)===productField.value);
   model.disabled=Boolean(productField.value&&product?.slug!=='poleras');
   if(model.disabled)model.value='';
  }
- function checkRanges(scope){
+ function checkRanges(){
   for(const [min,max] of [['priceMin','priceMax'],['quantityMin','quantityMax'],['dateFrom','dateTo']]){
-   const lower=scope.querySelector(`[name="${min}"]`),upper=scope.querySelector(`[name="${max}"]`);
-   if(!lower||!upper)continue;
+   const lower=filters.querySelector(`[name="${min}"]`),upper=filters.querySelector(`[name="${max}"]`);
    const reversed=lower.value&&upper.value&&(lower.type==='number'?lower.valueAsNumber>upper.valueAsNumber:lower.value>upper.value);
    upper.setCustomValidity(reversed?'El límite final debe ser igual o mayor que el inicial.':'');
   }
-  return fields(scope).every(element=>element.reportValidity());
- }
- function syncFields(){
-  for(const element of fields(filters)){
-   const value=state[element.name];
-   if(element.value!==value)element.value=value;
-   element.setCustomValidity('');
-  }
-  syncModelFilter(filters);
+  return fields.every(element=>element.reportValidity());
  }
  root.querySelector('#inventory-status').textContent=maintenanceNotice;
  query.value=state.query;
@@ -88,7 +77,7 @@ export function renderInventory(context){
   filters.querySelector('[data-inventory-range-count]').textContent=activeRanges?`(${activeRanges})`:'';
   updateAdminFilterCount(root,'inventory-filter-options',activeFilters);
   root.querySelector('#inventory-clear').disabled=!activeFilters&&!state.query;
-  results.innerHTML=loadError?`<div class="admin-empty" role="alert"><strong>No pudimos cargar el inventario.</strong><p>${safe(loadError)}</p><button type="button" class="admin-secondary" id="inventory-retry">Reintentar</button></div>`:!rows.length?`<div class="admin-empty"><strong>${items.length?'No hay lotes que coincidan.':'Aún no hay prendas registradas.'}</strong><p>${items.length?'Prueba otra búsqueda o limpia los filtros.':'Agrega tu primer lote para empezar a organizar tus prendas.'}</p></div>`:inventoryListMarkup(rows,state,products,field);
+  results.innerHTML=loadError?`<div class="admin-empty" role="alert"><strong>No pudimos cargar el inventario.</strong><p>${safe(loadError)}</p><button type="button" class="admin-secondary" id="inventory-retry">Reintentar</button></div>`:!rows.length?`<div class="admin-empty"><strong>${items.length?'No hay lotes que coincidan.':'Aún no hay prendas registradas.'}</strong><p>${items.length?'Prueba otra búsqueda o limpia los filtros.':'Agrega tu primer lote para empezar a organizar tus prendas.'}</p></div>`:inventoryListMarkup(rows,state.groupBy,products);
   root.querySelectorAll('.inventory-table').forEach(prepareAdminTable);
   if(results.getAttribute('aria-busy')==='true')setStockBusy(true);
   for(const id of ['new-inventory-item','inventory-export'])root.querySelector(`#${id}`).disabled=Boolean(loadError)||(id==='inventory-export'&&!rows.length);
@@ -96,57 +85,26 @@ export function renderInventory(context){
  }
  root.querySelector('#inventory-sort').onchange=event=>{state.sort=event.target.value;updateResults()};
  root.querySelector('#inventory-group-by').onchange=event=>{state.groupBy=event.target.value;updateResults()};
- syncModelFilter(filters);
- for(const element of fields(filters))state[element.name]=element.value;
+ syncModelFilter();
+ for(const element of fields)state[element.name]=element.value;
  updateResults();
  filters.addEventListener('change',event=>{
   if(!event.target.matches('[data-inventory-filter]'))return;
-  syncModelFilter(filters);
-  if(!checkRanges(filters))return;
-  for(const element of fields(filters))state[element.name]=element.value.trim();
+  syncModelFilter();
+  if(!checkRanges())return;
+  for(const element of fields)state[element.name]=element.value.trim();
   updateResults();
  });
  root.querySelector('#inventory-clear').onclick=()=>{
   state.query=query.value='';
-  for(const key of inventoryFilterKeys)state[key]='';
-  syncFields();
+  for(const element of fields){
+   state[element.name]=element.value='';
+   element.setCustomValidity('');
+  }
+  syncModelFilter();
   updateResults();
   query.focus();
  };
- results.addEventListener('beforetoggle',event=>{
-  if(event.newState!=='open')return;
-  const form=event.target.querySelector('.inventory-column-form');
-  if(!form)return;
-  form.reset();
-  for(const element of fields(form))element.setCustomValidity('');
-  syncModelFilter(form);
- },true);
- results.addEventListener('change',event=>{
-  const form=event.target.closest('.inventory-column-form');
-  if(!form)return;
-  syncModelFilter(form);
-  if(event.target.type==='number'||event.target.type==='date')checkRanges(form);
- });
- function applyColumn(form,clear=false){
-  if(!clear&&!checkRanges(form))return;
-  const popover=form.closest('[popover]'),trigger=adminActionTrigger(popover);
-  const {inventoryColumn,inventoryGroup}=trigger.dataset;
-  for(const element of fields(form))state[element.name]=clear?'':element.value.trim();
-  popover.hidePopover();
-  syncFields();
-  updateResults();
-  const next=[...results.querySelectorAll('[data-inventory-column]')].find(button=>button.dataset.inventoryColumn===inventoryColumn&&button.dataset.inventoryGroup===inventoryGroup);
-  (next||filterTrigger).focus({preventScroll:Boolean(next)});
- }
- results.addEventListener('submit',event=>{
-  if(!event.target.matches('.inventory-column-form'))return;
-  event.preventDefault();
-  applyColumn(event.target);
- });
- results.addEventListener('click',event=>{
-  const button=event.target.closest('[data-inventory-clear-column]');
-  if(button)applyColumn(button.form,true);
- });
  const dialog=root.querySelector('#inventory-dialog'),form=dialog.querySelector('form'),deletion=root.querySelector('#inventory-delete-dialog');let editing=null,removing=null,opener=null;
  const suggestions=bindInventorySuggestions(form,()=>store.read());
  function syncEditorProduct(previous=form.elements.model_code.value){

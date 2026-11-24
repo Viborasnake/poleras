@@ -109,7 +109,7 @@ export function prepareAdminTable(table) {
           const label = document.createElement('span');
           label.className = 'admin-cell-label';
           label.ariaHidden = 'true';
-          label.textContent = (headings[index].querySelector('[data-admin-column-label]') || headings[index]).textContent;
+          label.textContent = headings[index].textContent;
           cell.prepend(label);
         }
       }

@@ -1,23 +1,20 @@
 import {adminActions} from './admin-ui.js';
-import {inventoryColumns,inventoryColumnFilter} from './admin-inventory-filters.js';
 import {PRODUCT_COLORS} from './product-colors.js';
 import {inventoryGroups,inventoryProductType,inventoryModelLabel,inventoryProduct,inventoryText} from './inventory.js';
 const safe=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const money=value=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(value);
 const date=value=>new Intl.DateTimeFormat('es-CL',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(`${value}T12:00:00Z`));
 const colorHexes=new Map(PRODUCT_COLORS.map(color=>[inventoryText(color.name),color.hex]));
+const columnLabels=['Producto / marca','Color / talla','Precio unitario','Cantidad','Ingreso','Ubicación / notas','Acciones'];
 function inventoryColorSwatch(value){
  const color=inventoryText(value);
  const hex=/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/.test(color)?color:colorHexes.get(color==='verde oliva'?'verde olivo':color);
  return `<span class="inventory-color"><span class="inventory-color-dot"${hex?` style="--inventory-color:${hex}"`:''} aria-hidden="true"></span>${safe(value)}</span>`;
 }
-export function inventoryListMarkup(rows,state,products,field){
- return inventoryGroups(rows,state.groupBy,products).map(group=>{
+export function inventoryListMarkup(rows,groupBy,products){
+ const headers=columnLabels.map(label=>`<th scope="col">${label}</th>`).join('');
+ return inventoryGroups(rows,groupBy,products).map(group=>{
   const titleId=`inventory-group-${group.code}`;
-  const headers=inventoryColumns.map(column=>`<th scope="col">
-   <span class="inventory-column-mobile-title" data-admin-column-label>${column.label}</span>
-   ${inventoryColumnFilter(column,group,state,field)}
-  </th>`).join('');
   const lots=group.items.map(row=>{
    const isShirt=inventoryProduct(row,products)?.slug==='poleras';
    const colorAndSize=`${safe(row.color)}, ${safe(row.size)}`;
@@ -48,7 +45,7 @@ export function inventoryListMarkup(rows,state,products,field){
    <div class="admin-table-wrap" aria-labelledby="${titleId}">
     <table class="admin-table inventory-table">
      <caption class="inventory-sr-only">${safe(group.name)}. Inventario de prendas. Precio unitario en pesos chilenos.</caption>
-     <thead><tr>${headers}<th scope="col">Acciones</th></tr></thead><tbody>${lots}</tbody>
+     <thead><tr>${headers}</tr></thead><tbody>${lots}</tbody>
     </table>
    </div>
   </section>`;
