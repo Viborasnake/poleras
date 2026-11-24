@@ -232,7 +232,9 @@ La tabla de precios usa los vínculos persistidos entre insumos y variantes como
 
 La talla comercial se configura en Productos → Tallas y se vincula al insumo desde su formulario. La categoría del insumo fija el producto y modelo; el nombre del proveedor no determina la talla. Precios publica únicamente las variantes del modelo y talla vinculados. Un insumo sin talla compatible nunca recibe todas las variantes del catálogo. Las tallas de adulto usan XS, S, M, L, XL, XXL y 3XL–9XL; Niños usa edades en años y Body rangos de meses. Tote Bag admite S, M y L. Las tallas sin insumo con precio publicado no se ofrecen en la tienda.
 
-La guía de tallas del estudio distingue polera unisex, mujer, oversize, niños, body y tote bag. Unisex y Niños usan las fichas Dogo Premium CA6502 y CA6502 N de Roly Chile, respectivamente. Las tablas de poleras indican el ancho y el largo de la prenda extendida. Las prendas usan tablas orientativas con enlace a la ficha de un modelo Roly comparable; no se presentan como medidas confirmadas del insumo publicado. Para tote bag muestra S 30 × 30, M 35 × 45 y G 45 × 45 cm; G corresponde a la talla comercial L. La guía se abre desde cada producto, usa una tabla legible y conserva los nombres accesibles de sus pestañas.
+La guía de tallas del estudio abre con el producto elegido en el flujo de compra. Un selector nativo permite consultar polera unisex, mujer, oversize, niños, body y tote bag. La tabla usa columnas separadas para talla, ancho y largo en centímetros, o alto en el caso de la bolsa. La sección «¿Cómo tomo las medidas?» recomienda medir una prenda que ya quede bien, muestra los puntos de referencia y se abre inicialmente en escritorio. En móvil parte plegada y queda a mano antes de la tabla. La tabla y los controles adoptan las superficies del tema activo.
+
+Las medidas de prendas son orientativas y enlazan la ficha de un modelo Roly comparable. Unisex y Niños usan las fichas Dogo Premium CA6502 y CA6502 N de Roly Chile. Para tote bag se muestran S 30 × 30, M 35 × 45 y G 45 × 45 cm. G corresponde a la talla comercial L.
 
 ## 6. Implementación y mantenimiento
 

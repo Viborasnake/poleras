@@ -106,23 +106,26 @@ const adultShirtKinds=new Set(['basic','over','woman']);
 let productSizeCatalog=createProductSizeCatalog();
 const sizeLabel=(kind,size)=>productSizeLabel(productSizeCatalog,kind,size);
 const sortAvailableSizes=(kind,available)=>sortProductSizes(productSizeCatalog,kind,available);
-let activeSizeGuideKind='basic',shirtGuideSvg='';
-function syncSizeGuideLabels(kind=activeSizeGuideKind){
- const guide=document.querySelector('#size-guide-modal');if(!guide)return;
- activeSizeGuideKind=sizeGuideReferences[kind]?kind:'basic';
- const reference=sizeGuideReferences[activeSizeGuideKind];
- const body=guide.querySelector('.size-guide-body'),visual=guide.querySelector('.measure-visual');
- if(!shirtGuideSvg)shirtGuideSvg=visual.querySelector('svg')?.outerHTML||'';
- let tabs=guide.querySelector('.size-guide-tabs');
- if(!tabs){tabs=document.createElement('div');tabs.className='size-guide-tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Tipo de producto');guide.querySelector('.size-guide-header').after(tabs)}
- tabs.innerHTML=Object.entries(sizeGuideReferences).map(([code,item])=>`<button type="button" data-guide-kind="${code}" aria-pressed="${code===activeSizeGuideKind}">${item.name}</button>`).join('');
- if(!guide.dataset.guideBound){guide.addEventListener('click',event=>{const button=event.target.closest('[data-guide-kind]');if(button)syncSizeGuideLabels(button.dataset.guideKind)});guide.dataset.guideBound='true'}
- const tote=activeSizeGuideKind==='tote',isShirt=!['tote','body'].includes(activeSizeGuideKind);
- visual.innerHTML=`${isShirt?shirtGuideSvg:`<div class="measure-symbol">${productFamilyIcon(reference.family)}</div>`}<div class="measure-caption"><strong>${tote?'Ancho × alto':isShirt?'Medida A · ancho':'Ancho × largo'}</strong><span>Medidas en centímetros, con la prenda extendida y sin estirar.</span></div>`;
- const steps=tote?['Extiende la bolsa sobre una superficie plana.','Mide el ancho y el alto de la bolsa, sin contar las asas.','Compara ambas medidas con la tabla.']:['Busca una prenda similar que te quede como te gusta.','Extiéndela plana sobre una mesa, sin estirar la tela.','Compara su ancho y largo con la tabla.'];
- body.querySelector('.measure-steps').innerHTML=steps.map((step,index)=>`<li><b>${index+1}</b><span>${step}</span></li>`).join('');
- body.querySelector('.visual-size-table').innerHTML=`<table><caption class="sr-only">Medidas de referencia para ${reference.name}</caption><thead><tr><th scope="col">Talla</th><th scope="col">${tote?'Ancho × alto':'Ancho × largo'} (cm)</th></tr></thead><tbody>${reference.rows.map(([size,measure])=>`<tr><th scope="row">${size}</th><td>${measure}</td></tr>`).join('')}</tbody></table>`;
- body.querySelector('.measure-note').innerHTML=reference.source?`Medidas orientativas de <a href="${reference.url}" target="_blank" rel="noopener noreferrer">${reference.source}</a>. ${reference.inferred?'Los rangos de meses se aproximan a sus tallas de 3, 6, 12 y 18 meses. ':''}La prenda que use Droska puede variar; confirma las medidas antes de comprar.`:'Medidas de tote bag indicadas por Droska. La talla comercial L corresponde a G en esta guía.';
+function renderSizeGuide(guide,kind){
+ const reference=sizeGuideReferences[kind];
+ const isTote=kind==='tote',isBody=kind==='body';
+ const lengthLabel=isTote?'Alto':'Largo';
+ guide.querySelector('#size-guide-product').value=kind;
+ guide.querySelector('.measure-visual').hidden=isTote||isBody;
+ guide.querySelector('.measure-tip').textContent=isTote
+  ?'Pon una bolsa similar sobre una mesa y compárala con la tabla.'
+  :`Busca ${isBody?'un body':'una polera'} que ya ${kind==='kids'||isBody?'le':'te'} quede bien. Extiéndel${isBody?'o':'a'} sobre una mesa, sin estirar la tela, y compara las medidas con la tabla.`;
+ guide.querySelector('.measure-width').textContent=isTote?'De un costado al otro de la bolsa.':'De axila a axila, en línea recta.';
+ guide.querySelector('.measure-length-label').textContent=lengthLabel;
+ guide.querySelector('.measure-length').textContent=isTote?'Desde la abertura hasta la base, sin contar las asas.':isBody?'Desde el hombro hasta el broche, con el body cerrado.':'Desde la parte alta del hombro hasta el borde inferior.';
+ guide.querySelector('.visual-size-table').innerHTML=`<table>
+  <caption class="sr-only">Medidas de referencia para ${reference.name}</caption>
+  <thead><tr><th scope="col">Talla</th><th scope="col">Ancho (cm)</th><th scope="col">${lengthLabel} (cm)</th></tr></thead>
+  <tbody>${reference.rows.map(([size,width,length])=>`<tr><th scope="row">${size}</th><td>${width}</td><td>${length}</td></tr>`).join('')}</tbody>
+ </table>`;
+ guide.querySelector('.measure-note').innerHTML=reference.source
+  ?`Medidas de referencia. Pueden variar según la prenda.${reference.inferred?' Los rangos de meses son aproximados.':''} <a href="${reference.url}" target="_blank" rel="noopener noreferrer">Ficha de ${reference.source}</a>.`
+  :'La talla L de la tienda corresponde a G en esta guía.';
 }
 const products={basic:{name:'Básica',family:'men',price:14990,sizes:[...garmentSizes]},over:{name:'Oversize',family:'men',price:21990,sizes:[...garmentSizes]},woman:{name:'Básica mujer',family:'women',price:14990,sizes:[...garmentSizes]},kids:{name:'Niños',family:'kids',price:8990,sizes:[]},body:{name:'Body bebé',family:'body',price:null,sizes:[]},tote:{name:'Tote bag',family:'tote',price:8990,prices:{M:8990,L:9900},sizes:['M','L']}};
 const productFamilies=[
@@ -220,7 +223,40 @@ document.querySelector('#app').innerHTML=`
 </footer>
 <dialog id="studio"><div class="dialog-header"><a class="logo" href="#">polerama<span>✳</span></a><span>TU ESTUDIO CREATIVO</span><button class="icon-btn close-button" data-close aria-label="Cerrar estudio"><span aria-hidden="true"></span></button></div><div class="studio-body"><div class="preview"><div id="reference-panel"></div><div id="live-preview" hidden><span class="eyebrow">UNA VISTA A TU PRÓXIMA FAVORITA</span><div id="viewer"><div class="shirt preview-fallback"><div class="shirt-neck"></div><img alt="Tu diseño sobre la polera" hidden/></div></div><button type="button" class="viewer-fullscreen-trigger" id="open-fullscreen-viewer" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg><span>Ver diseño en grande</span></button></div><section id="checkout-cart-preview" class="checkout-cart-preview" hidden></section></div><div class="studio-controls"><div class="steps" aria-label="Progreso del diseño"></div><form id="design-form"><div id="step-content"></div><div class="form-navigation"><button type="button" id="back" class="small-button">Volver</button><button type="submit" class="button dark" id="next">Siguiente</button></div><p class="checkout-progress" id="checkout-progress" role="status" aria-live="polite" hidden></p></form></div></div></dialog>
 <dialog id="fullscreen-viewer" class="fullscreen-viewer-dialog" aria-labelledby="fullscreen-viewer-title"><header class="fullscreen-viewer-header"><div><span class="eyebrow">VISTA DE DISEÑO</span><h2 id="fullscreen-viewer-title">Tu diseño en detalle</h2></div><button type="button" class="fullscreen-viewer-close" id="close-fullscreen-viewer" aria-label="Cerrar vista ampliada"></button></header><div id="fullscreen-viewer-canvas" class="fullscreen-viewer-canvas"><span>Preparando vista…</span></div><div class="fullscreen-viewer-toolbar" aria-label="Controles de vista"><div class="fullscreen-zoom-controls"><button type="button" id="fullscreen-zoom-out" aria-label="Alejar el diseño">−</button><output id="fullscreen-zoom-status" aria-live="polite">0%</output><button type="button" id="fullscreen-zoom-in" aria-label="Acercar el diseño">+</button></div><button type="button" id="fullscreen-reset-view" class="fullscreen-reset-view">Restablecer</button></div><p class="fullscreen-viewer-hint">Arrastra para girar la prenda. Usa los controles para acercar el diseño.</p></dialog>
-<dialog id="size-guide-modal" aria-labelledby="size-guide-title"><div class="size-guide-header"><div><span class="eyebrow">GUÍA DE TALLAS</span><h2 id="size-guide-title">Encuentra tu medida.</h2></div><button type="button" class="icon-btn close-button" data-size-close aria-label="Cerrar guía de tallas"><span aria-hidden="true"></span></button></div><div class="size-guide-body"><div class="measure-visual"><svg viewBox="0 0 420 390" role="img" aria-labelledby="measure-title measure-desc"><title id="measure-title">Medición del ancho de una polera</title><desc id="measure-desc">La polera se mide en línea recta desde una axila hasta la otra.</desc><path class="measure-shirt" d="M133 55 174 34c9 21 63 21 72 0l41 21 75 60-45 63-34-24v195H137V154l-34 24-45-63 75-60Z"/><path class="measure-neck" d="M174 34c5 35 67 35 72 0"/><path class="measure-line" d="M137 158H283"/><path class="measure-arrow" d="m137 158 16-11m-16 11 16 11m130-11-16-11m16 11-16 11"/><circle cx="137" cy="158" r="6"/><circle cx="283" cy="158" r="6"/><text x="210" y="138" text-anchor="middle">AXILA A AXILA</text><text class="measure-a" x="210" y="190" text-anchor="middle">A</text></svg><div class="measure-caption"><strong>Medida A · Ancho</strong><span>Siempre en línea recta, sin estirar la tela.</span></div></div><div class="measure-info"><ol class="measure-steps"><li><b>1</b><span>Busca una polera que te quede como te gusta.</span></li><li><b>2</b><span>Extiéndela plana sobre una mesa.</span></li><li><b>3</b><span>Mide de axila a axila y compara el resultado.</span></li></ol><div class="visual-size-table"></div><p class="measure-note"></p></div></div></dialog>
+<dialog id="size-guide-modal" aria-labelledby="size-guide-title">
+ <header class="size-guide-header">
+  <h2 id="size-guide-title">Guía de tallas</h2>
+  <button type="button" class="icon-btn close-button" data-size-close aria-label="Cerrar guía de tallas"><span aria-hidden="true"></span></button>
+ </header>
+ <div class="size-guide-body">
+  <div class="size-guide-product">
+   <label for="size-guide-product">Producto</label>
+   <select id="size-guide-product" class="ds-field">${Object.entries(sizeGuideReferences).map(([kind,reference])=>`<option value="${kind}">${reference.name}</option>`).join('')}</select>
+  </div>
+  <details class="size-guide-help">
+   <summary>¿Cómo tomo las medidas?</summary>
+   <div class="size-guide-help-content">
+    <p class="measure-tip"></p>
+    <div class="measure-visual">
+     <svg viewBox="0 0 385 300" aria-hidden="true">
+      <path class="measure-shirt" d="M112 47 144 27c11 21 53 21 64 0l32 20 63 51-34 48-29-21v148H112V125l-29 21-34-48 63-51Z"/>
+      <path class="measure-neck" d="M144 27c5 31 59 31 64 0"/>
+      <path class="measure-line" d="M112 130h128m-128 0 10-7m-10 7 10 7m118-7-10-7m10 7-10 7M314 27v246m0-246-7 10m7-10 7 10m-7 236-7-10m7 10 7-10"/>
+      <path class="measure-guide-line" d="M212 27h92m-59 246h59"/>
+      <text x="176" y="118" text-anchor="middle">Ancho</text>
+      <text x="325" y="150" dominant-baseline="middle">Largo</text>
+     </svg>
+    </div>
+    <dl class="measure-directions">
+     <div><dt>Ancho</dt><dd class="measure-width"></dd></div>
+     <div><dt class="measure-length-label"></dt><dd class="measure-length"></dd></div>
+    </dl>
+   </div>
+  </details>
+  <div class="visual-size-table"></div>
+  <p class="measure-note"></p>
+ </div>
+</dialog>
 <dialog id="space"><div class="dialog-header"><h2>Tu espacio creativo</h2><button data-close class="icon-btn close-button" aria-label="Cerrar"><span aria-hidden="true"></span></button></div><div class="space-content"><span class="eyebrow">TUS IDEAS VIVEN AQUÍ</span><p>Desde aquí puedes seguir tus pedidos, revisar propuestas y volver a tu estudio creativo.</p><div id="saved-request"></div><button class="button dark" id="space-create">Abrir el estudio ↗</button></div></dialog>
 <dialog id="payment-modal" class="mp-payment-modal" aria-labelledby="payment-title"><div id="payment-content"></div></dialog><div id="toast" role="status"></div>`;
 function openDialog(dialog){
@@ -291,7 +327,7 @@ async function loadProductPricesOnce(){
   ]);
   if(variantsResult.error)throw variantsResult.error;
   if(sizesResult.error)console.warn('No pudimos cargar los nombres de talla configurados:',sizesResult.error);
-  else{productSizeCatalog=createProductSizeCatalog(sizesResult.data||[]);syncSizeGuideLabels()}
+  else productSizeCatalog=createProductSizeCatalog(sizesResult.data||[]);
   const data=normalizeVariantRows(variantsResult.data||[]);
   if(!data.length)throw new Error('No hay variantes publicadas.');
   variantRows=data;variantLoadStatus='ready';
@@ -2093,8 +2129,16 @@ function renderStep(){
  document.querySelectorAll('[data-product]').forEach(button=>button.onclick=()=>selectProductKind(button.dataset.product));
  document.querySelectorAll('[data-size]').forEach(b=>b.onclick=()=>{state.size=b.dataset.size;reconcileVariant(selectedCatalogDesign()?.sampleColor,true);confirmDetail('size');persistDraft();renderStep()});
  document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{state.color=b.dataset.color;reconcileVariant();confirmDetail('color');persistDraft();renderStep();viewer?.update(previewState())});
- const guide=document.querySelector('#size-guide-modal');const openGuide=document.querySelector('#open-size-guide');if(openGuide)openGuide.onclick=()=>{syncSizeGuideLabels(state.kind);guide.showModal()};
- guide.querySelectorAll('[data-size-close]').forEach(button=>button.onclick=()=>guide.close());
+ const guide=document.querySelector('#size-guide-modal');
+ const openGuide=document.querySelector('#open-size-guide');
+ if(openGuide)openGuide.onclick=()=>{
+  renderSizeGuide(guide,state.kind);
+  guide.querySelector('.size-guide-help').open=window.matchMedia('(min-width: 701px)').matches;
+  guide.scrollTop=0;
+  guide.showModal();
+ };
+ guide.querySelector('#size-guide-product').onchange=event=>renderSizeGuide(guide,event.currentTarget.value);
+ guide.querySelector('[data-size-close]').onclick=()=>guide.close();
  document.querySelectorAll('[data-view-side]').forEach(b=>b.onclick=()=>{activateSide(b.dataset.viewSide);renderStep();faceSelectedSide()});
  document.querySelectorAll('[data-view-print-layer]').forEach(button=>button.onclick=()=>{const id=button.dataset.viewPrintLayer;if(id.startsWith('primary-'))activateSide(id.replace('primary-',''));else activateAdditionalPrint(id);renderStep();faceSelectedSide()});
  document.querySelectorAll('[data-remove-side]').forEach(b=>b.onclick=()=>{removeSide(b.dataset.removeSide);renderStep();toast('Archivo eliminado.')});
