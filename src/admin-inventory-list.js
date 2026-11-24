@@ -22,11 +22,16 @@ export function inventoryListMarkup(rows,state,products,field){
    const isShirt=inventoryProduct(row,products)?.slug==='poleras';
    const colorAndSize=`${safe(row.color)}, ${safe(row.size)}`;
    const lotLabel=`${safe(row.name)}, ${colorAndSize}`;
+   const stockLabel=safe([row.name,row.brand,row.color,row.size&&`talla ${row.size}`].filter(Boolean).join(', '));
    return `<tr>
     <td><div><strong>${safe(row.name)}</strong><small>${safe(row.brand)} · ${safe(inventoryProductType(row,products))}${isShirt?` · ${safe(inventoryModelLabel(row))}`:''}</small></div></td>
     <td>${inventoryColorSwatch(row.color)}<small>${row.size?`Talla ${safe(row.size)}`:'Sin talla registrada'}</small></td>
     <td>${money(row.price)}</td>
-    <td><strong>${row.quantity}</strong> <span class="inventory-stock">${row.quantity?'unidades':'· Sin stock'}</span></td>
+    <td><div class="ds-quantity inventory-stock-stepper" role="group" aria-label="Stock de ${stockLabel}">
+     <button type="button" data-stock-id="${safe(row.id)}" data-stock-change="-1" aria-label="Bajar stock de ${stockLabel} en una unidad" title="Bajar stock en una unidad"${row.quantity===0?' disabled':''}>−</button>
+     <strong>${row.quantity}<span class="inventory-sr-only"> ${row.quantity===1?'unidad':'unidades'}</span></strong>
+     <button type="button" data-stock-id="${safe(row.id)}" data-stock-change="1" aria-label="Subir stock de ${stockLabel} en una unidad" title="Subir stock en una unidad">+</button>
+    </div>${row.quantity===0?'<small>Sin stock</small>':''}</td>
     <td><time datetime="${row.date}">${date(row.date)}</time></td>
     <td>${safe(row.location)}${row.notes?`<small class="inventory-notes">${safe(row.notes)}</small>`:''}</td>
     <td><div class="row-actions">

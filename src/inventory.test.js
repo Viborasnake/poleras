@@ -24,6 +24,21 @@ test('un cambio posterior en otra pestaña bloquea edición y eliminación de la
  assert.throws(()=>store.save({...draft,quantity:2},first),/otra pestaña/);
  assert.throws(()=>store.remove(first),/otra pestaña/);assert.equal(store.read()[0].quantity,9);
 });
+test('el acceso directo ajusta solo una unidad y conserva el lote al llegar a cero',()=>{
+ const original={...draft,id:'stock',quantity:1,brand:'Gildan',updated_at:'2026-01-01T12:00:00Z',extra:'registro anterior'};
+ const storage=setup(JSON.stringify([original])),store=inventoryStore(storage);
+ const [before]=store.read();
+ const empty=store.adjustStock(before,-1);
+ assert.equal(empty.quantity,0);
+ assert.equal(store.read().length,1);
+ assert.notEqual(empty.updated_at,original.updated_at);
+ assert.deepEqual(JSON.parse(storage.raw())[0],{...original,quantity:0,updated_at:empty.updated_at});
+ assert.throws(()=>store.adjustStock(empty,-1),/sin stock/);
+ assert.throws(()=>store.adjustStock(empty,2),/una unidad/);
+ assert.throws(()=>store.adjustStock(before,1),/otra pestaña/);
+ assert.equal(store.read()[0].quantity,0);
+ assert.equal(store.adjustStock(empty,1).quantity,1);
+});
 test('el respaldo no pisa versiones distintas ni importa parcialmente',()=>{
  const store=inventoryStore(setup()),first=store.save(draft);
  const backup=inventoryBackup([{...first,id:'nuevo'}, {...first,quantity:90}]);

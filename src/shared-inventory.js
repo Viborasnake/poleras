@@ -1,4 +1,4 @@
-import {INVENTORY_STORAGE_KEY, inventoryProduct, inventoryRecord, inventoryShirtName, parseInventory, parseInventoryBackup} from './inventory.js';
+import {INVENTORY_STORAGE_KEY, inventoryProduct, inventoryRecord, inventoryShirtName, inventoryStockRecord, parseInventory, parseInventoryBackup} from './inventory.js';
 
 const migrationKey=`${INVENTORY_STORAGE_KEY}-shared-v1`;
 const pageSize=500;
@@ -48,11 +48,14 @@ export function sharedInventoryStore(client,storage,products){
  }
 
  async function update(previous,changes){
+  const current=rows.get(previous.id);
+  const conflict='Este lote cambió en otro dispositivo. Recarga el inventario y vuelve a intentarlo.';
+  if(current?.lot!==previous)throw new Error(conflict);
   const {data,error}=await table().update({...changes,revision:crypto.randomUUID()})
-   .eq('id',previous.id).eq('revision',rows.get(previous.id).revision).eq('deleted',false)
+   .eq('id',previous.id).eq('revision',current.revision).eq('deleted',false)
    .select(columns).maybeSingle();
   if(error)throw new Error(error.message);
-  if(!data)throw new Error('Este lote cambió en otro dispositivo. Recarga el inventario y vuelve a intentarlo.');
+  if(!data)throw new Error(conflict);
   return data;
  }
 
@@ -69,6 +72,11 @@ export function sharedInventoryStore(client,storage,products){
     if(error)throw new Error(error.message);
     rows.set(lot.id,data);
    }
+   return lot;
+  },
+  async adjustStock(previous,change){
+   const lot=inventoryStockRecord(previous,change);
+   rows.set(lot.id,await update(previous,{lot}));
    return lot;
   },
   async remove(previous){

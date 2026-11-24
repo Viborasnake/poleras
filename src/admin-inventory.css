@@ -32,7 +32,11 @@
 .inventory-table td:first-child { display:table-cell; min-width:180px; }
 .inventory-table td small { display:block; margin-top:5px; color:var(--ds-text-secondary); font-size:12px; }
 .inventory-table .inventory-notes { white-space:pre-wrap; line-height:1.5; }
-.inventory-stock { color:var(--ds-text-secondary); font-size:12px; }
+.inventory-table .inventory-stock-stepper { display:inline-flex; gap:0; padding:0; max-width:100%; border-radius:var(--ds-radius-control); }
+.inventory-table .inventory-stock-stepper strong { min-width:26px; text-align:center; overflow-wrap:anywhere; }
+.inventory-table .inventory-stock-stepper button { flex:0 0 44px; width:44px; height:44px; border-radius:var(--ds-radius-control); cursor:pointer; }
+.inventory-table .inventory-stock-stepper button:focus-visible { outline-offset:-3px; }
+.inventory-table .inventory-stock-stepper button:is(:disabled,[aria-disabled="true"]) { background:var(--ds-surface-disabled); color:var(--ds-text-disabled); cursor:default; }
 .inventory-table .row-actions button { min-height:44px; font-size:12px; }
 .admin-inventory-dialog { width:min(700px,calc(100vw - 30px)); }
 .admin-inventory-dialog .admin-form-grid:empty { display:none; }

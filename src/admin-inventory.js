@@ -23,7 +23,7 @@ export function renderInventory(context){
  const {root,shell,toast}=context;
  const storage=context.storage||{getItem:key=>window.localStorage.getItem(key),setItem:(key,value)=>window.localStorage.setItem(key,value)};
  // Order notifications may refresh the shell; keep an inventory draft intact.
- if(root.querySelector('#inventory-dialog[open],#inventory-delete-dialog[open]'))return;
+ if(root.querySelector('#inventory-dialog[open],#inventory-delete-dialog[open],#inventory-results[aria-busy="true"]'))return;
  if(context.client&&!context.store){
   if(root.querySelector('[data-inventory-loading]'))return;
   const store=sharedInventoryStore(context.client,storage,context.products||[]);
@@ -90,6 +90,7 @@ export function renderInventory(context){
   root.querySelector('#inventory-clear').disabled=!activeFilters&&!state.query;
   results.innerHTML=loadError?`<div class="admin-empty" role="alert"><strong>No pudimos cargar el inventario.</strong><p>${safe(loadError)}</p><button type="button" class="admin-secondary" id="inventory-retry">Reintentar</button></div>`:!rows.length?`<div class="admin-empty"><strong>${items.length?'No hay lotes que coincidan.':'Aún no hay prendas registradas.'}</strong><p>${items.length?'Prueba otra búsqueda o limpia los filtros.':'Agrega tu primer lote para empezar a organizar tus prendas.'}</p></div>`:inventoryListMarkup(rows,state,products,field);
   root.querySelectorAll('.inventory-table').forEach(prepareAdminTable);
+  if(results.getAttribute('aria-busy')==='true')setStockBusy(true);
   for(const id of ['new-inventory-item','inventory-export'])root.querySelector(`#${id}`).disabled=Boolean(loadError)||(id==='inventory-export'&&!rows.length);
   root.querySelector('#inventory-retry')?.addEventListener('click',()=>renderInventory({...context,store:null,loadError:''}));
  }
@@ -170,7 +171,41 @@ export function renderInventory(context){
   dialog.showModal();mountAdminFormDisclosure(form,'inventory',{specs,editableSections:Boolean(item)});
  }
  root.querySelector('#new-inventory-item').onclick=event=>openEditor(null,event.currentTarget);
- root.querySelector('#inventory-results').onclick=event=>{
+ function setStockBusy(busy){
+  if(busy)results.setAttribute('aria-busy','true');
+  else results.removeAttribute('aria-busy');
+  for(const button of results.querySelectorAll('[data-stock-change]')){
+   if(busy)button.setAttribute('aria-disabled','true');
+   else button.removeAttribute('aria-disabled');
+  }
+ }
+ async function adjustStock(trigger){
+  if(trigger.disabled||results.getAttribute('aria-busy')==='true')return;
+  setStockBusy(true);
+  let record;
+  try{
+   const lot=store.read().find(row=>row.id===trigger.dataset.stockId);
+   if(!lot)throw new Error('El lote ya no existe. Actualiza el inventario.');
+   record=await store.adjustStock(lot,Number(trigger.dataset.stockChange));
+  }catch(error){
+   if(results.isConnected)toast(error.message);
+   return;
+  }finally{setStockBusy(false)}
+  if(!results.isConnected)return;
+  const focusedStock=results.contains(document.activeElement)?document.activeElement.closest('[data-stock-change]'):null;
+  items=store.read();
+  updateResults();
+  if(focusedStock){
+   const {stockId,stockChange}=focusedStock.dataset;
+   const sameLot=`[data-stock-id="${CSS.escape(stockId)}"]:not(:disabled)`;
+   const next=results.querySelector(`${sameLot}[data-stock-change="${stockChange}"]`)||results.querySelector(sameLot)||query;
+   next.focus({preventScroll:true});
+  }
+  root.querySelector('#inventory-status').textContent=`${record.name} · ${record.quantity} ${record.quantity===1?'unidad disponible':'unidades disponibles'}.`;
+ }
+ results.onclick=event=>{
+  const stockButton=event.target.closest('[data-stock-change]');
+  if(stockButton){void adjustStock(stockButton);return}
   const trigger=event.target.closest('[data-edit-inventory],[data-delete-inventory]');if(!trigger)return;
   try{const item=store.read().find(row=>row.id===(trigger.dataset.editInventory||trigger.dataset.deleteInventory));if(!item)throw new Error('El registro ya no existe. Actualiza el inventario.');
    if(trigger.dataset.editInventory)openEditor(item,trigger);

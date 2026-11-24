@@ -108,6 +108,13 @@ export function inventoryRecord(draft,previous){
  if(item.product_type_slug==='poleras')item.name=inventoryShirtName(item.name);
  return {...item,id:previous?.id||globalThis.crypto.randomUUID(),updated_at:new Date().toISOString()};
 }
+export function inventoryStockRecord(lot,change){
+ if(change!==1&&change!==-1)throw new Error('Ajusta el stock de a una unidad.');
+ const quantity=lot.quantity+change;
+ if(quantity<0)throw new Error('Este lote ya está sin stock.');
+ if(!Number.isSafeInteger(quantity)||!Number.isSafeInteger(lot.price*quantity))throw new Error('El stock supera el máximo permitido.');
+ return {...lot,quantity,updated_at:new Date().toISOString()};
+}
 export function inventoryStore(storage){
  const read=()=>{try{return parseInventory(storage.getItem(INVENTORY_STORAGE_KEY))}catch(error){throw new Error(error.message||'No pudimos leer el inventario de este navegador.')}};
  const write=items=>{try{storage.setItem(INVENTORY_STORAGE_KEY,JSON.stringify(items))}catch{throw new Error('No pudimos guardar. Revisa el espacio y los permisos del navegador; tus cambios siguen en el formulario.')}};
@@ -132,6 +139,14 @@ export function inventoryStore(storage){
     if(!current||JSON.stringify(current)!==JSON.stringify(previous))throw new Error('Este registro cambió en otra pestaña. Cierra y vuelve a abrirlo para editar la versión actual.');
    }
    write(previous?items.map(row=>row.id===previous.id?record:row):[record,...items]);return record;
+  },
+  adjustStock(previous,change){
+   const raw=storage.getItem(INVENTORY_STORAGE_KEY),items=parseInventory(raw);
+   const current=items.find(row=>row.id===previous.id);
+   if(!current||JSON.stringify(current)!==JSON.stringify(previous))throw new Error('Este lote cambió en otra pestaña. Actualiza el inventario y vuelve a intentarlo.');
+   const record=inventoryStockRecord(current,change);
+   write(JSON.parse(raw).map(row=>String(row.id)===record.id?{...row,quantity:record.quantity,updated_at:record.updated_at}:row));
+   return record;
   },
   remove(previous){
    const items=read(),current=items.find(row=>row.id===previous.id);
