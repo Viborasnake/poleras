@@ -3,7 +3,8 @@ import {parseProject,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-fi
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import {useProjectAutosave,type ProjectSaveStatus} from './use-project-autosave'
 import { pack } from './packing'
-import { inspectPng, withCanvasPrintProfile, resolutionCheck } from './print'
+import { inspectPng, resolutionCheck } from './print'
+import { exportGangPng, gangPrintSize, MAX_GANG_WIDTH_CM, MAX_GANG_PIXELS, MAX_GANG_SIDE_PX } from './gang-export'
 import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
 import {createHistory,recordHistory,moveHistory,type History} from './history'
@@ -102,10 +103,10 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const serializedImages=useRef(new WeakMap<object,string>())
   useEffect(()=>setWidthDraft(String(width)),[width])
   useEffect(()=>setHeightDraft(String(height)),[height])
-  function commitSheetDimension(value:string,current:number,apply:(next:number)=>void,setDraft:(next:string)=>void) {
+  function commitSheetDimension(value:string,current:number,apply:(next:number)=>void,setDraft:(next:string)=>void,max=Infinity) {
     const next=Number(value.replace(',','.'))
-    if(Number.isFinite(next)&&next>=1)apply(next)
-    else setDraft(String(current))
+    if(!Number.isFinite(next)||next<1){setDraft(String(current));return}
+    if(next<=max){apply(next);setDraft(String(next))}
   }
   function projectSnapshot():ProjectFile {
     const editor=getEditor?.()
@@ -138,7 +139,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   }
   function saveSheetPreset(){
     const name=sheetPresetName.trim()
-    if(!name||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)return
+    if(!name||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||width>MAX_GANG_WIDTH_CM||height<=0)return
     const next=[...sheetPresets.filter(p=>p.name.toLocaleLowerCase()!==name.toLocaleLowerCase()),{id:crypto.randomUUID(),name,width,height}]
     setSheetPresets(next);localStorage.setItem(sheetPresetsStorageKey,JSON.stringify(next));setSheetPresetName('');setMessage(`Preset de plancha «${name}» guardado.`)
   }
@@ -231,13 +232,13 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   let layout: ReturnType<typeof pack> = {placements:[],missing:0,usedHeight:0}
   let layoutError = ''
   try {layout=pack(items,width,height,gap/10,rotate)} catch(e){layoutError=(e as Error).message}
-  const pxW=Math.round(width/2.54*dpi), pxH=Math.round(height/2.54*dpi)
-  const tooBig = pxW*pxH>100_000_000 || pxW>16000 || pxH>16000
+  const {width:pxW,height:pxH,tooBig}=gangPrintSize(width,height,dpi)
+  const widthOverLimit=width>MAX_GANG_WIDTH_CM || Number(widthDraft.replace(',','.'))>MAX_GANG_WIDTH_CM
   const resolutionIssues=items.filter(item=>!resolutionCheck(item,dpi).matches)
   const resolutionKey=JSON.stringify([dpi,items.map(i=>[i.id,i.widthCm,i.heightCm,i.naturalWidth,i.naturalHeight])])
   const matchingDpi=[300,150,600].find(candidate=>items.length>0&&items.every(item=>resolutionCheck(item,candidate).matches))
   const resolutionBlocked=resolutionIssues.length>0 && acceptedResolution!==resolutionKey
-  const invalid = !!layoutError || tooBig || pxW<1 || pxH<1 || !items.length || layout.missing>0 || resolutionBlocked
+  const invalid = !!layoutError || widthOverLimit || tooBig || pxW<1 || pxH<1 || !items.length || layout.missing>0 || resolutionBlocked
   function correctResolution(){
     if(matchingDpi){setDpi(matchingDpi);setAcceptedResolution('');return}
     const changes=resolutionIssues.map(a=>`${a.name}: ${a.widthCm.toFixed(2)} × ${a.heightCm.toFixed(2)} → ${(a.naturalWidth/dpi*2.54).toFixed(2)} × ${(a.naturalHeight/dpi*2.54).toFixed(2)} cm`)
@@ -246,43 +247,18 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     setAcceptedResolution('')
   }
 
-  function draw(canvas:HTMLCanvasElement,w:number,h:number,forExport=false) {
-    canvas.width=w;canvas.height=h
-    const ctx=canvas.getContext('2d',{colorSpace:'srgb'})!
-    ctx.clearRect(0,0,w,h)
-    // Keep the alpha mask binary while placing halftone PNGs. Browser
-    // interpolation creates translucent halos around otherwise solid dots.
-    ctx.imageSmoothingEnabled=false
-    const scaleX=w/width,scaleY=h/height
-    for(const p of layout.placements) {
-      const asset=items.find(i=>i.id===p.id)!
-      ctx.save()
-      const target=resolutionCheck(asset,dpi)
-      const dw=forExport?target.width:asset.widthCm*scaleX
-      const dh=forExport?target.height:asset.heightCm*scaleY
-      ctx.translate(forExport?Math.round(p.x/2.54*dpi):p.x*scaleX,forExport?Math.round(p.y/2.54*dpi):p.y*scaleY)
-      if(p.rotated){ctx.translate(dh,0);ctx.rotate(Math.PI/2)}
-      ctx.drawImage(asset.img,0,0,dw,dh)
-      ctx.restore()
-    }
-  }
   useEffect(()=>{setMessage('')},[items,width,height,gap,rotate])
 
   async function exportSheet() {
     if(invalid || busy) return
     setBusy(true);setError('');setMessage('')
-    const canvas=document.createElement('canvas')
     try{
-      draw(canvas,pxW,pxH,true)
-      const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('No se pudo exportar. Reduce el tamaño de plancha.')),'image/png'))
-      const bytes=withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),dpi)
-      const check=inspectPng(bytes)
-      if(check.width!==pxW || check.height!==pxH || Math.abs(check.dpi-dpi)>.02 || Math.abs(check.dpiY-dpi)>.02 || check.profile!=='sRGB')throw new Error('La exportación no coincide con las medidas.')
-      const url=URL.createObjectURL(new Blob([bytes],{type:'image/png'}))
+      const blob=await exportGangPng(pxW,pxH,dpi,layout.placements,items)
+      const url=URL.createObjectURL(blob)
       const link=document.createElement('a');link.href=url;link.download=`gang-sheet-${width}x${height}cm-${dpi}ppp.png`;document.body.append(link);link.click();link.remove()
       setTimeout(()=>URL.revokeObjectURL(url),60000)
-      setMessage(`PNG verificado: ${pxW} × ${pxH} px · ${dpi} ppp. Descarga solicitada.`)
-    }catch(e){setError((e as Error).message)}finally{canvas.width=canvas.height=1;setBusy(false)}
+      setMessage(`PNG de ${pxW} × ${pxH} px · ${dpi} ppp. Descarga solicitada.`)
+    }catch(e){setError((e as Error).message)}finally{setBusy(false)}
   }
 
   return <section className="workspace gang-workspace"><aside className="sidebar">
@@ -290,11 +266,18 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     <div className={`control-card ${sheetOpen?'open':''}`}><button type="button" className="section-heading" aria-expanded={sheetOpen} aria-controls="gang-sheet-settings" onClick={()=>setSheetOpen(open=>!open)}><span>Plancha de impresión</span><ChevronDown size={18} aria-hidden="true"/></button><div className="section-body" id="gang-sheet-settings" hidden={!sheetOpen}>
       <label className="field">Nombre del trabajo<input aria-label="Nombre del trabajo" value={projectName} maxLength={80} onChange={e=>setProjectName(e.target.value)}/></label>
       <div className="field"><span>Mis presets de plancha</span>{sheetPresets.length>0&&<div className="sheet-presets">{sheetPresets.map(p=><div className="sheet-preset" key={p.id}><button type="button" aria-pressed={width===p.width&&height===p.height} onClick={()=>{setWidth(p.width);setHeight(p.height)}}>{p.name}<small>{p.width} × {p.height} cm</small></button><button type="button" className="sheet-preset-delete" aria-label={`Eliminar preset ${p.name}`} title="Eliminar preset" onClick={()=>deleteSheetPreset(p.id)}><Trash2 size={14}/></button></div>)}</div>}<div className="sheet-preset-save"><input aria-label="Nombre del preset de plancha" placeholder="Nombre del preset" value={sheetPresetName} onChange={e=>setSheetPresetName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();saveSheetPreset()}}}/><button type="button" className="btn" disabled={!sheetPresetName.trim()} onClick={saveSheetPreset}>Guardar</button></div></div>
-      <div className="dimension-fields"><label>Ancho (cm)<input type="text" inputMode="decimal" aria-label="Ancho de plancha" value={widthDraft} onChange={e=>setWidthDraft(e.target.value)} onBlur={()=>commitSheetDimension(widthDraft,width,setWidth,setWidthDraft)} onKeyDown={e=>{if(e.key==='Enter'){e.currentTarget.blur()}if(e.key==='Escape'){setWidthDraft(String(width));e.currentTarget.blur()}}}/></label><label>Alto (cm)<input type="text" inputMode="decimal" aria-label="Alto de plancha" value={heightDraft} onChange={e=>setHeightDraft(e.target.value)} onBlur={()=>commitSheetDimension(heightDraft,height,setHeight,setHeightDraft)} onKeyDown={e=>{if(e.key==='Enter'){e.currentTarget.blur()}if(e.key==='Escape'){setHeightDraft(String(height));e.currentTarget.blur()}}}/></label></div>
+      <div className="dimension-fields">
+        <label>Ancho (cm)<input type="text" inputMode="decimal" aria-label="Ancho de plancha" aria-invalid={widthOverLimit||undefined} aria-describedby={widthOverLimit?'gang-width-error':'gang-width-limit'} value={widthDraft} onChange={e=>setWidthDraft(e.target.value)} onBlur={()=>commitSheetDimension(widthDraft,width,setWidth,setWidthDraft,MAX_GANG_WIDTH_CM)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape')setWidthDraft(String(width))}}/></label>
+        <label>Alto (cm)<input type="text" inputMode="decimal" aria-label="Alto de plancha" value={heightDraft} onChange={e=>setHeightDraft(e.target.value)} onBlur={()=>commitSheetDimension(heightDraft,height,setHeight,setHeightDraft)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape')setHeightDraft(String(height))}}/></label>
+      </div>
+      {widthOverLimit
+        ? <p id="gang-width-error" role="alert" className="error-text">El ancho máximo es de {MAX_GANG_WIDTH_CM} cm.</p>
+        : <p id="gang-width-limit" className="help-text">Ancho máximo de {MAX_GANG_WIDTH_CM} cm.</p>}
       <p className="help-text" role="status">Insumo DTF seleccionado: {width} × {height} cm</p>
       <input hidden ref={projectInput} type="file" accept=".json,.trama.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void openProject(file)}}/>
       <div className="dimension-fields compact-fields"><label>Resolución<select aria-label="Resolución de plancha" value={dpi} onChange={e=>setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
       <label>Separación (mm)<input aria-label="Separación de diseños" type="number" min="0" max="50" value={gap} onChange={e=>setGap(Number(e.target.value))}/></label></div>
+      {tooBig && <p role="alert" className="error-text">La exportación admite hasta {MAX_GANG_PIXELS / 1_000_000} megapíxeles y {MAX_GANG_SIDE_PX.toLocaleString('es-CL')} px por lado. Reduce las medidas o los ppp.</p>}
       {resolutionIssues.length>0 && <div className="resolution-warning" role="alert"><strong>Revisar resolución antes de exportar</strong><button className="btn" onClick={correctResolution}>Corregir resolución sin remuestrear</button><p>La plancha usa {dpi} ppp. Estos diseños cambiarían de píxeles al tamaño elegido:</p><ul>{resolutionIssues.map(item=><li key={item.id}>{item.name}: {Math.round(resolutionCheck(item,dpi).effectiveDpi)} ppp efectivos → {dpi} ppp.</li>)}</ul><p>Reducir puede perder detalle; ampliar no recupera detalle y puede alterar la trama. Para cambiar los ppp, vuelve al original y genera la trama en el editor.</p>{matchingDpi && matchingDpi!==dpi && <button className="btn" onClick={()=>setDpi(matchingDpi)}>Igualar plancha a {matchingDpi} ppp</button>}<label><input type="checkbox" checked={acceptedResolution===resolutionKey} onChange={e=>setAcceptedResolution(e.target.checked?resolutionKey:'')}/> Acepto reescalar estos diseños para esta exportación.</label></div>}
       <label className="help-text"><input type="checkbox" checked={rotate} onChange={e=>setRotate(e.target.checked)}/> Permitir giro de 90°</label>
       <button className="btn" onClick={()=>{importMode.current='raw';input.current?.click()}}>Añadir diseños PNG / imágenes</button>
@@ -324,7 +307,6 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
       </div>
     })}
     {layoutError && <p role="alert" className="error-text">{layoutError}</p>}
-    {tooBig && <p role="alert" className="error-text">Máximo 100 megapíxeles y 16.000 px por lado. Reduce la plancha o los ppp.</p>}
     {layout.missing>0 && <p role="alert" className="error-text">{layout.missing} copias no caben. Amplía la plancha o reduce copias/tamaños para exportar todo.</p>}
     {error && <p className="error-text" role="alert">{error}</p>}
   </aside><div className="gang-stage"><div className="gang-toolbar"><div className="gang-toolbar-left"><div className="history-controls gang-history" role="group" aria-label="Historial del Gang Sheet"><button className="btn" disabled={!historyCounts.undo||projectBusy||busy} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button><button className="btn" disabled={!historyCounts.redo||projectBusy||busy} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button></div><span>Vista sobre</span><select aria-label="Seleccionar diseño" value={selectedAsset?.id??''} onChange={e=>setSelectedId(e.target.value||null)}><option value="">Seleccionar diseño…</option>{items.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><button className="btn" disabled={!selectedAsset} onClick={()=>selectedAsset&&editAsset(selectedAsset.id)}>Editar seleccionado</button><select aria-label="Fondo de vista previa del Gang Sheet" value={previewBg} onChange={e=>{setPreviewBg(e.target.value);onPreviewColorChange?.(e.target.value)}}><option value="checker">Transparencia</option><optgroup label="Neutros"><option value="white">Blanco · claro</option><option value="#596778">Gris · normal</option><option value="black">Negro · oscuro</option></optgroup><optgroup label="Azules"><option value="#8ecae6">Celeste · claro</option><option value="#2563eb">Azul rey · normal</option><option value="#304b70">Azul marino · oscuro</option><option value="#102a43">Azul oscuro · oscuro</option></optgroup><optgroup label="Verdes"><option value="#86efac">Verde menta · claro</option><option value="#16a34a">Verde · normal</option><option value="#166534">Verde botella · oscuro</option><option value="#808000">Verde olivo · normal</option><option value="#4b5320">Verde militar · oscuro</option></optgroup><optgroup label="Morados"><option value="#c4b5fd">Lavanda · claro</option><option value="#7c3aed">Morado · normal</option><option value="#4c1d95">Morado oscuro · oscuro</option></optgroup><optgroup label="Rojos"><option value="#fda4af">Rosado · claro</option><option value="#c1121f">Rojo fuerte · normal</option><option value="#7b2931">Rojo oscuro · oscuro</option></optgroup><optgroup label="Amarillos y naranjas"><option value="#fde68a">Amarillo · claro</option><option value="#f59e0b">Mostaza · normal</option><option value="#ea580c">Naranjo · oscuro</option></optgroup><optgroup label="Cafés"><option value="#e7d3b0">Beige · claro</option><option value="#a16207">Café · normal</option><option value="#3b2418">Café oscuro · oscuro</option></optgroup></select><span>Insumo: {width} × {height} cm · {layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de alto ocupado</span></div><button className="btn export" disabled={invalid||busy} onClick={exportSheet}>{busy?'Exportando…':'Exportar Gang Sheet'}</button></div><GangPreview width={width} height={height} dpi={dpi} background={previewBg} placements={layoutError?[]:layout.placements} items={items} selectedId={selectedAsset?.id} onSelect={setSelectedId} onEdit={editAsset} status={message}/></div></section>

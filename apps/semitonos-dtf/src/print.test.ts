@@ -1,7 +1,8 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {deflateSync,inflateSync} from 'node:zlib'
-import {printSize,withPngDpi,inspectPng,withCanvasPrintProfile,resolutionCheck} from './print.ts'
+import {encodeRgbaPng,printSize,withPngDpi,inspectPng,withCanvasPrintProfile,resolutionCheck} from './print.ts'
+import {gangPrintSize} from './gang-export.ts'
 function crc(bytes:Uint8Array){let v=~0;for(const b of bytes){v^=b;for(let k=0;k<8;k++)v=(v>>>1)^(-(v&1)&0xedb88320)}return (~v)>>>0}
 function chunk(type:string,data:Uint8Array){const b=Buffer.alloc(12+data.length);b.writeUInt32BE(data.length);b.write(type,4);b.set(data,8);b.writeUInt32BE(crc(b.subarray(4,-4)),b.length-4);return b}
 const pixels=Buffer.from([0,255,0,0,0,0,255,0,255]) // one transparent and one opaque pixel
@@ -47,4 +48,41 @@ test('all cross-DPI handoffs and changed print sizes require resampling warning'
  }
  const item={naturalWidth:2953,naturalHeight:4430,widthCm:2953/300*2.54,heightCm:4430/300*2.54}
  assert.equal(resolutionCheck(item,300).matches,true)
+})
+
+test('Gang Sheet supports a 300 cm print side at 300 ppp and blocks oversized output', () => {
+  assert.deepEqual(gangPrintSize(300, 130, 300), {width:35433, height:15354, tooBig:false})
+  assert.deepEqual(gangPrintSize(58, 300, 300), {width:6850, height:35433, tooBig:false})
+  assert.equal(gangPrintSize(300, 5, 600).tooBig, false)
+  assert.equal(gangPrintSize(300, 300, 300).tooBig, true)
+  assert.equal(gangPrintSize(1, 301, 600).tooBig, true)
+})
+
+test('streamed PNG preserves alpha, physical dimensions, and sRGB across bands', async () => {
+  const transparent = new Uint8Array(pixels.length)
+  const rows = new ReadableStream<Uint8Array<ArrayBuffer>>({
+    start(controller) {
+      controller.enqueue(Uint8Array.from(pixels))
+      controller.enqueue(transparent)
+      controller.close()
+    },
+  })
+  const blob = await encodeRgbaPng(2, 2, 300, rows)
+  const bytes = Buffer.from(await blob.arrayBuffer())
+  const info = inspectPng(bytes)
+  assert.equal(info.width, 2)
+  assert.equal(info.height, 2)
+  assert.equal(info.colorType, 6)
+  assert.equal(info.profile, 'sRGB')
+  assert.ok(Math.abs(info.dpi - 300) < .02)
+  assert.ok(Math.abs(info.dpiY - 300) < .02)
+  const compressed: Buffer[] = []
+  for (let offset = 8; offset < bytes.length;) {
+    const length = bytes.readUInt32BE(offset)
+    if (bytes.toString('ascii', offset + 4, offset + 8) === 'IDAT') {
+      compressed.push(bytes.subarray(offset + 8, offset + 8 + length))
+    }
+    offset += length + 12
+  }
+  assert.deepEqual(inflateSync(Buffer.concat(compressed)), Buffer.concat([pixels, transparent]))
 })

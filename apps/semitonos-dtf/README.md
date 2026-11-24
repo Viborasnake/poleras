@@ -93,9 +93,9 @@ Los controles de trama se ocultan en «Sin semitono». Las intensidades automát
 
 ## Tamaño y exportación
 
-El tamaño se calcula como `píxeles = cm / 2,54 × ppp`, redondeado al píxel más cercano. El remuestreo ocurre **antes** del semitono, cuya frecuencia usa la resolución elegida. La exportación incluye un bloque PNG `pHYs` con esa resolución, reemplazando los 96 ppp habituales del canvas. Se validan dimensiones, resolución e integridad de los bloques del PNG antes de solicitar la descarga. El mensaje de confirmación indica las medidas verificadas; no confirma que el navegador haya guardado el archivo en disco. Algunos RIP ignoran los metadatos: comprobar allí los centímetros indicados.
+El tamaño se calcula como `píxeles = cm / 2,54 × ppp`, redondeado al píxel más cercano. El remuestreo ocurre **antes** del semitono, cuya frecuencia usa la resolución elegida. La exportación incluye un bloque PNG `pHYs` con esa resolución, reemplazando los 96 ppp habituales del canvas. Cuando se solicita la descarga, el mensaje indica las dimensiones en píxeles y los ppp del PNG. Algunos RIP ignoran los metadatos, por lo que conviene comprobar allí los centímetros indicados.
 
-No hay reducción silenciosa. El editor acepta salidas de hasta 40 megapíxeles y 12.000 px por lado; las planchas, 100 megapíxeles y 16.000 px por lado. Si se supera el límite, se muestra el motivo y se bloquea la exportación. El procesamiento de trama/remuestreo se ejecuta en un Web Worker cancelable.
+El editor acepta salidas de hasta 40 megapíxeles y 12.000 px por lado. En Gang Sheet, el ancho llega a 300 cm y el PNG admite hasta 600 megapíxeles y 70.866 px por lado. A 300 ppp se pueden exportar, por ejemplo, planchas de 58 × 300 cm y 300 × 130 cm. La exportación de planchas grandes genera el PNG por franjas y conserva la resolución elegida. Si las medidas superan un límite, el editor muestra el motivo y bloquea la exportación. El procesamiento de trama y remuestreo se ejecuta en un Web Worker cancelable.
 
 La escala 200% duplica ancho y alto en píxeles (cuadruplica el área). La ampliación conserva y remuestrea el detalle disponible; no utiliza IA ni reproduce Photoshop Preserve Details 2.0, y no puede recuperar información ausente. Subir nitidez en exceso puede producir halos. Revisar al 100%.
 
