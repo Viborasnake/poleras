@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { inspectPng, printSize, withCanvasPrintProfile } from './print'
+import {printWidthGroups} from './print-width-presets'
 import GangSheet, {type ProjectActions} from './GangSheet'
 import {parseProject,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-file'
 import {readActiveProject,writeActiveProject,deleteActiveProject,emptyProject} from './project-storage'
@@ -26,6 +27,8 @@ type ViewMode = 'result' | 'split' | 'original'
 type ComparisonTarget = 'result' | 'rescale' | 'background'
 type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'garment' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
 type PrintReviewAction = 'export' | 'resized' | 'gang'
+
+const printWidthOptions = printWidthGroups.flatMap(group=>group.options)
 
 export type Settings = {
   lpi: number
@@ -255,6 +258,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [dimensions, setDimensions] = useState({ width: 1400, height: 1000 })
   const [dragging, setDragging] = useState(false)
   const [widthCm, setWidthCm] = useState('11.8533')
+  const [lastPrintSize, setLastPrintSize] = useState('')
+  const printSizePreset = printWidthOptions.find(({id,width}) => id===lastPrintSize && String(width)===widthCm)
   const [dpi, setDpi] = useState(300)
   const [imageVersion, setImageVersion] = useState(0)
   const [readyKey, setReadyKey] = useState('')
@@ -1020,7 +1025,29 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <label className="field">Reescalado de imagen (%)<input aria-label="Reescalado de imagen en porcentaje" type="number" min="1" max="2000" step="25" value={widthCm && Number(widthCm) > 0 ? Number((Number(widthCm) / 2.54 * dpi / dimensions.width * 100).toFixed(1)) : ''} onChange={e => setWidthCm(e.target.value ? (dimensions.width * Number(e.target.value) / 100 / dpi * 2.54).toFixed(4) : '')} /></label>
             <div className="scale-presets">{[100,200,300,400].map(percent => <button key={percent} onClick={() => setWidthCm((dimensions.width * percent / 100 / dpi * 2.54).toFixed(4))}>{percent}%</button>)}</div>
             </div></details>
-            <div className="dimension-fields"><label>Ancho (cm)<input aria-label="Ancho en centímetros" type="number" min="0.1" step="0.1" value={widthCm} onChange={e => setWidthCm(e.target.value)} /></label><label>Alto (cm)<input aria-label="Alto en centímetros" type="number" min="0.1" step="0.1" value={widthCm && Number(widthCm) > 0 ? (Number(widthCm) / ratio).toFixed(2) : ''} onChange={e => setWidthCm(e.target.value ? String(Number(e.target.value) * ratio) : '')} /></label></div>
+            <label className="field">Ancho por talla
+              <select className="print-width-preset" value={printSizePreset?.id ?? ''} onChange={event=>{
+                const option=printWidthOptions.find(({id})=>id===event.target.value)
+                if (!option) return
+                setLastPrintSize(option.id)
+                setWidthCm(String(option.width))
+              }}>
+                <option value="" disabled>Elegir talla</option>
+                {printWidthGroups.map(({label,options})=><optgroup key={label} label={label}>
+                  {options.map(({id,size,width})=><option key={id} value={id}>{size} · {width} cm</option>)}
+                </optgroup>)}
+              </select>
+            </label>
+            <div className="dimension-fields">
+              <label>Ancho (cm)<input aria-label="Ancho en centímetros" type="number" min="0.1" step="0.1" value={widthCm} onChange={event=>{
+                setLastPrintSize('')
+                setWidthCm(event.target.value)
+              }} /></label>
+              <label>Alto (cm)<input aria-label="Alto en centímetros" type="number" min="0.1" step="0.1" value={widthCm && Number(widthCm) > 0 ? (Number(widthCm) / ratio).toFixed(2) : ''} onChange={event=>{
+                setLastPrintSize('')
+                setWidthCm(event.target.value ? String(Number(event.target.value) * ratio) : '')
+              }} /></label>
+            </div>
             <label className="field">Resolución<select aria-label="Resolución de impresión" value={dpi} onChange={e => setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
             <p className="help-text">Salida PNG sRGB, 8 bits por canal. Comprueba los ppp requeridos por tu RIP. Aumentarlos no recupera detalle del original.</p>
             <p className="help-text">Proporciones bloqueadas.</p>

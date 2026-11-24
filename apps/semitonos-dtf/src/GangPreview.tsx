@@ -5,7 +5,7 @@ import {hitGangAsset} from './gang-selection'
 import {previewColorName,type PreviewColor} from './preview-colors'
 
 export type GangPreviewActions = {fit:()=>void}
-type Props = {width:number;height:number;dpi:number;background:string;placements:Placement[];items:{id:string;img:CanvasImageSource;widthCm:number;heightCm:number;previewColor?:PreviewColor}[];selectedId?:string|null;onSelect?:(id:string|null)=>void;onEdit?:(id:string)=>void;status?:string;actionsRef?:Ref<GangPreviewActions>}
+type Props = {width:number;height:number;dpi:number;background:string;showIndividualColors:boolean;placements:Placement[];items:{id:string;img:CanvasImageSource;widthCm:number;heightCm:number;previewColor?:PreviewColor}[];selectedId?:string|null;onSelect?:(id:string|null)=>void;onEdit?:(id:string)=>void;status?:string;actionsRef?:Ref<GangPreviewActions>}
 
 function checkerPattern(ctx:CanvasRenderingContext2D) {
   const tile=document.createElement('canvas')
@@ -19,7 +19,7 @@ function checkerPattern(ctx:CanvasRenderingContext2D) {
   return ctx.createPattern(tile,'repeat')
 }
 
-export default function GangPreview({width,height,dpi,background,placements,items,selectedId,onSelect,onEdit,status,actionsRef}:Props) {
+export default function GangPreview({width,height,dpi,background,showIndividualColors,placements,items,selectedId,onSelect,onEdit,status,actionsRef}:Props) {
   const viewport=useRef<HTMLDivElement>(null)
   const canvas=useRef<HTMLCanvasElement>(null)
   const [size,setSize]=useState({width:1,height:1})
@@ -60,7 +60,8 @@ export default function GangPreview({width,height,dpi,background,placements,item
     ctx.translate(originX,originY+(landscape?sheetH:0))
     if(landscape)ctx.rotate(-Math.PI/2)
     ctx.beginPath();ctx.rect(0,0,pixelsW*scale,pixelsH*scale);ctx.clip()
-    const checker=background==='checker'||items.some(item=>item.previewColor==='checker')?checkerPattern(ctx):null
+    const hasChecker=background==='checker'||(showIndividualColors&&items.some(item=>item.previewColor==='checker'))
+    const checker=hasChecker?checkerPattern(ctx):null
     const backgroundFill=(color:string)=>color==='checker'?(checker??'#fff'):color
     ctx.fillStyle=backgroundFill(background)
     ctx.fillRect(0,0,pixelsW*scale,pixelsH*scale)
@@ -73,7 +74,7 @@ export default function GangPreview({width,height,dpi,background,placements,item
       ctx.translate(Math.round(p.x/2.54*dpi)*scale,Math.round(p.y/2.54*dpi)*scale)
       const w=Math.round(item.widthCm/2.54*dpi)*scale,h=Math.round(item.heightCm/2.54*dpi)*scale
       if(p.rotated){ctx.translate(h,0);ctx.rotate(Math.PI/2)}
-      if(item.previewColor&&item.previewColor!==background){
+      if(showIndividualColors&&item.previewColor&&item.previewColor!==background){
         ctx.fillStyle=backgroundFill(item.previewColor)
         ctx.fillRect(0,0,w,h)
       }
@@ -82,7 +83,7 @@ export default function GangPreview({width,height,dpi,background,placements,item
       ctx.restore()
     }
     ctx.restore()
-  },[size,scroll,scale,areaW,areaH,sheetW,sheetH,pixelsW,pixelsH,landscape,dpi,background,placements,items,selectedId])
+  },[size,scroll,scale,areaW,areaH,sheetW,sheetH,pixelsW,pixelsH,landscape,dpi,background,showIndividualColors,placements,items,selectedId])
   function pick(clientX:number,clientY:number){
     const rect=canvas.current!.getBoundingClientRect()
     const displayX=clientX-rect.left-(areaW-sheetW)/2+scroll.x, displayY=clientY-rect.top-(areaH-sheetH)/2+scroll.y

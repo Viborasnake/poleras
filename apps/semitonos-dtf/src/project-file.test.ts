@@ -20,6 +20,16 @@ test('project preserves individual preview colors and permits designs that inher
   assert.equal(restored.items[0].previewColor,undefined)
   assert.throws(()=>parseProject(JSON.stringify({...p,items:[{...p.items[0],previewColor:'invalid'}]})))
 })
+test('project restores whether individual colors are visible',()=>{
+  const p=fixture()
+  p.items[0].previewColor='#c1121f'
+  assert.equal(parseProject(JSON.stringify(p)).showIndividualColors,undefined)
+  for(const enabled of [true,false]){
+    const saved={...p,showIndividualColors:enabled}
+    assert.deepEqual(parseProject(JSON.stringify(saved)),saved)
+  }
+  assert.throws(()=>parseProject(JSON.stringify({...p,showIndividualColors:'false'})))
+})
 test('project rejects unknown versions, external image URLs and duplicate IDs',()=>{
   const p=fixture();assert.throws(()=>parseProject(JSON.stringify({...p,version:2})))
   p.items[0].dataUrl='https://example.com/image.png';assert.throws(()=>parseProject(JSON.stringify(p)))

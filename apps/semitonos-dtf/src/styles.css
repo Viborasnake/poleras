@@ -208,8 +208,8 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
 .workflow-step.active b { border-color:var(--aqua); color:var(--aqua); }
 .workflow-connector { width:24px; height:1px; background:#35403c; }
 .tool-tabs span { margin-left:auto; font-size:11px; color:#727d77; }
-.section-body select,.section-body input[type=number] { width:100%; min-width:0; padding:8px; background:#0b0e11; color:#e4ece8; border:1px solid #35413b; border-radius:6px; }
-.dimension-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.section-body select,.section-body input[type=number],.dimension-fields input { width:100%; min-width:0; padding:8px; background:#0b0e11; color:#e4ece8; border:1px solid #35413b; border-radius:6px; }
+.dimension-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .dimension-fields label { display:grid; gap:7px; color:#aab4af; font-size:11px; }
 .help-text { margin:0; font-size:11px; color:#99a69f; line-height:1.55; }
 .error-text { font-size:12px; color:#ffb0a9; line-height:1.5; }
@@ -298,8 +298,7 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .gang-workspace .asset-selected { border-color:var(--aqua); }
 .gang-workspace .section-body { gap:12px; padding:10px 12px 12px; }
 .gang-workspace .field { gap:5px; }
-.gang-workspace .compact-fields { gap:8px; }
-.gang-workspace .compact-fields input, .gang-workspace .compact-fields select { padding:8px; }
+#gang-sheet-settings { grid-template-columns:minmax(0,1fr); }
 .warning-inline { color:#f0c989; }
 .asset-heading { display:flex; align-items:center; gap:12px; width:100%; min-width:0; min-height:50px; padding:11px 12px; border:0; background:transparent; color:#e6e8e9; text-align:left; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
 .asset-heading:hover { background:#191d22; }
@@ -899,10 +898,13 @@ input[type='range']::-webkit-slider-thumb {
   background-size: 6px 6px;
 }
 .gang-workspace .asset-color-field { font-size: 13px; }
-.asset-color-field select, .gang-general-color select {
+.asset-color-field select, .gang-general-color select, .gang-individual-colors {
   min-height: 44px;
+}
+.asset-color-field select, .gang-general-color select, .print-width-preset {
   appearance: auto;
 }
+.gang-individual-colors[aria-pressed="true"] { border-color: var(--ds-lime); }
 .gang-general-color {
   display: flex;
   flex-wrap: wrap;
