@@ -84,13 +84,30 @@ export function mountAdminFormDisclosure(form,kind,{validateFile=()=>null,specs:
   return {...spec,node,valid:()=> (!spec.valid||spec.valid())&&controls(node).filter(field=>field.type==='file'&&!field.disabled).every(field=>[...field.files].every(file=>!validateFile(file,field))),value:()=>spec.value?String(spec.value()):adminStepSnapshot(node),summary:()=>spec.summary?spec.summary():adminFieldSummary(node)};
  });
  const review=document.createElement('section');review.className='admin-disclosure-review';const heading=document.createElement('h3'),list=document.createElement('dl');heading.textContent='Revisa antes de guardar';review.append(heading,list);actions.before(review);
- const state=createDisclosureState();if(editableSections)steps.forEach(step=>{state.confirmed[step.id]=step.value()});const initial=adminStepSnapshot(form),before=steps.map(step=>step.summary?step.summary():adminFieldSummary(step.node,{limit:Infinity}));let pending=false,destroyed=false;
+ const state=createDisclosureState(),initialValues=steps.map(step=>step.value());
+ if(editableSections)steps.forEach((step,index)=>{state.confirmed[step.id]=initialValues[index]});
+ const initial=adminStepSnapshot(form),before=steps.map(step=>step.summary?step.summary():adminFieldSummary(step.node,{limit:Infinity}));let pending=false,destroyed=false;
  let expandToggle=null;
  if(editableSections){const tools=document.createElement('div');tools.className='admin-disclosure-tools';expandToggle=document.createElement('button');expandToggle.type='button';expandToggle.className='admin-secondary';expandToggle.textContent='Expandir todo';expandToggle.setAttribute('aria-expanded','false');tools.append(expandToggle);group.prepend(tools)}
  const abort=new AbortController(),signal=abort.signal;
  const controller=mountFormDisclosure({container:group,state,steps,finalButton:submit,review,prefix:`admin-${kind}`,busy:()=>pending,multiple:editableSections,onChange:()=>{
   if(expandToggle){const allExpanded=steps.every(step=>Boolean(state.expanded?.[step.id]));expandToggle.textContent=allExpanded?'Cerrar todo':'Expandir todo';expandToggle.setAttribute('aria-expanded',String(allExpanded));expandToggle.disabled=pending}
-  list.replaceChildren();for(const step of steps){const row=document.createElement('div'),label=document.createElement('dt'),value=document.createElement('dd');label.textContent=step.title;const after=step.summary?step.summary():adminFieldSummary(step.node,{limit:Infinity}),index=steps.indexOf(step);value.textContent=editableSections&&before[index]!==after?`Antes: ${before[index]}\nDespués: ${after}`:after;row.append(label,value);list.append(row)}if(editableSections&&adminStepSnapshot(form)===initial){submit.disabled=true;const status=group.querySelector('.ds-disclosure-status');status.textContent='Edita la sección que necesitas cambiar y revisa las diferencias antes de guardar.';status.dataset.tone='hint'}
+  list.replaceChildren();
+  steps.forEach((step,index)=>{
+   const button=step.node.querySelector(':scope > .ds-disclosure-panel > [data-disclosure-continue]');
+   if(button){
+    const unsaved=step.value()!==initialValues[index];
+    button.toggleAttribute('data-unsaved',unsaved);
+    const label=unsaved?'Cambios sin guardar':step.continueLabel||'Continuar';
+    if(button.textContent!==label)button.textContent=label;
+    if(unsaved)button.setAttribute('aria-label','Cambios sin guardar. Continuar');else button.removeAttribute('aria-label');
+   }
+   const row=document.createElement('div'),label=document.createElement('dt'),value=document.createElement('dd');
+   label.textContent=step.title;const after=step.summary();
+   value.textContent=editableSections&&before[index]!==after?`Antes: ${before[index]}\nDespués: ${after}`:after;
+   row.append(label,value);list.append(row);
+  });
+  if(editableSections&&adminStepSnapshot(form)===initial){submit.disabled=true;const status=group.querySelector('.ds-disclosure-status');status.textContent='Edita la sección que necesitas cambiar y revisa las diferencias antes de guardar.';status.dataset.tone='hint'}
  }});
  if(expandToggle)expandToggle.onclick=()=>{const allExpanded=steps.every(step=>Boolean(state.expanded?.[step.id]));controller.setExpanded(allExpanded?[]:steps.map(step=>step.id));if(!allExpanded)focusDisclosure(group.querySelector('.ds-disclosure-panel:not([hidden]) input, .ds-disclosure-panel:not([hidden]) select, .ds-disclosure-panel:not([hidden]) textarea')||group.querySelector('.ds-disclosure-head h3'))};
  const closeButtons=[...form.querySelectorAll('.dialog-close,.dialog-cancel')];
@@ -101,6 +118,7 @@ export function mountAdminFormDisclosure(form,kind,{validateFile=()=>null,specs:
  // values without native input events. Read them after their handlers complete.
  form.addEventListener('click',()=>queueMicrotask(refresh),{signal});
  form.addEventListener('keydown',()=>queueMicrotask(refresh),{signal});
+ form.addEventListener('pointerdown',event=>{if(event.target.closest('.admin-mockup-focus-picker'))queueMicrotask(refresh)},{signal});
  dialog?.addEventListener('cancel',event=>{if(pending)event.preventDefault()},{signal});
  const submitAction=async(event,handler=originalSubmit)=>{
   event.preventDefault();if(editableSections&&adminStepSnapshot(form)===initial)return;if(!controller.guardFinal(event)||pending)return;

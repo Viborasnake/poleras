@@ -11,6 +11,9 @@ function render(kind=scenario.value,editing=mode.value==='edit'){
  current.onsubmit=async event=>{event.preventDefault();payload=adminFormData(current);actions++;if(pendingResolve===true)await new Promise(resolve=>{pendingResolve=resolve});outcome.textContent='Acción simulada. No se guardó ni publicó información.'};
  if(kind==='collection')field('is_featured').closest('label').insertAdjacentHTML('afterend','<label class="admin-check"><input name="is_new_collection" type="checkbox"><span>Mostrar pill Nueva colección</span></label>');
  if(kind==='design'){
+  const colors=current.querySelector('.admin-allowed-colors');
+  colors.dataset.designColorProduct='poleras';
+  colors.querySelectorAll('[name="allowed_colors"]').forEach(input=>input.name='design_colors_poleras');
   current.querySelectorAll('[data-design-product]').forEach(section=>{
    const selected=section.querySelector('[name="design_products"]'),input=section.querySelector('[type="file"]');
    const update=()=>{section.querySelector('[data-product-upload]').hidden=!selected.checked;input.disabled=!selected.checked;input.required=selected.checked&&!section.dataset.currentArtwork};selected.onchange=update;update();
@@ -21,7 +24,7 @@ function render(kind=scenario.value,editing=mode.value==='edit'){
   field('id').value='1';
   if(kind==='product'){field('name').value='Poleras';field('slug').value='poleras';field('menu_description').value='Diseña tu próxima favorita';field('sort_order').value='10'}
   if(kind==='collection'){field('product_type_id').value='1';field('category_id').value='1';field('name').value='Personaliza con tu mascota';field('slug').value='personaliza-con-tu-mascota';field('sort_order').value='1'}
-  if(kind==='design'){field('collection_id').value='1';field('name').value='La Playera';field('slug').value='la-playera';field('caption').value='Tu mascota inmortalizada en la playa';const section=current.querySelector('[data-design-product="poleras"]');section.dataset.currentArtwork='/la-playera.webp';section.querySelector('[name="design_products"]').checked=true;section.querySelector('[name="design_products"]').dispatchEvent(new Event('change',{bubbles:true}));current.querySelector('[name="allowed_colors"][value="beige"]').checked=true}
+  if(kind==='design'){field('collection_id').value='1';field('name').value='La Playera';field('slug').value='la-playera';field('caption').value='Tu mascota inmortalizada en la playa';const section=current.querySelector('[data-design-product="poleras"]');section.dataset.currentArtwork='/la-playera.webp';section.querySelector('[name="design_products"]').checked=true;section.querySelector('[name="design_products"]').dispatchEvent(new Event('change',{bubbles:true}));current.querySelector('[name="design_colors_poleras"][value="beige"]').checked=true}
  }
  field('name').oninput=()=>{field('slug').value=field('name').value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,'-')};
  controller=mountAdminFormDisclosure(current,kind,{validateFile:file=>!['image/png','image/jpeg','image/webp'].includes(file.type)?'Archivo inválido':null,editableSections:editing});
@@ -31,6 +34,7 @@ function change(name,value){const node=field(name);node.value=value;node.dispatc
 function click(selector){const node=form().querySelector(selector);if(!node)throw new Error(`No existe ${selector}`);node.click()}
 const next=id=>click(`[data-disclosure-continue="${id}"]`);
 const edit=id=>click(`[data-disclosure-edit="${id}"]`);
+const sectionButton=id=>form().querySelector(`[data-disclosure-continue="${id}"]`);
 function assert(value,message){if(!value)throw new Error(message)}
 const flush=()=>new Promise(resolve=>queueMicrotask(resolve));
 async function evaluate(){
@@ -45,11 +49,35 @@ async function evaluate(){
  await check('Reabrir restaura los nodos originales y elimina pasos duplicados',()=>{const current=form(),name=field('name');unmountAdminFormDisclosure(current);assert(!current.querySelector('[data-admin-disclosure]')&&field('name')===name,'Perdió nodo original');current.reset();controller=mountAdminFormDisclosure(current,'product');assert(current.querySelectorAll('[data-admin-disclosure]').length===1&&controller.state.active==='identity'&&button().disabled,'Estado anterior filtrado')});
  await check('Edición permite abrir cualquier bloque y expandir o cerrar todos',()=>{render('design',true);assert(form().querySelectorAll('[data-disclosure-edit]').length===5&&controller.state.active===null,'No habilitó todos los bloques guardados');edit('publication');assert(!form().querySelector('[data-disclosure-continue="publication"]').closest('fieldset').hidden,'No abrió publicación directamente');const toggle=form().querySelector('.admin-disclosure-tools button');toggle.click();assert([...form().querySelectorAll('.ds-disclosure-panel')].every(panel=>!panel.hidden)&&toggle.textContent==='Cerrar todo','No expandió todas las secciones');toggle.click();assert([...form().querySelectorAll('.ds-disclosure-panel')].every(panel=>panel.hidden)&&toggle.textContent==='Expandir todo','No cerró todas las secciones')});
  await check('Edición puntual invalida solo el bloque modificado',()=>{edit('identity');input('caption','Descripción puntual actualizada');assert(button().disabled&&!controller.state.confirmed.identity&&controller.state.confirmed.products&&controller.state.confirmed.publication,'Obligó a repetir bloques sin cambios');next('identity');assert(!button().disabled,'No habilitó guardar tras confirmar el único bloque cambiado')});
+ await check('El botón señala cambios por sección hasta volver al valor inicial',()=>{
+  render('design',true);
+  edit('identity');
+  const caption=field('caption').value,changed=sectionButton('identity'),unchanged=sectionButton('publication');
+  assert(changed.textContent==='Continuar'&&!changed.hasAttribute('data-unsaved'),'Marcó la sección al abrirla');
+  input('caption','Descripción modificada');
+  assert(changed.textContent==='Cambios sin guardar'&&changed.hasAttribute('data-unsaved'),'Falta el estado de cambios');
+  assert(unchanged.textContent==='Continuar'&&!unchanged.hasAttribute('data-unsaved'),'Marcó otra sección');
+  next('identity');edit('identity');
+  assert(changed.hasAttribute('data-unsaved')&&actions===0,'La confirmación borró el estado antes del guardado');
+  input('caption',caption);
+  assert(changed.textContent==='Continuar'&&!changed.hasAttribute('data-unsaved')&&button().disabled,'No limpió el estado al revertir');
+ });
  await check('Colección: no confirma producto/categoría precargados',()=>{render('collection');change('product_type_id','1');change('category_id','1');assert(controller.state.active==='hierarchy'&&button().disabled,'Confirmó precarga');next('hierarchy');input('name','Animales de prueba');next('identity');field('is_new_collection').checked=true;next('publication');assert(!button().disabled&&adminFormData(form()).get('is_new_collection')==='on','Perdió flag editorial')});
  await check('Diseño: rechaza producto sin selección y exige archivo si es nuevo',()=>{render('design');change('collection_id','1');input('name','Diseño de prueba');next('identity');next('products');assert(controller.state.active==='products'&&button().disabled,'Aceptó ningún producto');const section=form().querySelector('[data-design-product="poleras"]');section.querySelector('[name="design_products"]').click();next('products');assert(controller.state.active==='products','Aceptó producto sin archivo')});
  await check('Diseño: conserva archivo actual y excluye archivo de producto no seleccionado',()=>{const section=form().querySelector('[data-design-product="poleras"]');section.dataset.currentArtwork='/laika.png';section.querySelector('[name="design_products"]').dispatchEvent(new Event('change',{bubbles:true}));next('products');assert(controller.state.active==='colors','No reconoció archivo actual');const values=adminFormData(form());assert(values.getAll('design_products').join()==='poleras'&&!values.has('artwork_totebags'),'Incluyó archivo deshabilitado')});
- await check('Diseño: muestra debe estar entre los colores permitidos',()=>{next('colors');assert(controller.state.active==='colors','Aceptó ningún color');form().querySelector('[name="allowed_colors"][value="black"]').click();next('colors');assert(controller.state.active==='colors','Aceptó muestra excluida');form().querySelector('[name="allowed_colors"][value="beige"]').click();next('colors');assert(controller.state.active==='mockups','No avanzó con colores válidos');next('mockups');next('publication');assert(!button().disabled,'No llegó a revisión')});
- await check('Diseño: los cambios de geometría sin eventos invalidan mockups',async()=>{edit('mockups');field('mockup_poleras_focus_x').value='75';form().querySelector('.admin-mockup-files').click();await flush();assert(button().disabled,'No invalidó geometría');next('mockups');assert(!button().disabled&&adminFormData(form()).get('mockup_poleras_focus_x')==='75','Perdió geometría al confirmar')});
+ await check('Diseño: muestra debe estar entre los colores permitidos',()=>{next('colors');assert(controller.state.active==='colors','Aceptó ningún color');form().querySelector('[name="design_colors_poleras"][value="black"]').click();next('colors');assert(controller.state.active==='colors','Aceptó muestra excluida');form().querySelector('[name="design_colors_poleras"][value="beige"]').click();next('colors');assert(controller.state.active==='mockups','No avanzó con colores válidos');next('mockups');next('publication');assert(!button().disabled,'No llegó a revisión')});
+ await check('Diseño: el puntero señala el cambio de foco del mockup',async()=>{
+  edit('mockups');
+  const picker=document.createElement('button');
+  picker.type='button';picker.className='admin-mockup-focus-picker';
+  picker.onpointerdown=()=>{field('mockup_poleras_focus_x').value='75'};
+  form().querySelector('.admin-mockup-files').append(picker);
+  picker.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'mouse'}));
+  await flush();
+  assert(button().disabled&&sectionButton('mockups').textContent==='Cambios sin guardar'&&sectionButton('mockups').hasAttribute('data-unsaved'),'No señaló el cambio de geometría');
+  picker.remove();next('mockups');
+  assert(!button().disabled&&adminFormData(form()).get('mockup_poleras_focus_x')==='75','Perdió geometría al confirmar');
+ });
  await check('Diseño: archivo nuevo exige reconfirmación y aparece íntegro en FormData',()=>{edit('products');const section=form().querySelector('[data-design-product="poleras"]'),file=section.querySelector('[type="file"]');section.dataset.currentArtwork='';file.required=true;const transfer=new DataTransfer();transfer.items.add(new File(['fixture'], 'nuevo-estampado.webp',{type:'image/webp',lastModified:1}));file.files=transfer.files;file.dispatchEvent(new Event('change',{bubbles:true}));assert(button().disabled,'Confirmó al elegir archivo');next('products');assert(!button().disabled&&adminFormData(form()).get('artwork_poleras').name==='nuevo-estampado.webp','No conservó el archivo nuevo');});
  await check('Diseño: archivo inválido en mockup bloquea la revisión y permite corregir',()=>{edit('mockups');const transfer=new DataTransfer();transfer.items.add(new File(['fixture'],'documento.txt',{type:'text/plain'}));field('mockup_poleras').files=transfer.files;field('mockup_poleras').dispatchEvent(new Event('change',{bubbles:true}));next('mockups');assert(button().disabled&&controller.state.active==='mockups','Aceptó archivo inválido');field('mockup_poleras').files=new DataTransfer().files;field('mockup_poleras').dispatchEvent(new Event('change',{bubbles:true}));next('mockups');assert(!button().disabled,'No recuperó la revisión al corregir');});
  await check('Guardia final comprueba campos ocultos y bloquea el envío anticipado',()=>{field('name').value='';form().dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));assert(actions===0&&button().disabled&&controller.state.active==='identity','Envió datos ocultos inválidos')});
