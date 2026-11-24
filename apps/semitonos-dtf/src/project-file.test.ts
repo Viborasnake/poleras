@@ -12,6 +12,14 @@ test('project accepts every garment preview color',()=>{
     assert.deepEqual(parseProject(JSON.stringify(p)),p)
   }
 })
+test('project preserves individual preview colors and permits designs that inherit the general color',()=>{
+  const p=fixture()
+  p.items.push({...p.items[0],id:'red',previewColor:'#c1121f'},{...p.items[0],id:'transparent',previewColor:'checker'})
+  const restored=parseProject(JSON.stringify(p))
+  assert.deepEqual(restored,p)
+  assert.equal(restored.items[0].previewColor,undefined)
+  assert.throws(()=>parseProject(JSON.stringify({...p,items:[{...p.items[0],previewColor:'invalid'}]})))
+})
 test('project rejects unknown versions, external image URLs and duplicate IDs',()=>{
   const p=fixture();assert.throws(()=>parseProject(JSON.stringify({...p,version:2})))
   p.items[0].dataUrl='https://example.com/image.png';assert.throws(()=>parseProject(JSON.stringify(p)))

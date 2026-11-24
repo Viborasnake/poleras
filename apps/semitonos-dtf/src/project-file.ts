@@ -1,7 +1,8 @@
 import type {EditorDocument} from './editor-document'
 import {validColorRange} from './color-range.ts'
 import {isEdgeMaskStyle} from './edge-mask.ts'
-export type ProjectAsset={id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
+import {isPreviewColor,type PreviewColor} from './preview-colors.ts'
+export type ProjectAsset={id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument;previewColor?:PreviewColor}
 export type ProjectFile={format:'trama-dtf';version:1;name:string;sheet:{width:number;height:number;dpi:number;gap:number;rotate:boolean};background:string;items:ProjectAsset[];editor?:{name:string;document:EditorDocument;assetId?:string}}
 // A project embeds raster assets as PNG data URLs. Keep a generous guard against
 // accidental browser freezes while allowing realistic multi-design gang sheets.
@@ -9,9 +10,6 @@ export const MAX_PROJECT_FILE_BYTES = 1_000_000_000
 const fail=()=>{throw new Error('Proyecto inválido o incompatible. No se cambió el trabajo actual.')}
 const positive=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>0
 const png=(s:unknown)=>typeof s==='string'&&/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s)
-// Preview colors are persisted with the project, so every value exposed by the
-// garment-color picker must be accepted here as well.
-const previewBackgrounds=['checker','black','white','#596778','#8ecae6','#2563eb','#304b70','#102a43','#86efac','#16a34a','#166534','#808000','#4b5320','#c4b5fd','#7c3aed','#4c1d95','#fda4af','#c1121f','#7b2931','#fde68a','#f59e0b','#ea580c','#e7d3b0','#a16207','#3b2418']
 function checkDocument(d:EditorDocument) {
   if(!d||d.version!==1||!png(d.original)||!positive(d.widthCm)||![150,300,600].includes(d.dpi)||!d.settings)fail()
   const s=d.settings
@@ -37,10 +35,11 @@ function checkDocument(d:EditorDocument) {
 }
 export function parseProject(text:string):ProjectFile {
   const p=JSON.parse(text) as ProjectFile
-  if(!p||p.format!=='trama-dtf'||p.version!==1||typeof p.name!=='string'||!p.sheet||!positive(p.sheet.width)||!positive(p.sheet.height)||![150,300,600].includes(p.sheet.dpi)||!Number.isFinite(p.sheet.gap)||p.sheet.gap<0||typeof p.sheet.rotate!=='boolean'||!previewBackgrounds.includes(p.background)||!Array.isArray(p.items)||p.items.length>200)fail()
+  if(!p||p.format!=='trama-dtf'||p.version!==1||typeof p.name!=='string'||!p.sheet||!positive(p.sheet.width)||!positive(p.sheet.height)||![150,300,600].includes(p.sheet.dpi)||!Number.isFinite(p.sheet.gap)||p.sheet.gap<0||typeof p.sheet.rotate!=='boolean'||!isPreviewColor(p.background)||!Array.isArray(p.items)||p.items.length>200)fail()
   const ids=new Set<string>();let copies=0
   for(const a of p.items){
     if(!a||typeof a.id!=='string'||ids.has(a.id)||typeof a.name!=='string'||!png(a.dataUrl)||![a.naturalWidth,a.naturalHeight,a.widthCm,a.heightCm].every(positive)||!Number.isInteger(a.quantity)||a.quantity<1||a.quantity>200)fail()
+    if(a.previewColor!==undefined&&!isPreviewColor(a.previewColor))fail()
     ids.add(a.id);copies+=a.quantity
     if(a.document)checkDocument(a.document)
   }

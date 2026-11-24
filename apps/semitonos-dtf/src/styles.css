@@ -877,6 +877,39 @@ input[type='range']::-webkit-slider-thumb {
 .asset-heading:hover { background: #f957a416; }
 .asset-heading:focus-visible { outline-color: var(--ds-lilac); }
 .asset-heading-meta { color: var(--ds-text-tertiary); }
+.asset-heading-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 3px;
+  color: var(--ds-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+.asset-color-swatch {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--ds-border-control);
+  border-radius: 50%;
+}
+.asset-color-swatch[data-checker] {
+  background: conic-gradient(var(--ds-text-primary) 25%, var(--ds-border-control) 0 50%, var(--ds-text-primary) 0 75%, var(--ds-border-control) 0);
+  background-size: 6px 6px;
+}
+.gang-workspace .asset-color-field { font-size: 13px; }
+.asset-color-field select, .gang-general-color select {
+  min-height: 44px;
+  appearance: auto;
+}
+.gang-general-color {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
 .asset-actions .asset-duplicate { border-color: #8c79df; background: #211a33; color: var(--ds-lilac-soft); }
 .sheet-preset > button:first-child {
   border-color: #62645b;

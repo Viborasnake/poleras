@@ -23,3 +23,11 @@ test('render echoes are not recorded and history stays bounded',()=>{
  for(let i=1;i<100;i++)h=recordHistory(h,i,i)
  assert.equal(h.past.length,50)
 })
+test('discrete changes are undone individually between grouped edits',()=>{
+ let h=recordHistory(createHistory('original'),'sizes',0)
+ h=recordHistory(h,'red',null)
+ h=recordHistory(h,'checker',null)
+ h=recordHistory(h,'new sizes',0)
+ assert.deepEqual(h.past,['original','sizes','red','checker'])
+ assert.equal(moveHistory(moveHistory(h,'undo'),'undo').present,'red')
+})

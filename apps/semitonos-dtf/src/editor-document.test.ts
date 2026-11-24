@@ -1,15 +1,16 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {updateGangAsset} from './editor-document.ts'
-test('editing a design replaces it, retains copies and persists original separately',()=>{
+test('editing a design retains copies and the preview color while replacing the raster',()=>{
  const original={original:'data:image/png;base64,original',settings:{lpi:30},dpi:150,widthCm:25,crop:{x:1,y:2,width:50,height:80}}
- const old={id:'design',quantity:4,render:'old-screened',document:original}
+ const old={id:'design',quantity:4,render:'old-screened',document:original,previewColor:'#c1121f' as const}
  const edited={id:'temporary',quantity:1,render:'new-screened',document:{...original,dpi:300,settings:{lpi:45}}}
  const updated=updateGangAsset([old],edited,'design')
  assert.equal(updated.length,1);assert.equal(updated[0].id,'design');assert.equal(updated[0].quantity,4)
  const restored=JSON.parse(JSON.stringify(updated))[0]
  assert.equal(restored.document.original,original.original)
  assert.equal(restored.render,'new-screened');assert.equal(restored.document.dpi,300)
+ assert.equal(restored.previewColor,'#c1121f')
  assert.deepEqual(restored.document.crop,original.crop)
  assert.equal(old.render,'old-screened');assert.equal(old.document.settings.lpi,30)
 })

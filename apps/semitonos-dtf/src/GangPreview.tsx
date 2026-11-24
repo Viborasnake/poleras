@@ -1,11 +1,25 @@
-import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from 'react'
+import {useEffect, useImperativeHandle, useRef, useState, type PointerEvent as ReactPointerEvent, type Ref} from 'react'
 import {Hand, Minus, Plus, ZoomIn} from 'lucide-react'
 import type {Placement} from './packing'
 import {hitGangAsset} from './gang-selection'
+import {previewColorName,type PreviewColor} from './preview-colors'
 
-type Props = {width:number;height:number;dpi:number;background:string;placements:Placement[];items:{id:string;img:CanvasImageSource;widthCm:number;heightCm:number}[];selectedId?:string|null;onSelect?:(id:string|null)=>void;onEdit?:(id:string)=>void;status?:string}
+export type GangPreviewActions = {fit:()=>void}
+type Props = {width:number;height:number;dpi:number;background:string;placements:Placement[];items:{id:string;img:CanvasImageSource;widthCm:number;heightCm:number;previewColor?:PreviewColor}[];selectedId?:string|null;onSelect?:(id:string|null)=>void;onEdit?:(id:string)=>void;status?:string;actionsRef?:Ref<GangPreviewActions>}
 
-export default function GangPreview({width,height,dpi,background,placements,items,selectedId,onSelect,onEdit,status}:Props) {
+function checkerPattern(ctx:CanvasRenderingContext2D) {
+  const tile=document.createElement('canvas')
+  tile.width=tile.height=16
+  const tileContext=tile.getContext('2d')!
+  tileContext.fillStyle='#fff'
+  tileContext.fillRect(0,0,16,16)
+  tileContext.fillStyle='#d7d7d7'
+  tileContext.fillRect(0,0,8,8)
+  tileContext.fillRect(8,8,8,8)
+  return ctx.createPattern(tile,'repeat')
+}
+
+export default function GangPreview({width,height,dpi,background,placements,items,selectedId,onSelect,onEdit,status,actionsRef}:Props) {
   const viewport=useRef<HTMLDivElement>(null)
   const canvas=useRef<HTMLCanvasElement>(null)
   const [size,setSize]=useState({width:1,height:1})
@@ -46,21 +60,23 @@ export default function GangPreview({width,height,dpi,background,placements,item
     ctx.translate(originX,originY+(landscape?sheetH:0))
     if(landscape)ctx.rotate(-Math.PI/2)
     ctx.beginPath();ctx.rect(0,0,pixelsW*scale,pixelsH*scale);ctx.clip()
-    if(background==='checker') {
-      const tile=document.createElement('canvas');tile.width=tile.height=16
-      const t=tile.getContext('2d')!;t.fillStyle='#fff';t.fillRect(0,0,16,16)
-      t.fillStyle='#d7d7d7';t.fillRect(0,0,8,8);t.fillRect(8,8,8,8)
-      ctx.fillStyle=ctx.createPattern(tile,'repeat')!
-    } else ctx.fillStyle=background
+    const checker=background==='checker'||items.some(item=>item.previewColor==='checker')?checkerPattern(ctx):null
+    const backgroundFill=(color:string)=>color==='checker'?(checker??'#fff'):color
+    ctx.fillStyle=backgroundFill(background)
     ctx.fillRect(0,0,pixelsW*scale,pixelsH*scale)
     ctx.imageSmoothingEnabled=false
+    const assets=new Map(items.map(item=>[item.id,item]))
     for(const p of placements) {
-      const item=items.find(i=>i.id===p.id)
+      const item=assets.get(p.id)
       if(!item)continue
       ctx.save()
       ctx.translate(Math.round(p.x/2.54*dpi)*scale,Math.round(p.y/2.54*dpi)*scale)
       const w=Math.round(item.widthCm/2.54*dpi)*scale,h=Math.round(item.heightCm/2.54*dpi)*scale
       if(p.rotated){ctx.translate(h,0);ctx.rotate(Math.PI/2)}
+      if(item.previewColor&&item.previewColor!==background){
+        ctx.fillStyle=backgroundFill(item.previewColor)
+        ctx.fillRect(0,0,w,h)
+      }
       ctx.drawImage(item.img,0,0,w,h)
       if(p.id===selectedId){ctx.strokeStyle='#20dbc3';ctx.lineWidth=2;ctx.strokeRect(1,1,Math.max(0,w-2),Math.max(0,h-2))}
       ctx.restore()
@@ -78,6 +94,7 @@ export default function GangPreview({width,height,dpi,background,placements,item
     viewport.current?.scrollTo(0,0)
     setScroll({x:0,y:0})
   }
+  useImperativeHandle(actionsRef,()=>({fit:()=>changeZoom(null)}))
   function startDrag(e:ReactPointerEvent<HTMLDivElement>) {
     if(!handActive)return
     drag.current={x:e.clientX,y:e.clientY,left:e.currentTarget.scrollLeft,top:e.currentTarget.scrollTop}
@@ -109,7 +126,7 @@ export default function GangPreview({width,height,dpi,background,placements,item
         <button className="zoom-text" aria-pressed={zoom===1} aria-label="Zoom al 100 por ciento" onClick={()=>changeZoom(1)}>100%</button>
         <button className="zoom-text" aria-pressed={zoom===realSizeScale} aria-label={`Tamaño real: ${Math.round(realSizeScale*100)}%`} title={`Tamaño real aproximado a ${dpi} ppp`} onClick={()=>changeZoom(realSizeScale)}>Tamaño real</button>
       </div>
-      <div className="gang-format">{status || `PNG · ${background==='checker'?'Fondo transparente':`Vista sobre ${background}`}`}</div>
+      <div className="gang-format">{status || `PNG · Color general · ${previewColorName(background)}`}</div>
     </div>
   </div>
 }

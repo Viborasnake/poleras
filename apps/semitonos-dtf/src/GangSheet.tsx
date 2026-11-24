@@ -1,5 +1,5 @@
-import GangPreview from './GangPreview'
-import {parseProject,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-file'
+import GangPreview, {type GangPreviewActions} from './GangPreview'
+import {parseProject,type ProjectAsset,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-file'
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import {useProjectAutosave,type ProjectSaveStatus} from './use-project-autosave'
 import { pack } from './packing'
@@ -9,13 +9,19 @@ import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
 import {createHistory,recordHistory,moveHistory,type History} from './history'
 import {ChevronDown,Copy,Pencil,Trash2} from 'lucide-react'
+import {isPreviewColor,previewColorGroups,previewColorName} from './preview-colors'
 
-type Asset = {id:string;name:string;img:CanvasImageSource;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
+type Asset = Omit<ProjectAsset,'dataUrl'> & {img:CanvasImageSource}
 export type ProjectActions={save:()=>void;open:()=>void}
 type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; previewColor?:string; onPreviewColorChange?:(value:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void; initialProject:ProjectFile;editorRevision:string;editorLoading:boolean;onSaveStatus:(s:ProjectSaveStatus)=>void;actionsRef?:Ref<ProjectActions>}
-type SavedAsset = {id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 type GangSnapshot = {items:Asset[];projectName:string;width:number;height:number;dpi:number;gap:number;rotate:boolean;previewBg:string}
 type SheetPreset = {id:string;name:string;width:number;height:number}
+const previewColorOptions = <>
+  <option value="checker">Transparencia</option>
+  {previewColorGroups.map(({label,colors})=><optgroup key={label} label={label}>
+    {colors.map(([value,caption])=><option key={value} value={value}>{caption}</option>)}
+  </optgroup>)}
+</>
 const sheetStorageKey = 'trama-dtf-gang-sheet-v1'
 const sheetPresetsStorageKey = 'trama-dtf-gang-sheet-presets-v1'
 function readSheetPresets():SheetPreset[] {
@@ -97,12 +103,21 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const projectInput=useRef<HTMLInputElement>(null)
   const [projectBusy,setProjectBusy]=useState(false)
   const [assetLoading,setAssetLoading]=useState(0)
+  const previewActions=useRef<GangPreviewActions>(null)
   const gangHistory=useRef<History<GangSnapshot>|null>(null)
   const historyApplying=useRef(false)
+  const previewColorChanged=useRef(false)
   const [historyCounts,setHistoryCounts]=useState({undo:0,redo:0})
   const serializedImages=useRef(new WeakMap<object,string>())
   useEffect(()=>setWidthDraft(String(width)),[width])
   useEffect(()=>setHeightDraft(String(height)),[height])
+  function changeAssetColor(id:string,value:string) {
+    const color=isPreviewColor(value)?value:undefined
+    previewColorChanged.current=true
+    setItems(all=>all.map(item=>item.id===id?{...item,previewColor:color}:item))
+    setSelectedId(id)
+    previewActions.current?.fit()
+  }
   function commitSheetDimension(value:string,current:number,apply:(next:number)=>void,setDraft:(next:string)=>void,max=Infinity) {
     const next=Number(value.replace(',','.'))
     if(!Number.isFinite(next)||next<1){setDraft(String(current));return}
@@ -123,9 +138,11 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   useEffect(()=>{
     if(!hydrated)return
     if(historyApplying.current){historyApplying.current=false;return}
+    const group=previewColorChanged.current?null:0
+    previewColorChanged.current=false
     const snapshot:GangSnapshot={items:[...items],projectName,width,height,dpi,gap,rotate,previewBg}
     if(!gangHistory.current)gangHistory.current=createHistory(snapshot)
-    else gangHistory.current=recordHistory(gangHistory.current,snapshot,0)
+    else gangHistory.current=recordHistory(gangHistory.current,snapshot,group)
     setHistoryCounts({undo:gangHistory.current.past.length,redo:gangHistory.current.future.length})
   },[hydrated,items,projectName,width,height,dpi,gap,rotate,previewBg])
   function navigateHistory(direction:'undo'|'redo'){
@@ -286,9 +303,17 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     {items.map(item=>{
       const expanded=expandedAssets.has(item.id)
       const effectiveDpi=Math.round(resolutionCheck(item,dpi).effectiveDpi)
+      const color=item.previewColor??previewBg
       return <div className={`control-card asset-card ${selectedId===item.id?'asset-selected':''}`} key={item.id}>
         <button type="button" className="asset-heading" aria-expanded={expanded} aria-controls={`asset-details-${item.id}`} title={item.name} onClick={()=>{setSelectedId(item.id);toggleAsset(item.id)}}>
-          <span className="asset-heading-copy"><span className="asset-heading-name">{item.name}</span><span className="asset-heading-meta" aria-label={`Ancho ${item.widthCm.toFixed(2)} centímetros, alto ${item.heightCm.toFixed(2)} centímetros, ${effectiveDpi} puntos por pulgada`}>{item.widthCm.toFixed(1)} × {item.heightCm.toFixed(1)} cm <i aria-hidden="true">·</i> {effectiveDpi} ppp</span></span>
+          <span className="asset-heading-copy">
+            <span className="asset-heading-name">{item.name}</span>
+            <span className="asset-heading-meta" aria-label={`Ancho ${item.widthCm.toFixed(2)} centímetros, alto ${item.heightCm.toFixed(2)} centímetros, ${effectiveDpi} puntos por pulgada`}>{item.widthCm.toFixed(1)} × {item.heightCm.toFixed(1)} cm <i aria-hidden="true">·</i> {effectiveDpi} ppp</span>
+            <span className="asset-heading-color">
+              <span className="asset-color-swatch" data-checker={color==='checker'||undefined} style={color==='checker'?undefined:{backgroundColor:color}} aria-hidden="true"/>
+              {item.previewColor?'':'General · '}{previewColorName(color)}
+            </span>
+          </span>
           <ChevronDown size={18} aria-hidden="true"/>
         </button>
         <div className="section-body asset-details" id={`asset-details-${item.id}`} hidden={!expanded}>
@@ -302,6 +327,13 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
           </div>}
           <div className="dimension-fields"><label>Ancho (cm)<input type="number" min="0.1" step="0.1" value={Number(item.widthCm.toFixed(2))} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,widthCm:Number(e.target.value),heightCm:Number(e.target.value)*i.naturalHeight/i.naturalWidth}:i))}/></label><label>Copias<input aria-label={`Copias de ${item.name}`} type="number" min="1" max="200" value={item.quantity} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,quantity:Number(e.target.value)}:i))}/></label></div>
           <p className="help-text">Alto proporcional: {item.heightCm.toFixed(2)} cm</p>
+          <label className="field asset-color-field">
+            Color de polera
+            <select aria-label={`Color de polera de ${item.name}`} value={item.previewColor??''} onChange={event=>changeAssetColor(item.id,event.target.value)}>
+              <option value="">Usar color general</option>
+              {previewColorOptions}
+            </select>
+          </label>
           {item.document && onEditDocument ? <button className="btn" onClick={()=>editAsset(item.id)}>Editar original</button> : <p className="help-text">Original no disponible. Importa el original al editor para generar una nueva trama.</p>}
         </div>
       </div>
@@ -309,5 +341,32 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     {layoutError && <p role="alert" className="error-text">{layoutError}</p>}
     {layout.missing>0 && <p role="alert" className="error-text">{layout.missing} copias no caben. Amplía la plancha o reduce copias/tamaños para exportar todo.</p>}
     {error && <p className="error-text" role="alert">{error}</p>}
-  </aside><div className="gang-stage"><div className="gang-toolbar"><div className="gang-toolbar-left"><div className="history-controls gang-history" role="group" aria-label="Historial del Gang Sheet"><button className="btn" disabled={!historyCounts.undo||projectBusy||busy} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button><button className="btn" disabled={!historyCounts.redo||projectBusy||busy} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button></div><span>Vista sobre</span><select aria-label="Seleccionar diseño" value={selectedAsset?.id??''} onChange={e=>setSelectedId(e.target.value||null)}><option value="">Seleccionar diseño…</option>{items.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><button className="btn" disabled={!selectedAsset} onClick={()=>selectedAsset&&editAsset(selectedAsset.id)}>Editar seleccionado</button><select aria-label="Fondo de vista previa del Gang Sheet" value={previewBg} onChange={e=>{setPreviewBg(e.target.value);onPreviewColorChange?.(e.target.value)}}><option value="checker">Transparencia</option><optgroup label="Neutros"><option value="white">Blanco · claro</option><option value="#596778">Gris · normal</option><option value="black">Negro · oscuro</option></optgroup><optgroup label="Azules"><option value="#8ecae6">Celeste · claro</option><option value="#2563eb">Azul rey · normal</option><option value="#304b70">Azul marino · oscuro</option><option value="#102a43">Azul oscuro · oscuro</option></optgroup><optgroup label="Verdes"><option value="#86efac">Verde menta · claro</option><option value="#16a34a">Verde · normal</option><option value="#166534">Verde botella · oscuro</option><option value="#808000">Verde olivo · normal</option><option value="#4b5320">Verde militar · oscuro</option></optgroup><optgroup label="Morados"><option value="#c4b5fd">Lavanda · claro</option><option value="#7c3aed">Morado · normal</option><option value="#4c1d95">Morado oscuro · oscuro</option></optgroup><optgroup label="Rojos"><option value="#fda4af">Rosado · claro</option><option value="#c1121f">Rojo fuerte · normal</option><option value="#7b2931">Rojo oscuro · oscuro</option></optgroup><optgroup label="Amarillos y naranjas"><option value="#fde68a">Amarillo · claro</option><option value="#f59e0b">Mostaza · normal</option><option value="#ea580c">Naranjo · oscuro</option></optgroup><optgroup label="Cafés"><option value="#e7d3b0">Beige · claro</option><option value="#a16207">Café · normal</option><option value="#3b2418">Café oscuro · oscuro</option></optgroup></select><span>Insumo: {width} × {height} cm · {layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de alto ocupado</span></div><button className="btn export" disabled={invalid||busy} onClick={exportSheet}>{busy?'Exportando…':'Exportar Gang Sheet'}</button></div><GangPreview width={width} height={height} dpi={dpi} background={previewBg} placements={layoutError?[]:layout.placements} items={items} selectedId={selectedAsset?.id} onSelect={setSelectedId} onEdit={editAsset} status={message}/></div></section>
+  </aside>
+  <div className="gang-stage">
+    <div className="gang-toolbar">
+      <div className="gang-toolbar-left">
+        <div className="history-controls gang-history" role="group" aria-label="Historial del Gang Sheet">
+          <button className="btn" disabled={!historyCounts.undo||projectBusy||busy} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button>
+          <button className="btn" disabled={!historyCounts.redo||projectBusy||busy} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button>
+        </div>
+        <select aria-label="Seleccionar diseño" value={selectedAsset?.id??''} onChange={event=>setSelectedId(event.target.value||null)}>
+          <option value="">Seleccionar diseño…</option>
+          {items.map(asset=><option key={asset.id} value={asset.id}>{asset.name}</option>)}
+        </select>
+        <button className="btn" disabled={!selectedAsset} onClick={()=>selectedAsset&&editAsset(selectedAsset.id)}>Editar seleccionado</button>
+        <label className="gang-general-color">
+          Color general
+          <select value={previewBg} onChange={event=>{
+            const color=event.target.value
+            previewColorChanged.current=true
+            setPreviewBg(color)
+            onPreviewColorChange?.(color)
+          }}>{previewColorOptions}</select>
+        </label>
+        <span>Insumo: {width} × {height} cm · {layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de alto ocupado</span>
+      </div>
+      <button className="btn export" disabled={invalid||busy} onClick={exportSheet}>{busy?'Exportando…':'Exportar Gang Sheet'}</button>
+    </div>
+    <GangPreview actionsRef={previewActions} width={width} height={height} dpi={dpi} background={previewBg} placements={layoutError?[]:layout.placements} items={items} selectedId={selectedAsset?.id} onSelect={setSelectedId} onEdit={editAsset} status={message}/>
+  </div></section>
 }
