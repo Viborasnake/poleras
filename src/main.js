@@ -1,3 +1,4 @@
+import {catalogPrintPriceRows,catalogPrintViews} from './catalog-print-presentation.js';
 import {catalogPoleraComposition,catalogChargeablePrints,normalizePoleraPrints,POLERA_PRINT_LOCATIONS} from '../supabase/functions/_shared/catalog-polera-prints.js';
 import {printPrice} from '../supabase/functions/_shared/print-pricing.js';
 import {studioPreviewState} from './studio-preview.js';
@@ -570,9 +571,19 @@ function normalizeCartPrices(){
  }
  if(changed)saveLocal(CART_KEY,cart);
 }
-function cartBreakdownMarkup(item){const breakdown=cartItemBreakdown(item),placement=breakdown.printSides==='both'?'Frente + espalda':breakdown.printSides==='back'?'Espalda':'Frente',catalogPrintIncluded=Boolean(item.catalogDesignSlug)&&breakdown.print===0;return `<dl class="cart-item-breakdown"><div><dt>Producto base</dt><dd>${money(breakdown.base)}</dd></div>${catalogPrintIncluded?'':`<div><dt>Estampado · ${placement}</dt><dd>+${money(breakdown.print)}</dd></div>`}${breakdown.qualityReview?`<div><dt>Ajuste técnico</dt><dd>+${money(breakdown.review)}</dd></div>`:''}${item.quantity>1?`<div><dt>${item.quantity} unidades</dt><dd>${money(breakdown.unit)} c/u</dd></div>`:''}</dl>`}
+function printChargeRowsMarkup(rows,summary=false){
+ const labelTag=summary?'span':'dt',valueTag=summary?'strong':'dd';
+ return rows.map(({label,amount})=>`<div><${labelTag}>${safe(label)}</${labelTag}><${valueTag}>${amount===null?'Incluido':amount===0?money(0):`+${money(amount)}`}</${valueTag}></div>`).join('');
+}
+function cartBreakdownMarkup(item){
+ const breakdown=cartItemBreakdown(item);
+ const prints=item.catalogPoleraPrints&&item.printConfiguration?.prints?.length
+  ?catalogPrintPriceRows(item.printConfiguration,PRINT_PRICES)
+  :item.catalogDesignSlug&&breakdown.print===0?[]:[{label:'Estampados',amount:breakdown.print}];
+ return `<dl class="cart-item-breakdown"><div><dt>Producto base</dt><dd>${money(breakdown.base)}</dd></div>${printChargeRowsMarkup(prints)}${breakdown.qualityReview?`<div><dt>Ajuste técnico</dt><dd>+${money(breakdown.review)}</dd></div>`:''}${item.quantity>1?`<div><dt>${item.quantity} unidades</dt><dd>${money(breakdown.unit)} c/u</dd></div>`:''}</dl>`;
+}
 function cartPrintConfigurationLabel(item){const sides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');return printConfigurationLabel(item.printConfiguration,sides)}
-function renderCart(){normalizeCartPrices();const target=document.querySelector('#cart-content');queueMicrotask(()=>{if(!account&&cart.length&&target.isConnected)showCartAccessGate(target)});if(!cart.length){target.innerHTML='<div class="cart-empty"><span>✳</span><h3>Aún no hay poleras aquí.</h3><p>Elige un diseño del catálogo o crea una polera desde cero.</p><div class="cart-empty-actions"><button type="button" class="button dark commerce-wide ds-cta" id="cart-choose">Elegir una polera <span aria-hidden="true">→</span></button><button type="button" class="cart-empty-create" id="cart-start">Crear mi polera</button></div></div>';document.querySelector('#cart-choose').onclick=()=>closeCartDrawer(()=>{location.hash='catalogo'});document.querySelector('#cart-start').onclick=()=>closeCartDrawer(()=>openStudio('ready'));return}const visibleItems=cartExpanded?cart:cart.slice(0,2),hiddenItems=Math.max(0,cart.length-visibleItems.length),itemLabel=cart.reduce((sum,item)=>sum+item.quantity,0)===1?'producto':'productos';target.innerHTML=`<div class="cart-overview"><strong>${cart.reduce((sum,item)=>sum+item.quantity,0)} ${itemLabel} en tu pedido</strong><span>Resumen antes de pagar</span></div><div class="cart-list cart-list--compact">${visibleItems.map(item=>`<article class="cart-item cart-item--compact"><div class="cart-art" style="--cart-color:${safe(item.color)}">${item.designPreview?`<img src="${safe(item.designPreview)}" alt="Diseño elegido">`:`<span>${safe(item.initial)}</span>`}</div><div class="cart-item-copy"><strong>${safe(cartProductLabel(item))}</strong><small>Talla ${safe(sizeLabel(item.modelCode,item.size))} · ${safe(cartColorLabel(item))} · ${safe(item.sides)}</small><small class="cart-item-placement">${safe(cartPrintConfigurationLabel(item))}</small>${cartBreakdownMarkup(item)}<button type="button" data-cart-remove="${safe(item.id)}">Quitar</button></div><div class="cart-price"><strong>${money(item.price*item.quantity)}</strong><div class="quantity"><button type="button" data-cart-quantity="${safe(item.id)}" data-change="-1" aria-label="Reducir cantidad">−</button><span>${item.quantity}</span><button type="button" data-cart-quantity="${safe(item.id)}" data-change="1" aria-label="Aumentar cantidad">+</button></div></div></article>`).join('')}</div>${hiddenItems?`<button type="button" class="cart-show-more" id="cart-show-more">Ver ${hiddenItems} diseño${hiddenItems===1?'':'s'} más <span aria-hidden="true">↓</span></button>`:''}${cartExpanded&&cart.length>2?'<button type="button" class="cart-show-more" id="cart-show-less">Mostrar resumen</button>':''}<div class="cart-total"><span>Subtotal productos</span><strong>${money(cartTotal())}</strong><div class="cart-total-detail"><span>Despacho</span><b>Por calcular</b></div><small>El total final será el subtotal de productos más el despacho calculado en el checkout.</small></div><button type="button" class="button dark commerce-wide ds-cta" id="cart-checkout">Continuar compra <span>→</span></button><button type="button" class="cart-keep-shopping" id="cart-keep-shopping">← Seguir comprando</button>`;target.querySelectorAll('.cart-art').forEach((art,index)=>{const current=visibleItems[index],preview=current?.catalogDesignCustomerImage?'':catalogPreviewForCart(current?.catalogDesignSlug,current?.modelCode);if(preview)art.innerHTML=`<img src="${safe(preview)}" alt="Diseño elegido">`});target.querySelectorAll('[data-cart-remove]').forEach(button=>button.onclick=()=>{cart=cart.filter(item=>item.id!==button.dataset.cartRemove);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelectorAll('[data-cart-quantity]').forEach(button=>button.onclick=()=>{const item=cart.find(entry=>entry.id===button.dataset.cartQuantity);if(!item)return;item.quantity+=Number(button.dataset.change);if(item.quantity<1)cart=cart.filter(entry=>entry!==item);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelector('#cart-show-more')?.addEventListener('click',()=>{cartExpanded=true;renderCart()});target.querySelector('#cart-show-less')?.addEventListener('click',()=>{cartExpanded=false;renderCart()});document.querySelector('#cart-keep-shopping').onclick=()=>closeCartDrawer();document.querySelector('#cart-checkout').onclick=()=>account?closeCartDrawer(()=>beginCheckout(false)):showCartAccessGate(target)}
+function renderCart(){normalizeCartPrices();const target=document.querySelector('#cart-content');queueMicrotask(()=>{if(!account&&cart.length&&target.isConnected)showCartAccessGate(target)});if(!cart.length){target.innerHTML='<div class="cart-empty"><span>✳</span><h3>Aún no hay poleras aquí.</h3><p>Elige un diseño del catálogo o crea una polera desde cero.</p><div class="cart-empty-actions"><button type="button" class="button dark commerce-wide ds-cta" id="cart-choose">Elegir una polera <span aria-hidden="true">→</span></button><button type="button" class="cart-empty-create" id="cart-start">Crear mi polera</button></div></div>';document.querySelector('#cart-choose').onclick=()=>closeCartDrawer(()=>{location.hash='catalogo'});document.querySelector('#cart-start').onclick=()=>closeCartDrawer(()=>openStudio('ready'));return}const visibleItems=cartExpanded?cart:cart.slice(0,2),hiddenItems=Math.max(0,cart.length-visibleItems.length),itemLabel=cart.reduce((sum,item)=>sum+item.quantity,0)===1?'producto':'productos';target.innerHTML=`<div class="cart-overview"><strong>${cart.reduce((sum,item)=>sum+item.quantity,0)} ${itemLabel} en tu pedido</strong><span>Resumen antes de pagar</span></div><div class="cart-list cart-list--compact">${visibleItems.map(item=>`<article class="cart-item cart-item--compact"><div class="cart-art" style="--cart-color:${safe(item.color)}">${item.designPreview?`<img src="${safe(item.designPreview)}" alt="Diseño elegido">`:`<span>${safe(item.initial)}</span>`}</div><div class="cart-item-copy"><strong>${safe(cartProductLabel(item))}</strong><small>Talla ${safe(sizeLabel(item.modelCode,item.size))} · ${safe(cartColorLabel(item))} · ${safe(item.sides)}</small>${item.catalogPoleraPrints?'':`<small class="cart-item-placement">${safe(cartPrintConfigurationLabel(item))}</small>`}${cartBreakdownMarkup(item)}<button type="button" data-cart-remove="${safe(item.id)}">Quitar</button></div><div class="cart-price"><strong>${money(item.price*item.quantity)}</strong><div class="quantity"><button type="button" data-cart-quantity="${safe(item.id)}" data-change="-1" aria-label="Reducir cantidad">−</button><span>${item.quantity}</span><button type="button" data-cart-quantity="${safe(item.id)}" data-change="1" aria-label="Aumentar cantidad">+</button></div></div></article>`).join('')}</div>${hiddenItems?`<button type="button" class="cart-show-more" id="cart-show-more">Ver ${hiddenItems} diseño${hiddenItems===1?'':'s'} más <span aria-hidden="true">↓</span></button>`:''}${cartExpanded&&cart.length>2?'<button type="button" class="cart-show-more" id="cart-show-less">Mostrar resumen</button>':''}<div class="cart-total"><span>Subtotal productos</span><strong>${money(cartTotal())}</strong><div class="cart-total-detail"><span>Despacho</span><b>Por calcular</b></div><small>El total final será el subtotal de productos más el despacho calculado en el checkout.</small></div><button type="button" class="button dark commerce-wide ds-cta" id="cart-checkout">Continuar compra <span>→</span></button><button type="button" class="cart-keep-shopping" id="cart-keep-shopping">← Seguir comprando</button>`;target.querySelectorAll('.cart-art').forEach((art,index)=>{const current=visibleItems[index],preview=current?.catalogDesignCustomerImage?'':catalogPreviewForCart(current?.catalogDesignSlug,current?.modelCode);if(preview)art.innerHTML=`<img src="${safe(preview)}" alt="Diseño elegido">`});target.querySelectorAll('[data-cart-remove]').forEach(button=>button.onclick=()=>{cart=cart.filter(item=>item.id!==button.dataset.cartRemove);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelectorAll('[data-cart-quantity]').forEach(button=>button.onclick=()=>{const item=cart.find(entry=>entry.id===button.dataset.cartQuantity);if(!item)return;item.quantity+=Number(button.dataset.change);if(item.quantity<1)cart=cart.filter(entry=>entry!==item);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelector('#cart-show-more')?.addEventListener('click',()=>{cartExpanded=true;renderCart()});target.querySelector('#cart-show-less')?.addEventListener('click',()=>{cartExpanded=false;renderCart()});document.querySelector('#cart-keep-shopping').onclick=()=>closeCartDrawer();document.querySelector('#cart-checkout').onclick=()=>account?closeCartDrawer(()=>beginCheckout(false)):showCartAccessGate(target)}
 document.querySelector('#cart-content').addEventListener('click',event=>{const id=event.target.closest('[data-cart-remove],[data-cart-quantity]')?.dataset.cartRemove||event.target.closest('[data-cart-quantity]')?.dataset.cartQuantity;if(id&&!cart.some(item=>item.id===id))removeCartDesignFiles(id).catch(()=>{})});
 async function checkoutItems(withArtwork=true){const items=[];for(const item of cart){const artwork=withArtwork?await paymentArtworkFor(item,(await supabase.auth.getUser()).data.user?.id):{frontDesignPath:null,backDesignPath:null},printSides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');items.push({modelCode:item.modelCode||Object.entries(products).find(([,product])=>product.name===item.kind)?.[0]||'basic',size:item.size,color:item.color,printSides,printConfiguration:normalizePrintConfiguration(item.printConfiguration,printSides),quantity:item.quantity,qualityReview:effectiveQualityReview(item),variantId:item.variantId||null,catalogDesignSlug:item.catalogDesignSlug||null,catalogDesignCustomerImage:Boolean(item.catalogDesignCustomerImage),...artwork})}return items}
 async function createCheckoutDraft(){
@@ -766,7 +777,7 @@ function showStagePhoto(index){
   stagePhoto.classList.toggle('is-artwork-fallback',Boolean(item.artworkFallback));
   const design=selectedCatalogDesign();
   const productKind=Object.keys(products).find(kind=>modelProductSlug(kind)===item.productSlug);
-  const price=productKind&&designSupportsProduct(design,productKind)?catalogPriceWithPrints(productPrice(productKind,null,null,design),design,productKind):null;
+  const price=!item.printDetail&&productKind&&designSupportsProduct(design,productKind)?catalogPriceWithPrints(productPrice(productKind,null,null,design),design,productKind):null;
   const icon=productFamilyIcon(({poleras:'men',bodys:'body',totebags:'tote'})[item.productSlug]);
   const designType=design?.acceptsCustomerImage?'Diseño personalizable':design?.featured?'✦ Diseño destacado':'Diseño original';
   stagePhoto.querySelector('.studio-stage-photo-pills').innerHTML=`<span class="studio-stage-photo-product">${icon}<span>${escapeText(item.label)}</span></span><span class="studio-stage-photo-type">${designType}</span>${price==null?'':`<span class="studio-stage-photo-price">Desde ${money(price)}</span>`}`;
@@ -808,9 +819,9 @@ function renderStudioGallery(){
  const items=studioGalleryItems(design,catalogProducts);
  if(designForProduct(design,'poleras')&&catalogProducts.some(product=>product.slug==='poleras')){
   const {mockups}=normalizePoleraPrints(design.poleraPrints);
-  items.push(...Object.entries(mockups).map(([location,path])=>({src:catalogAssetUrl(path),label:POLERA_PRINT_LOCATIONS[location].label,productSlug:'poleras',focusX:50,focusY:50,artworkFallback:true})));
+  items.push(...Object.entries(mockups).map(([location,path])=>({src:catalogAssetUrl(path),label:POLERA_PRINT_LOCATIONS[location].label,productSlug:'poleras',focusX:50,focusY:50,artworkFallback:true,printDetail:true})));
  }
- if(design&&!items.some(item=>item.productSlug===modelProductSlug(state.kind))){
+ if(design&&!items.some(item=>item.productSlug===modelProductSlug(state.kind)&&!item.printDetail)){
   const selectedProduct=modelProductSlug(state.kind);
   const artwork=designForProduct(design,selectedProduct);
   const src=artwork&&artworkUrl(artwork);
@@ -829,7 +840,7 @@ function renderStudioGallery(){
   const image=document.createElement('img');image.src=item.src;image.alt=`${item.label} con el diseño ${design.name}`;image.loading='lazy';image.decoding='async';image.style.objectPosition=`${item.focusX}% ${item.focusY}%`;
   const caption=document.createElement('span');caption.className='studio-gallery-caption';caption.innerHTML=`${productFamilyIcon(({poleras:'men',bodys:'body',totebags:'tote'})[item.productSlug])}<span></span>`;caption.querySelector('span').textContent=item.label;
   const productKind=Object.keys(products).find(kind=>modelProductSlug(kind)===item.productSlug);
-  const price=productKind&&designSupportsProduct(design,productKind)?catalogPriceWithPrints(productPrice(productKind,null,null,design),design,productKind):null;
+  const price=!item.printDetail&&productKind&&designSupportsProduct(design,productKind)?catalogPriceWithPrints(productPrice(productKind,null,null,design),design,productKind):null;
   if(price!=null){const pricePill=document.createElement('span');pricePill.className='studio-gallery-price';pricePill.textContent=`Desde ${money(price)}`;button.append(pricePill)}
   button.append(image,caption);return button;
  }));
@@ -1007,33 +1018,7 @@ function syncPreview(){
   const storyKey=JSON.stringify([personalizedDesign.id,personalizedDesign.customerPhotoSubject,personalizedDesign.personalizationArrow]);
   if(story.dataset.key!==storyKey){story.innerHTML=catalogPetStory(personalizedDesign.personalizationArrow,personalizedDesign.customerPhotoSubject,true);story.dataset.key=storyKey}
  }else story?.remove();
- let printViews=livePreview.querySelector('.catalog-studio-print-views');
- const catalogPrints=catalogPoleraComposition(selectedCatalogDesign(),state.kind);
- const showPrintViews=catalogPrints&&state.mode==='ready'&&state.step!==2&&
-  (catalogPrints.configuration.prints.length>1||catalogPrints.configuration.prints[0].placement!=='center'||catalogPrints.printSides==='back');
- if(showPrintViews){
-  if(!printViews){
-   printViews=document.createElement('div');printViews.className='mockup-sides catalog-studio-print-views';
-   printViews.setAttribute('role','group');printViews.setAttribute('aria-label','Vistas de estampado');
-   livePreview.append(printViews);
-   printViews.addEventListener('click',event=>{
-    const button=event.target.closest('[data-catalog-print-view]');if(!button)return;
-    activatePrintLayer(button.dataset.catalogPrintView);faceSelectedSide();syncPreview();
-   });
-  }
-  const layers=allPrintLayers();
-  const key=layers.map(print=>`${print.id}:${print.placement}`).join(',');
-  if(printViews.dataset.key!==key){
-   printViews.innerHTML=layers.map(print=>`<button type="button" data-catalog-print-view="${print.id}">${catalogPrintLabel(print)}</button>`).join('');
-   printViews.dataset.key=key;
-  }
-  const active=state.activePrintId||`primary-${state.printSide}`;
-  printViews.querySelectorAll('button').forEach(button=>{
-   const selected=button.dataset.catalogPrintView===active;
-   button.setAttribute('aria-pressed',String(selected));
-   button.classList.toggle('selected',selected);
-  });
- }else printViews?.remove();
+ renderCatalogPrintViews();
  const liveEyebrow=livePreview.querySelector(':scope > .eyebrow');if(liveEyebrow){liveEyebrow.hidden=false;liveEyebrow.textContent=catalogPreviewReady?`TU DISEÑO ELEGIDO, EN ${state.kind==='tote'?'LA TOTE BAG':state.kind==='body'?'EL BODY':'LA POLERA'}`:'UNA VISTA A TU PRÓXIMA FAVORITA'}
  let effects=livePreview.querySelector('.forge-3d-effects');
  if(!effects){const particles=Array.from({length:34},(_,index)=>`<i style="--i:${index};--x:${5+(index*37)%90}%;--y:${8+(index*53)%84}%;--s:${3+(index%5)*1.4}px;--drift:${-34+(index*29)%68}px;--duration:${2.6+(index%6)*.28}s"></i>`).join('');livePreview.insertAdjacentHTML('beforeend',`<div class="forge-3d-effects" aria-hidden="true"><div class="forge-3d-halo"></div><div class="forge-3d-scan"></div><div class="forge-3d-particles">${particles}</div><div class="forge-3d-status"><span></span><div><strong></strong><small></small></div></div></div>`);effects=livePreview.querySelector('.forge-3d-effects')}
@@ -1041,11 +1026,11 @@ function syncPreview(){
  const panel=document.querySelector('#reference-panel');panel.hidden=true;panel.replaceChildren();
  const fallbackShell=document.querySelector('.preview-fallback');
  if(fallbackShell){fallbackShell.classList.toggle('body-fallback',state.kind==='body');fallbackShell.style.setProperty('--shirt',state.color);const fallback=fallbackShell.querySelector('img');if(fallback){fallback.hidden=!renderState.image;fallback.alt=state.kind==='body'?'Tu diseño sobre el body':'Tu diseño sobre la polera';if(!fallback.hidden)fallback.src=renderState.image}}
- if((isForging||showMockup)&&studio.open){const wantedKind=state.kind==='tote'?'tote':'shirt';if(viewerKind!==wantedKind){viewer?.dispose();viewer=null;viewerPromise=null;introTurn=null;viewerKind=wantedKind;viewerVersion++;stageAngle=0;showPreviewLoading()}viewer?.update(renderState);if(!viewerPromise){const version=viewerVersion,session=introSession;viewerPromise=import(wantedKind==='tote'?'./tote-viewer.js':'./garment.js').then(async m=>{const created=wantedKind==='tote'?await m.createToteViewer(document.querySelector('#viewer'),renderState):await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:4.9});if(version!==viewerVersion){created.dispose();return null}viewer=created;introTurn=createIntroTurn({turn:created.turn,reducedMotion:()=>introReducedMotion.matches});requestAnimationFrame(()=>requestAnimationFrame(()=>{if(session!==introSession||introInteracted||!studio.open||viewer!==created)return;if(state.printSide==='back'||activePrintConfiguration().placement.startsWith('sleeve_'))created.face(state.printSide,activePrintConfiguration().placement);else if(!introReducedMotion.matches)introTurn.start()}));return viewer}).catch(()=>{if(version===viewerVersion){viewerPromise=null;showPreviewFallback(renderState);stageControls.hidden=true;toast('El visor 3D no está disponible en este navegador.','error')}return null})}
+ if((isForging||showMockup)&&studio.open){const wantedKind=state.kind==='tote'?'tote':'shirt';if(viewerKind!==wantedKind){viewer?.dispose();viewer=null;viewerPromise=null;introTurn=null;viewerKind=wantedKind;viewerVersion++;stageAngle=0;showPreviewLoading()}viewer?.update(renderState);if(!viewerPromise){const version=viewerVersion,session=introSession;viewerPromise=import(wantedKind==='tote'?'./tote-viewer.js':'./garment.js').then(async m=>{const created=wantedKind==='tote'?await m.createToteViewer(document.querySelector('#viewer'),renderState):await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:4.9});if(version!==viewerVersion){created.dispose();return null}viewer=created;introTurn=createIntroTurn({turn:created.turn,reducedMotion:()=>introReducedMotion.matches});requestAnimationFrame(()=>requestAnimationFrame(()=>{if(session!==introSession||introInteracted||!studio.open||viewer!==created)return;if(state.printSide==='back'||activePrintConfiguration().placement.startsWith('sleeve_'))faceSelectedSide();else if(!introReducedMotion.matches)introTurn.start()}));return viewer}).catch(()=>{if(version===viewerVersion){viewerPromise=null;showPreviewFallback(renderState);stageControls.hidden=true;toast('El visor 3D no está disponible en este navegador.','error')}return null})}
  viewerPromise?.then(created=>{created?.update(renderState);created?.resize()})}
  if(fullscreenViewerDialog?.open)fullscreenViewer?.update(renderState);
 }
-function renderCheckoutCartPreview(){normalizeCartPrices();const target=document.querySelector('#checkout-cart-preview');if(!target)return;const items=cart,itemCount=cart.reduce((sum,item)=>sum+item.quantity,0),designCount=cart.length,shipping=state.shippingQuote?.amount,hasQuote=Boolean(state.shippingQuote),total=cartTotal()+(shipping||0)-state.couponDiscount,couponSummary=state.couponDiscount?`−${money(state.couponDiscount)}`:'Disponible';target.innerHTML=`<span class="eyebrow">TU PEDIDO · ${designCount} ${designCount===1?'DISEÑO':'DISEÑOS'} · ${itemCount} ${itemCount===1?'PRODUCTO':'PRODUCTOS'}</span><h3>Resumen del pedido</h3><div class="checkout-cart-preview-list">${items.map((item,index)=>{const image=item.catalogDesignCustomerImage?'':catalogPreviewForCart(item.catalogDesignSlug,item.modelCode)||item.designPreview,breakdown=cartItemBreakdown(item);return `<article><div class="checkout-cart-preview-art" style="--cart-color:${safe(item.color)}">${image?`<img src="${safe(image)}" alt="Diseño ${index+1} de tu pedido">`:`<span>${safe(item.initial)}</span>`}</div><div><strong>${safe(cartProductLabel(item))}</strong><small>Talla ${safe(sizeLabel(item.modelCode,item.size))} · ${safe(cartColorLabel(item))} · ${safe(item.sides)} · ${item.quantity} ${item.quantity===1?'unidad':'unidades'}</small><small class="cart-item-placement">${safe(cartPrintConfigurationLabel(item))}</small>${cartBreakdownMarkup(item)}<div class="checkout-cart-line-total"><span>Total del producto</span><b>${money(breakdown.line)}</b></div></div></article>`}).join('')}</div><div class="checkout-cart-preview-total"><table><tbody><tr><th scope="row">Subtotal de productos</th><td>${money(cartTotal())}</td></tr><tr><th scope="row">Despacho</th><td>${hasQuote?(shipping?money(shipping):'Gratis'):'Por calcular'}</td></tr><tr class="checkout-cart-preview-coupon"><th scope="row">Cupón de descuento</th><td>${couponSummary}</td></tr>${hasQuote?`<tr class="checkout-cart-preview-grand-total"><th scope="row">Total</th><td>${money(total)}</td></tr>`:''}</tbody></table></div>`}
+function renderCheckoutCartPreview(){normalizeCartPrices();const target=document.querySelector('#checkout-cart-preview');if(!target)return;const items=cart,itemCount=cart.reduce((sum,item)=>sum+item.quantity,0),designCount=cart.length,shipping=state.shippingQuote?.amount,hasQuote=Boolean(state.shippingQuote),total=cartTotal()+(shipping||0)-state.couponDiscount,couponSummary=state.couponDiscount?`−${money(state.couponDiscount)}`:'Disponible';target.innerHTML=`<span class="eyebrow">TU PEDIDO · ${designCount} ${designCount===1?'DISEÑO':'DISEÑOS'} · ${itemCount} ${itemCount===1?'PRODUCTO':'PRODUCTOS'}</span><h3>Resumen del pedido</h3><div class="checkout-cart-preview-list">${items.map((item,index)=>{const image=item.catalogDesignCustomerImage?'':catalogPreviewForCart(item.catalogDesignSlug,item.modelCode)||item.designPreview,breakdown=cartItemBreakdown(item);return `<article><div class="checkout-cart-preview-art" style="--cart-color:${safe(item.color)}">${image?`<img src="${safe(image)}" alt="Diseño ${index+1} de tu pedido">`:`<span>${safe(item.initial)}</span>`}</div><div><strong>${safe(cartProductLabel(item))}</strong><small>Talla ${safe(sizeLabel(item.modelCode,item.size))} · ${safe(cartColorLabel(item))} · ${safe(item.sides)} · ${item.quantity} ${item.quantity===1?'unidad':'unidades'}</small>${item.catalogPoleraPrints?'':`<small class="cart-item-placement">${safe(cartPrintConfigurationLabel(item))}</small>`}${cartBreakdownMarkup(item)}<div class="checkout-cart-line-total"><span>Total del producto</span><b>${money(breakdown.line)}</b></div></div></article>`}).join('')}</div><div class="checkout-cart-preview-total"><table><tbody><tr><th scope="row">Subtotal de productos</th><td>${money(cartTotal())}</td></tr><tr><th scope="row">Despacho</th><td>${hasQuote?(shipping?money(shipping):'Gratis'):'Por calcular'}</td></tr><tr class="checkout-cart-preview-coupon"><th scope="row">Cupón de descuento</th><td>${couponSummary}</td></tr>${hasQuote?`<tr class="checkout-cart-preview-grand-total"><th scope="row">Total</th><td>${money(total)}</td></tr>`:''}</tbody></table></div>`}
 function openStudio(mode='choose',kind){state.mode=mode;state.cartItemId=null;state.checkoutAsGuest=false;introSession++;introInteracted=false;introTurn?.reset();introTurn=null;if(mode==='browse'){photoRotationPaused=false;const pause=stagePhoto.querySelector('.studio-stage-photo-pause');pause.querySelector('span:first-child').textContent='Ⅱ';pause.querySelector('span:last-child').textContent='Pausar fotos';pause.setAttribute('aria-pressed','false')}if(kind){state.kind=kind;state.size=products[kind].sizes[0]}state.step=1;studio.showModal();document.body.classList.add('locked');renderStep();loadProductPrices()}
 function resetIdea(){
  detailsDisclosure=createDisclosureState();detailsDisclosureScope='own';publicFlowStates.clear();state.referencesBusy=false;
@@ -1161,7 +1146,7 @@ function catalogModalPrintDetails(design){
  if(locations.length===1&&primary==='front'&&!photos.length)return '';
  const label=locations.map(location=>POLERA_PRINT_LOCATIONS[location].label).join(' · ');
  const photoButton=(title,url='')=>`<button type="button" class="ds-secondary-button" data-print-photo="${safe(url)}" aria-pressed="${!url}">${title}</button>`;
- return `<div class="catalog-print-details"><p><strong>Estampados</strong> ${label}</p>${photos.length?`<div class="catalog-print-photo-options" role="group" aria-label="Fotos de la polera">${photoButton('Vista general')}${photos.map(location=>photoButton(POLERA_PRINT_LOCATIONS[location].label,catalogAssetUrl(mockups[location]))).join('')}</div>`:''}</div>`;
+ return `<div class="catalog-print-details"><p><strong>Estampados</strong> ${label}</p>${photos.length?`<div class="catalog-print-photo-options" role="group" aria-label="Fotos de detalle">${photoButton('Vista general')}${photos.map(location=>photoButton(POLERA_PRINT_LOCATIONS[location].label,catalogAssetUrl(mockups[location]))).join('')}</div><p class="catalog-print-photo-status" role="status"></p>`:''}</div>`;
 }
 function catalogDesignCard(design,index,collection,preferredProduct='',wall=false,wallFeatured=false,inDialog=false,shareCollection=false){
  const sourceDesign=design;
@@ -1715,12 +1700,26 @@ async function handleCatalogDialogCardClick(event){
   const photo=event.target.closest('[data-print-photo]');
   if(photo){
    const card=photo.closest('.catalog-design-card'),image=card.querySelector('.catalog-print-photo'),visual=image.parentElement;
-   const url=photo.dataset.printPhoto;
-   if(url){image.src=url;image.alt=`Mockup de ${photo.textContent.toLowerCase()}`;}
-   image.hidden=!url;
-   visual.classList.toggle('is-print-detail',Boolean(url));
-   visual.classList.remove('is-zoomed');
-   card.querySelectorAll('[data-print-photo]').forEach(button=>button.setAttribute('aria-pressed',String(button===photo)));
+   const status=card.querySelector('.catalog-print-photo-status'),url=photo.dataset.printPhoto;
+   const buttons=[...card.querySelectorAll('[data-print-photo]')];
+   const showGeneral=()=>{
+    image.hidden=true;visual.classList.remove('is-print-detail');
+    buttons.forEach(button=>button.setAttribute('aria-pressed',String(!button.dataset.printPhoto)));
+   };
+   visual.dataset.printPhoto=url;visual.classList.remove('is-zoomed');
+   if(!url){showGeneral();status.textContent='';return}
+   buttons.forEach(button=>button.setAttribute('aria-pressed',String(button===photo)));
+   status.textContent='Cargando foto…';
+   const next=new Image();next.src=url;
+   try{
+    await next.decode();
+    if(visual.dataset.printPhoto!==url)return;
+    image.src=url;image.alt=`Detalle de ${photo.textContent.toLowerCase()}`;
+    image.hidden=false;visual.classList.add('is-print-detail');status.textContent='';
+   }catch{
+    if(visual.dataset.printPhoto!==url)return;
+    showGeneral();status.textContent='No se pudo cargar esta foto. Puedes volver a intentarlo.';
+   }
    return;
   }
   if(toggleCatalogZoom(event))return;
@@ -1757,7 +1756,30 @@ document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>but
 document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('close',()=>{if(!document.querySelector('dialog[open]'))document.body.classList.remove('locked')}));
 document.querySelector('#space-create').onclick=()=>{document.querySelector('#space').close();openStudio()};
 const sideNames={front:'Frente',back:'Espalda'};
-const catalogPrintLabel=print=>Object.values(POLERA_PRINT_LOCATIONS).find(location=>location.side===print.side&&location.placement===print.placement)?.label||sideNames[print.side];
+function renderCatalogPrintViews(){
+ const composition=catalogPoleraComposition(selectedCatalogDesign(),state.kind);
+ const layers=composition?.configuration.prints;
+ if(state.mode!=='ready'||!layers?.length||layers.length===1&&layers[0].side==='front'&&layers[0].placement==='center')return;
+ const content=document.querySelector('#step-content'),heading=content?.querySelector('h2');
+ if(!heading)return;
+ const views=catalogPrintViews(layers);
+ let controls=content.querySelector('.catalog-studio-print-views');
+ if(!controls){
+  controls=document.createElement('fieldset');controls.className='catalog-studio-print-views';
+  controls.innerHTML=`<legend>Ver estampados en 3D</legend><div>${views.map(view=>`<button type="button" class="ds-secondary-button" data-catalog-print-view="${view.key}">${view.label}</button>`).join('')}</div>`;
+  heading.after(controls);
+  controls.addEventListener('click',event=>{
+   const button=event.target.closest('[data-catalog-print-view]');
+   const view=views.find(candidate=>candidate.key===button?.dataset.catalogPrintView);
+   if(!view)return;
+   cancelIntroTurn();
+   activatePrintLayer(view.id);state.catalogPrintView=view.key;
+   faceSelectedSide(view.placement);syncPreview();
+  });
+ }
+ const selected=state.catalogPrintView||views.find(view=>view.id===(state.activePrintId||`primary-${state.printSide}`))?.key;
+ controls.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.catalogPrintView===selected)));
+}
 
 async function prepareCatalogArtwork(design,kind){
  const productArtwork=designForProduct(design,modelProductSlug(kind));
@@ -1781,7 +1803,7 @@ function applyCatalogArtwork([primary,...additional]){
  state.printConfigurations={front:defaultPrintSideConfiguration('front'),back:defaultPrintSideConfiguration('back'),[primary.side]:normalizePrintSideConfiguration(primary,primary.side)};
  state.printSides=[primary.side];
  state.additionalPrints=additional.map(layer=>({id:layer.id,side:layer.side,configuration:normalizePrintSideConfiguration(layer,layer.side),image:layer.image,fileName:layer.fileName,assessment:layer.assessment}));
- state.printAdjustmentsOpen=false;state.qualityAccepted=false;state.qualityReview=false;state.uploaded=true;
+ state.catalogPrintView=null;state.printAdjustmentsOpen=false;state.qualityAccepted=false;state.qualityReview=false;state.uploaded=true;
  activateSide(primary.side);
 }
 const includedSides=()=>state.kind==='tote'?['front']:state.printSides;
@@ -1806,7 +1828,11 @@ const hasRequiredFiles=()=>includedSides().every(side=>Boolean(state.images[side
 const failingSides=()=>[...includedSides().map(side=>state.assessments[side]),...state.additionalPrints.map(item=>item.assessment)].filter(assessment=>assessment&&!assessment.qualifies);
 function activateSide(side){if(!includedSides().includes(side))return;state.activePrintId=null;state.printSide=side;state.image=state.images[side]||'';state.assessment=state.assessments[side]||null;state.isDefault=!state.images.front&&!state.images.back&&!state.additionalPrints.some(item=>item.image);const config=activePrintConfiguration();state.printScale=Number(config.scale)||PRINT_SIZE_SCALE[config.size]}
 function activateAdditionalPrint(id){const item=state.additionalPrints.find(candidate=>candidate.id===id);if(!item)return;state.activePrintId=item.id;state.printSide=item.side;state.image=item.image||'';state.assessment=item.assessment||null;state.isDefault=false;state.printScale=Number(item.configuration.scale)||PRINT_SIZE_SCALE[item.configuration.size]}
-function faceSelectedSide(){const placement=activePrintConfiguration().placement;viewer?.face(state.printSide,placement);viewerPromise?.then(()=>viewer?.face(state.printSide,placement))}
+function faceSelectedSide(placement=activePrintConfiguration().placement){
+ const side=state.printSide,face=placement==='sleeve_both'?'sleeve_left':placement;
+ if(viewer)viewer.face(side,face);
+ else viewerPromise?.then(created=>created?.face(side,face));
+}
 function moveCatalogDesignTo(side){
  const source=state.images.front?'front':'back';
  if(source===side)return;
@@ -2136,7 +2162,7 @@ function renderStep(){
  document.querySelector('.steps').innerHTML=`<div class="steps-rail" style="--step-count:${labels.length};--rail-progress:${railProgress.toFixed(2)}%;--rail-edge:${railEdge.toFixed(2)}%"><i aria-hidden="true"></i>${labels.map((label,index)=>`<span class="${index+1===state.step?'active':''} ${index+1<state.step?'done':''}" aria-label="Paso ${index+1} de ${labels.length}: ${label}" ${index+1===state.step?'aria-current="step"':''}><b aria-hidden="true">${index+1<state.step?'✓':String(index+1).padStart(2,'0')}</b><small>${label}</small></span>`).join('')}</div>`;
   const p=products[state.kind],personalizedSelection=currentPurchaseType()==='personalized',choice=printChoice(),selectedVariant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant,selectedPrice=variantPriceForPurchase(selectedVariant,personalizedSelection),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:state.qualityReview}),pricing=currentPrintPricing(selectedPrice??0,qualityReview?QUALITY_ADJUSTMENT_CLP:0),whatsappPurchase=currentPurchaseMethod()==='whatsapp';
  next.hidden=false;next.disabled=state.checking||state.step===1&&!resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;back.hidden=state.step===1;
- const ctas=['Ver resumen',purchaseMethodLabel(currentPurchaseMethod(),{purchaseType:currentPurchaseType()}),'Confirmar pedido'];next.textContent=state.catalogDesignCustomerImage?(selectedCatalogDesign()?.customerPhotoSubject==='people'?'Continuar · Tu foto':'Continuar · Foto de tu mascota'):ctas[state.step-1];
+ const ctas=['Ver resumen',whatsappPurchase?purchaseMethodLabel('whatsapp',{purchaseType:currentPurchaseType()}):'Añadir al carro','Confirmar pedido'];next.textContent=state.catalogDesignCustomerImage?(selectedCatalogDesign()?.customerPhotoSubject==='people'?'Continuar · Tu foto':'Continuar · Foto de tu mascota'):ctas[state.step-1];
  let html='';
  if(state.step===1){
   const activeFamily=productFamilyForKind(state.kind),source=selectedCatalogDesign(),available=([id])=>designSupportsProduct(source,id)&&eligibleVariants(id,null,source).length>0;
@@ -2151,7 +2177,9 @@ function renderStep(){
   html=`<span class="eyebrow">PASO 1 · DETALLES</span><h2>${state.catalogDesignPurchaseMode==='base'?'Elige tu producto.':'Elige qué quieres personalizar.'}</h2>${purchaseModeChoice}<section class="detail-block product-family-block"><div class="detail-heading"><strong>Elige un producto</strong><small>Después define modelo, talla y color</small></div><div class="product-family-options" role="group" aria-label="Tipo de producto">${familyCards}</div></section><section class="detail-block model-block"><div class="detail-heading"><strong>${activeFamily==='tote'?'Formato':'Modelo'}</strong><small>Precio base ${personalizedSelection?'de personalización':''}</small></div><div class="product-options">${modelOptions.map(([id,item])=>`<button type="button" class="${state.kind===id?'selected':''}" data-product="${id}"><strong>${item.name}</strong><span class="model-price">${priceLabel(productPrice(id,null,null,source,personalizedSelection))}</span></button>`).join('')}</div></section><div class="details-grid"><section class="detail-block color-block"><div class="detail-heading"><strong>${state.kind==='tote'?'Tela':'Color'}</strong><small>${colorOptions.length===1?'Única opción':'Elige uno'}</small></div><div class="colors" role="group" aria-label="Color del producto">${colorOptions.map(([color,name])=>`<button type="button" aria-label="${escapeText(name)}" aria-pressed="${state.color===color}" data-color="${color}" style="--swatch:${color}" class="${state.color===color?'chosen':''}"><i aria-hidden="true"></i><span>${escapeText(name)}</span></button>`).join('')}</div>${!colorOptions.length?`<p class="field-note" role="status">${variantLoadStatus==='loading'?'Cargando colores disponibles…':'No hay colores disponibles para esta talla y diseño.'}</p>`:''}</section><section class="detail-block size-block"><div class="detail-heading"><strong>${state.kind==='kids'?'Edad':state.kind==='body'?'Edad':'Talla'}</strong><button type="button" class="size-guide-trigger" id="open-size-guide"><span class="size-guide-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 16 16V4m-5 5 5-5 5 5"/><path d="M5 14v5h14v-5"/></svg></span><span class="size-guide-label">Guía de tallas</span><i aria-hidden="true">›</i></button></div><div class="sizes ${adultShirtKinds.has(state.kind)?'named-garment-sizes':''}">${p.sizes.map(size=>`<button type="button" data-size="${size}" class="${state.size===size?'selected':''}" aria-pressed="${state.size===size}"><span class="size-name">${sizeLabel(state.kind,size)}</span><small class="size-price">${sizePriceLabel(state.kind,size,source,personalizedSelection)}</small></button>`).join('')}</div></section></div><div class="studio-price-summary" aria-live="polite"><div><span>Precio de tu selección</span><strong>${selectedVariant?money(pricing.total):'Elige talla y color'}</strong></div>${selectedVariant?`<small>Producto ${money(selectedPrice)} · Estampado ${pricing.print?`+${money(pricing.print)}`:'incluido'}${qualityReview?` · Revisión +${money(QUALITY_ADJUSTMENT_CLP)}`:''}</small>`:'<small>El precio final depende de la talla, el color y el estampado.</small>'}</div><section class="detail-block print-placement-block">${printSidesHtml()}</section>`;
  }
  if(state.step===1&&!state.catalogDesign&&failingSides().length){const names=[...includedSides().filter(side=>state.assessments[side]&&!state.assessments[side].qualifies).map(side=>sideNames[side].toLowerCase()),...state.additionalPrints.filter(item=>item.assessment&&!item.assessment.qualifies).map(item=>item.configuration.placement.startsWith('sleeve_')?'brazo':'bolsillo')].join(' y ');html+=`<aside class="quality-inline-notice" role="status"><strong>Revisión técnica necesaria</strong><p>El archivo de ${names} podría verse pixelado al imprimir. Lo revisaremos antes de producirlo; el ajuste se verá desglosado en el resumen.</p><span>+${money(QUALITY_ADJUSTMENT_CLP)}</span></aside>`}
- if(state.step===2)html=`<span class="eyebrow">PASO 2 · RESUMEN</span><h2>Tu idea, lista para pedir.</h2>${hasTwoSides()?`<div class="mockup-sides">${includedSides().map(side=>`<button type="button" data-view-side="${side}" class="${state.printSide===side?'selected':''}">${sideNames[side]}</button>`).join('')}</div>`:''}<p class="mockup-note">Gira el producto y revisa todos los detalles antes de añadirla al carro.</p>${qualityReview?`<div class="review-chip">Revisión del equipo incluida · ${money(QUALITY_ADJUSTMENT_CLP)}</div>`:''}<div class="order-summary"><div><span>${state.kind==='tote'?'Tote bag':state.kind==='body'?'Body bebé':`Polera ${p.name}`} · talla ${sizeLabel(state.kind,state.size)} · ${escapeText(selectedVariant?.colorName||state.color)}</span><strong>${money(pricing.base)}</strong></div><div class="order-summary-detail"><span>Diseño · ${printSidesLabel()}</span><strong>${escapeText(printConfigurationLabel(currentPrintConfiguration(),choice))}</strong></div>${qualityReview?`<div><span>Ajuste técnico del archivo</span><strong>+${money(QUALITY_ADJUSTMENT_CLP)}</strong></div>`:''}<div class="total"><span>Total</span><strong>${money(pricing.total)}</strong></div></div>`;
+ const catalogComposition=state.step===2&&catalogPoleraComposition(selectedCatalogDesign(),state.kind);
+ const summaryPrintCharges=catalogComposition?catalogPrintPriceRows(catalogComposition.configuration,PRINT_PRICES):pricing.print?[{label:'Estampados',amount:pricing.print}]:[];
+ if(state.step===2)html=`<span class="eyebrow">PASO 2 · RESUMEN</span><h2>Tu idea, lista para pedir.</h2>${hasTwoSides()?`<div class="mockup-sides">${includedSides().map(side=>`<button type="button" data-view-side="${side}" class="${state.printSide===side?'selected':''}">${sideNames[side]}</button>`).join('')}</div>`:''}<p class="mockup-note">Gira el producto y revisa todos los detalles antes de añadirla al carro.</p>${qualityReview?`<div class="review-chip">Revisión del equipo incluida · ${money(QUALITY_ADJUSTMENT_CLP)}</div>`:''}<div class="order-summary"><div><span>${state.kind==='tote'?'Tote bag':state.kind==='body'?'Body bebé':`Polera ${p.name}`} · talla ${sizeLabel(state.kind,state.size)} · ${escapeText(selectedVariant?.colorName||state.color)}</span><strong>${money(pricing.base)}</strong></div><div class="order-summary-detail"><span>Diseño · ${printSidesLabel()}</span><strong>${escapeText(printConfigurationLabel(currentPrintConfiguration(),choice))}</strong></div>${printChargeRowsMarkup(summaryPrintCharges,true)}${qualityReview?`<div><span>Ajuste técnico del archivo</span><strong>+${money(QUALITY_ADJUSTMENT_CLP)}</strong></div>`:''}<div class="total"><span>Total</span><strong>${money(pricing.total)}</strong></div></div>`;
  if(state.step===2&&currentPurchaseMethod()==='whatsapp')html+=`<section class="whatsapp-purchase-contact" aria-labelledby="whatsapp-contact-title"><div class="whatsapp-contact-heading"><span class="eyebrow">DATOS PARA CONTACTARTE</span><h3 id="whatsapp-contact-title">Te escribiremos por WhatsApp.</h3><p>Completa tus datos para enviar la solicitud con tu selección.</p></div><div class="whatsapp-contact-fields"><label class="field"><span>Nombre completo</span><input id="whatsapp-name" required autocomplete="name" placeholder="Tu nombre" value="${escapeText(state.name||[state.firstName,state.lastName].filter(Boolean).join(' '))}"></label><label class="field"><span>Email</span><input id="whatsapp-email" required type="email" autocomplete="email" placeholder="tu@email.com" value="${escapeText(state.email)}"></label><label class="field"><span>Teléfono</span><input id="whatsapp-phone" required type="tel" autocomplete="tel" placeholder="+56 9 1234 5678" value="${escapeText(state.phone)}"></label></div><small class="whatsapp-contact-note"><span aria-hidden="true">📎</span><span>Al abrir WhatsApp, adjunta ahí tus imágenes o archivos de referencia.</span></small></section>`;
  if(state.step===3){state.editingContact=true;const shipping=state.shippingQuote?.amount||0,subtotal=cartTotal(),total=subtotal+shipping-state.couponDiscount,hasQuote=Boolean(state.shippingQuote);html=`<span class="eyebrow">PASO 3 · DATOS Y PAGO</span><div class="checkout-title-row"><h2>Completa tu pedido.</h2><button type="button" class="checkout-edit-order" id="edit-order">← Editar mi polera</button></div>${checkoutAccessHtml()}${fulfillmentPickerHtml()}${fulfillmentDetailsHtml()}${hasQuote?`<section class="shipping-quote" aria-live="polite"><span class="shipping-quote-icon" aria-hidden="true">✓</span><div><strong>${state.shippingQuote.label} calculado</strong><small>${state.fulfillment==='delivery'?`${state.commune}, ${state.region}`:'Coordinaremos el punto y horario contigo.'}</small></div><b>${shipping?money(shipping):'Gratis'}</b></section>`:`<p class="shipping-calculation-note">Completa los datos y calcula el despacho antes de pasar al pago.</p>`}<div class="notice">Elige tu medio de pago después de revisar el pedido.</div>`;next.textContent=hasQuote?`Ir a pagar · ${money(total)}`:'Calcular despacho';}
  document.querySelector('#step-content').innerHTML=html;
@@ -2186,13 +2214,17 @@ function renderStep(){
  if(state.step===2){
   const placementSummary=stepContent.querySelector('.order-summary-detail strong');if(placementSummary)placementSummary.textContent=printConfigurationLabel(currentPrintConfiguration(),printChoice());
   let mockupTabs=stepContent.querySelector('.mockup-sides');
-  if(!mockupTabs&&(printCount()>1||state.catalogDesign&&state.kind!=='tote')){
+  const catalogComposition=catalogPoleraComposition(selectedCatalogDesign(),state.kind);
+  if(catalogComposition){
+   placementSummary?.closest('.order-summary-detail')?.remove();
+   mockupTabs?.remove();
+  }else if(!mockupTabs&&(printCount()>1||state.catalogDesign&&state.kind!=='tote')){
    mockupTabs=document.createElement('div');mockupTabs.className='mockup-sides';stepContent.querySelector('.mockup-note')?.before(mockupTabs);
   }
-  if(mockupTabs){
-    mockupTabs.innerHTML=allPrintLayers().map((item,index)=>{
+  if(mockupTabs&&!catalogComposition){
+   mockupTabs.innerHTML=allPrintLayers().map((item,index)=>{
     const active=state.activePrintId?state.activePrintId===item.id:state.printSide===item.side&&item.id===`primary-${item.side}`;
-    const label=state.catalogDesign?catalogPrintLabel(item):`${index+1}. ${sideNames[item.side]}${item.placement==='center'?'':` · ${PRINT_PLACEMENT_LABEL[item.placement]}`}`;
+    const label=`${index+1}. ${sideNames[item.side]}${item.placement==='center'?'':` · ${PRINT_PLACEMENT_LABEL[item.placement]}`}`;
     return `<button type="button" data-view-print-layer="${item.id}" aria-pressed="${active}" class="${active?'selected':''}">${label}</button>`;
    }).join('');
   }

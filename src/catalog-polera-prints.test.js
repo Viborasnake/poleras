@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {catalogPoleraComposition,catalogChargeablePrints,catalogOrderConfiguration,normalizePoleraPrints} from '../supabase/functions/_shared/catalog-polera-prints.js';
 import {printPrice} from '../supabase/functions/_shared/print-pricing.js';
 import {cartPriceBreakdown} from './cart-pricing.js';
-import {orderPrintPlan} from './admin-order-print-plan.js';
+import {catalogPrintPriceRows,catalogPrintViews} from './catalog-print-presentation.js';
+import {orderPrintPlan,orderPrintPlanMarkup} from './admin-order-print-plan.js';
 
 const design={product_artworks:{poleras:'primary.webp',totebags:'tote.webp'}};
 const rates={front_large_clp:5500,front_pocket_clp:2300,back_large_clp:4600,arm_clp:1800};
@@ -49,4 +50,29 @@ test('las fotos de detalle se limitan a las ubicaciones activas',()=>{
  assert.deepEqual(normalizePoleraPrints({primary:'arm-left',additional:{arms:'duplicate.webp',back:'back.webp'},mockups:{
   back:'back-photo.webp',arms:'duplicate-photo.webp','arm-left':'sleeve-photo.webp',
  }}),{primary:'arm-left',additional:{back:'back.webp'},mockups:{'arm-left':'sleeve-photo.webp',back:'back-photo.webp'}});
+});
+
+test('la vista 3D abre cada manga y el desglose distingue aplicaciones incluidas y cobradas',()=>{
+ const composition=catalogPoleraComposition({...design,polera_prints:{primary:'arms',additional:{back:'back.webp'}}},'basic');
+ const views=catalogPrintViews(composition.configuration.prints);
+ assert.deepEqual(views.map(view=>[view.label,view.placement]),[
+  ['Brazo izquierdo','sleeve_left'],['Brazo derecho','sleeve_right'],['Espalda completa','center'],
+ ]);
+ assert.equal(views[0].id,views[1].id);
+ assert.notEqual(views[0].key,views[1].key);
+ assert.deepEqual(catalogPrintPriceRows(composition.configuration,rates),[
+  {label:'Primer brazo',amount:null},{label:'Segundo brazo',amount:1800},{label:'Espalda completa',amount:4600},
+ ]);
+});
+
+test('la planimetría conserva el nombre del archivo y señala una ubicación pendiente de cotización',()=>{
+ const markup=orderPrintPlanMarkup({order_items:[{
+  name_snapshot:'Tote bag de prueba',catalog_artwork_path:'https://example.test/archivo-de-produccion-muy-largo.webp',print_sides:'front',
+ }]},path=>path);
+ assert.match(markup,/class="admin-print-filename" title="archivo-de-produccion-muy-largo\.webp"/);
+ assert.match(markup,/href="https:\/\/example\.test\/archivo-de-produccion-muy-largo\.webp"/);
+ assert.doesNotMatch(markup,/Izquierda y derecha/);
+ const pending=orderPrintPlanMarkup({request_type:'creative',order_items:[{name_snapshot:'Idea',print_sides:'front'}]},path=>path);
+ assert.match(pending,/Ubicaciones por definir/);
+ assert.doesNotMatch(pending,/<svg/);
 });

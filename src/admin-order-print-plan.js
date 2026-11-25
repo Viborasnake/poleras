@@ -57,13 +57,18 @@ function sideDiagram(side,prints,shape){
 
 export function orderPrintPlanMarkup(order,assetUrl){
  if(!order.order_items?.length)return '';
+ const items=order.order_items.map(item=>({item,prints:orderPrintPlan(item)}));
  const estimated=order.price_snapshot?.estimated_print_extra_clp;
  const estimate=order.request_type==='creative'&&Number.isSafeInteger(estimated)&&estimated>0
-  ?`<p>Estampados adicionales estimados: ${safe(new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP'}).format(estimated))} por unidad.</p>`:'';
- const articles=order.order_items.map(item=>{
-  const prints=orderPrintPlan(item);
+  ?`<p>Recargo estimado por estampados adicionales: ${safe(new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP'}).format(estimated))} por unidad.</p>`:'';
+ const articles=items.map(({item,prints})=>{
   const name=item.name_snapshot||'Producto';
   const kind=/tote/i.test(name)?'tote':/body/i.test(name)?'body':'shirt';
+  const heading=`<h4>${safe(name)} <span>· ${safe(item.quantity||1)} u.</span></h4>`;
+  const hasPlacement=Object.keys(item.print_configuration||{}).length||prints.some(print=>print.catalogPath||print.privatePath);
+  if(order.request_type==='creative'&&!item.product_variant_id&&!order.price_snapshot?.product_selection&&!hasPlacement){
+   return `<article>${heading}<p>Ubicaciones por definir en la cotización.</p></article>`;
+  }
   const diagrams=Object.entries(garmentOutlines[kind]).map(([side,shape])=>sideDiagram(side,prints,shape)).join('');
   const rows=prints.map(print=>{
    const url=print.catalogPath?assetUrl(print.catalogPath):'';
@@ -71,10 +76,12 @@ export function orderPrintPlanMarkup(order,assetUrl){
    const file=/^(https:\/\/|data:image\/svg\+xml[,;])/i.test(url)?
     `<a class="admin-secondary" href="${safe(url)}" target="_blank" rel="noopener" aria-label="Abrir archivo ${print.number}, ${safe(print.label)}">Abrir archivo</a>`:
     print.privatePath?`<button type="button" class="admin-secondary" data-print-file="${safe(print.privatePath)}" aria-label="Abrir archivo ${print.number}, ${safe(print.label)}">Abrir archivo</button>`:
-     `<small>${pending}</small>`;
-   return `<li><span class="admin-print-number" aria-hidden="true">${print.number}</span><span><strong>${safe(print.label)}</strong>${print.fileName?`<small>${safe(print.fileName)}</small>`:''}</span>${file}</li>`;
+     `<small class="admin-print-file-pending">${pending}</small>`;
+   return `<li><span class="admin-print-number" aria-hidden="true">${print.number}</span><div class="admin-print-file-copy"><strong>${safe(print.label)}</strong>${print.fileName?`<small class="admin-print-filename" title="${safe(print.fileName)}">${safe(print.fileName)}</small>`:''}${file}</div></li>`;
   }).join('');
-  return `<article><h4>${safe(name)} · ${safe(item.quantity||1)} u.</h4><div class="admin-print-plan-item"><div class="admin-print-diagrams">${diagrams}</div><ol aria-label="Archivos por ubicación">${rows}</ol></div></article>`;
+  return `<article>${heading}<div class="admin-print-plan-item"><div class="admin-print-diagrams">${diagrams}</div><ol aria-label="Archivos por ubicación">${rows}</ol></div></article>`;
  }).join('');
- return `<section class="admin-print-plan" aria-labelledby="admin-print-plan-title"><h3 id="admin-print-plan-title">Planimetría de estampado</h3><p>Izquierda y derecha según la vista frontal. Las marcas muestran ubicaciones de referencia.</p>${estimate}${articles}</section>`;
+ const hasSideSpecificPrints=items.some(({prints})=>prints.some(print=>/^(chest_|sleeve_)/.test(print.placement)));
+ const sideNote=hasSideSpecificPrints?' Izquierda y derecha se leen mirando la prenda de frente.':'';
+ return `<section class="admin-print-plan" aria-labelledby="admin-print-plan-title"><h3 id="admin-print-plan-title">Planimetría de estampado</h3><p>Cada número vincula una ubicación con su archivo.${sideNote}</p>${estimate}${articles}</section>`;
 }
