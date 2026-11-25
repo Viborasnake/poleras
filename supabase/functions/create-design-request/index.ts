@@ -1,3 +1,6 @@
+import { catalogPoleraComposition, catalogOrderConfiguration, catalogChargeablePrints } from '../_shared/catalog-polera-prints.js'
+import { printConfigurationLabel } from '../_shared/print-configuration.js'
+import { printPrice } from '../_shared/print-pricing.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { sendOrderEmail } from '../_shared/order-email.ts'
 import { designProductArtworks, modelProductSlug } from '../_shared/catalog-product-artworks.js'
@@ -48,9 +51,10 @@ Deno.serve(async request => {
   if (!firstName || !email.includes('@') || !phone) return json({ error: 'Faltan datos de contacto.' }, 400)
   let catalogDesign: any = null
   let selectedProduct: any = null
+  let composition: ReturnType<typeof catalogPoleraComposition> = null
   let referenceVerificationPending = false
   if (catalogDesignSlug) {
-    const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,product_artworks,allowed_colors,allowed_product_colors').eq('slug', catalogDesignSlug).maybeSingle()
+    const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,product_artworks,polera_prints,allowed_colors,allowed_product_colors').eq('slug', catalogDesignSlug).maybeSingle()
     if (error) return json({ error: 'No pudimos validar el diseño de colección.' }, 503)
     if (!data?.active || !data.accepts_customer_image) return json({ error: 'Este diseño no admite referencias del cliente.' }, 409)
     catalogDesign = data
@@ -64,7 +68,10 @@ Deno.serve(async request => {
       const selectedColors=allowedColorsForModel(data,model?.code)
       const invalidSelection = variantError || !variant?.active || !model?.active || !['front','back'].includes(side) || (model?.code === 'tote' && side !== 'front') || !designProductArtworks(data)[modelProductSlug(model?.code)] || (selectedColors&&!selectedColors.includes(String(variant?.color_hex||'').toLowerCase()))
       if (invalidSelection && !recovery) return json({ error: 'La selección ya no está disponible. Revisa producto, talla y color.' }, 409)
-      if (!invalidSelection) selectedProduct = { variant_id: variant.id, sku: variant.sku, model: model.name, size: variant.size, color: variant.color_name, color_hex: variant.color_hex, side }
+      if (!invalidSelection) {
+        composition = catalogPoleraComposition(data, model.code)
+        selectedProduct = { variant_id: variant.id, sku: variant.sku, model: model.name, size: variant.size, color: variant.color_name, color_hex: variant.color_hex, side: composition?.configuration.prints[0].side ?? side }
+      }
       else selectedProduct = {
         variant_id: variant?.id || null,
         sku: variant?.sku || 'CREATIVE-REVIEW',
@@ -91,6 +98,14 @@ Deno.serve(async request => {
     }
   }
 
+  const printSides = composition?.printSides ?? selectedProduct?.side ?? 'front'
+  const configuration = composition ? catalogOrderConfiguration(composition, true) : null
+  const placement = configuration ? printConfigurationLabel(configuration, printSides) : printSides === 'back' ? 'Espalda' : 'Frente'
+  let estimatedPrintExtra: number | null = null
+  if (configuration) {
+    const { data: printPrices } = await admin.from('storefront_settings').select('front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
+    if (printPrices) estimatedPrintExtra = printPrice(catalogChargeablePrints(configuration), printSides, printPrices)
+  }
   const now = new Date().toISOString()
   const subjectLabel = catalogDesign?.customer_photo_subject === 'people' ? 'persona' : 'mascota'
   const flowType = !catalogDesign ? 'idea' : catalogDesign.customer_photo_subject === 'people' ? 'people_personalization' : 'pet_personalization'
@@ -101,7 +116,7 @@ Deno.serve(async request => {
     source: 'idea_request',
     request_type: 'creative',
     creative_request_id: requestId,
-    request_details: catalogDesign ? `Personalización de colección · ${catalogDesign.name}\n${selectedProduct ? `Producto: ${selectedProduct.model} · Talla/formato: ${selectedProduct.size} · Color: ${selectedProduct.color} · Estampado: ${selectedProduct.side === 'back' ? 'Espalda' : 'Frente'}\n` : ''}Fotos de la ${subjectLabel} adjuntas como referencias obligatorias.\n${idea}${recoveryNote}` : `${idea}${recoveryNote}`,
+    request_details: catalogDesign ? `Personalización de colección · ${catalogDesign.name}\n${selectedProduct ? `Producto: ${selectedProduct.model} · Talla/formato: ${selectedProduct.size} · Color: ${selectedProduct.color} · Estampado: ${placement}\n` : ''}Fotos de la ${subjectLabel} adjuntas como referencias obligatorias.\n${idea}${recoveryNote}` : `${idea}${recoveryNote}`,
     request_references: references,
     status: 'submitted',
     subtotal_clp: 0,
@@ -109,7 +124,7 @@ Deno.serve(async request => {
     discount_clp: 0,
     total_clp: 0,
     shipping_address: shippingAddress,
-    price_snapshot: { type: 'creative_request', quote_pending: true, purchase_type: 'personalized', flow_type: flowType, catalog_design_slug: catalogDesign?.slug || null, product_selection: selectedProduct, recovered_intake: recovery, recovery_reason: recoveryReason || null, reference_verification_pending: referenceVerificationPending },
+    price_snapshot: { type: 'creative_request', quote_pending: true, purchase_type: 'personalized', flow_type: flowType, catalog_design_slug: catalogDesign?.slug || null, product_selection: selectedProduct, estimated_print_extra_clp: estimatedPrintExtra, recovered_intake: recovery, recovery_reason: recoveryReason || null, reference_verification_pending: referenceVerificationPending },
     submitted_at: now,
   }).select('id').single()
   if (orderError || !order) {
@@ -127,7 +142,8 @@ Deno.serve(async request => {
     name_snapshot: catalogDesign?.name ? `Personalización con ${subjectLabel} · ${catalogDesign.name}` : 'Diseño personalizado por cotizar',
     sku_snapshot: selectedProduct?.sku || 'CREATIVE-QUOTE',
     color_hex: selectedProduct?.color_hex || null,
-    print_sides: selectedProduct?.side || 'front',
+    print_sides: printSides,
+    ...(configuration ? { print_configuration: configuration } : {}),
     quantity: 1,
     unit_price_clp: 0,
     line_total_clp: 0,

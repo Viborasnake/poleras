@@ -20,7 +20,8 @@ test('Mercado Pago conserva una preferencia reutilizable y configura webhook',as
   assert.match(checkout,/checkout_error: 'payment_initialization_failed'/);
   assert.doesNotMatch(checkout,/from\('orders'\)\.delete\(\)/);
   assert.match(checkout,/const qualityReview = Boolean\(item\.qualityReview\) && !isUnmodifiedCatalogItem\(item\)/);
-  assert.match(checkout,/isCatalogPrintIncluded\(item,item\.printSides,printConfigurationCount\(printConfigurations\[index\],item\.printSides\)\)/);
+  assert.match(checkout,/catalogPoleraComposition\(designs.get\(item\.catalogDesignSlug\), item\.modelCode\)/);
+  assert.match(checkout,/printPrice\(catalogChargeablePrints\(configuration\), printSides, storeSettings\)/);
 });
 
 test('el webhook conserva trazabilidad de reversas y contracargos',async()=>{

@@ -191,6 +191,8 @@ Mis datos conserva resúmenes independientes de información y dirección. Edita
 
 Producto, colección y diseño usan los primitives de revelación progresiva. Los datos iniciales se confirman explícitamente; texto, listas, selección múltiple y archivos avanzan con Continuar. Producto agrupa identidad → método de compra → opciones y visibilidad. Colección agrupa producto/categoría → identidad → publicación. Diseño agrupa colección/identidad → productos y sus archivos → configuración de color → mockups opcionales → comportamiento y publicación. Los productos vinculados conservan su despliegue de archivo dependiente; los archivos actuales se identifican como conservados.
 
+Para Poleras, Productos y archivos permite elegir la ubicación del arte principal y marcar ubicaciones adicionales. Frente y espalda usan tamaño completo. Bolsillos y brazos distinguen izquierda y derecha según la vista frontal. Ambos brazos repite el mismo arte en ambas mangas. Los campos de arte y mockup se muestran al activar su ubicación. Cada ubicación activa admite una foto de detalle opcional. La tarifa por ubicación se configura en Productos → Precios → Servicios y estampados. El diseño de catálogo incluye una aplicación y cada aplicación adicional usa la tarifa correspondiente.
+
 Slug y orden se despliegan dentro de Opciones avanzadas cuando corresponda. Un error abre ese detalle para mostrar el campo afectado. El patrón de slug usa una expresión compatible con la validación HTML actual. Los checkboxes de publicación muestran Sí/No en el resumen; elegir un archivo o mover el foco de un mockup invalida su confirmación y exige revisarlo. Las opciones compatibles conservan su confirmación.
 
 El resumen completo precede al botón de guardar/publicar. Durante el guardado se bloquean las acciones de avance, edición, cancelación y cierre. La lectura con `adminFormData` habilita temporalmente solo los fieldsets del patrón; conserva deshabilitados los controles que excluye la lógica de producto. No se guarda ni se sube por confirmar una sección. Reabrir restaura los nodos originales antes de reiniciar valores y etapas; no se clonan campos ni archivos. La composición vive en `src/admin-form-disclosure.js`. El banco `/samples/admin-forms.html` utiliza el HTML real del panel con datos sintéticos y simula la acción final.
@@ -205,6 +207,8 @@ Cada producto tiene su resumen y confirmación explícita. Una línea pendiente 
 Al abrir un pedido, la **Revisión técnica** aparece al inicio del detalle, antes de los datos del cliente, cobro y preparación de producción. El administrador puede marcar o retirar la revisión por producto desde ese bloque; el cambio se registra en el historial y no altera precios por sí solo.
 
 Editar un pedido abre resúmenes independientes, sin repetir el alta. Los bloques válidos parten revisados y Guardar se habilita después de cambiar y confirmar una sección. La revisión muestra Antes/Después en los bloques modificados. El guardado conserva el proceso existente de aprobación posterior y email. El guardia de envío se aplica también al listener de captura del pedido manual; no se puede eludir por Enter o un submit programático. La composición vive en `src/admin-order-disclosure.js` y tiene banco local en `/samples/order-forms.html`.
+
+El detalle del pedido presenta una planimetría por producto debajo del listado de artículos. Los números del frente y de la espalda se vinculan a la lista de ubicaciones y sus archivos. Ambos brazos repite el número en las mangas y comparte un archivo. Las vistas son esquemáticas y el listado textual conserva toda la información para navegación con teclado. Cuando todavía falta el arte de producción, la ubicación indica su estado.
 
 ### Administración: inventario
 
@@ -549,3 +553,5 @@ El estampado 3D de la tote aprovecha un área máxima de 1,27 × 1,35 unidades s
 
 
 El Body se apoya visualmente sobre un bebé invisible: pecho suave, guatita algo más adelantada y volumen trasero de cadera para el pañal. El volumen se recoge hacia los broches, sin panel plano ni inflado uniforme. Las mangas tienen sección redondeada para alojar los brazos; los laterales del torso conectan frente y espalda con curvatura suave. Se conservan las cinco aberturas, las costuras continuas y los pliegues fuera del estampado. Son proporciones visuales, no medidas de confección.
+
+En el modal del home, la ficha de Poleras identifica las ubicaciones configuradas. Las fotos de detalle publicadas aparecen como botones etiquetados junto a «Vista general». Al elegir una foto, esta ocupa el área de imagen sin recorte y el botón anuncia la selección. La ficha conserva la descripción, el selector de producto y la acción para abrir el estudio.

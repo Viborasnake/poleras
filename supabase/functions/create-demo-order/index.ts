@@ -1,3 +1,4 @@
+import { catalogPoleraComposition, catalogChargeablePrints, catalogOrderConfiguration } from '../_shared/catalog-polera-prints.js'
 import { printPrice } from '../_shared/print-pricing.js'
 import {designProductArtworks,modelProductSlug} from '../_shared/catalog-product-artworks.js'
 import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant,variantPriceForPurchase} from '../_shared/variant-selection.js'
@@ -64,7 +65,7 @@ Deno.serve(async request => {
   for (const item of items) {
     if (!allowedModels.has(item.modelCode) || !allowedSizeForModel(item.modelCode, item.size) || !allowedSides.has(item.printSides) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20 || !hexColor.test(item.color || '')) return json({ error: 'Uno de los productos no es válido.' }, 400)
     if (item.catalogDesignCustomerImage != null && typeof item.catalogDesignCustomerImage !== 'boolean') return json({ error: 'Uno de los productos no es válido.' }, 400)
-    if (item.modelCode === 'tote' && (!['S', 'M', 'L'].includes(item.size) || item.printSides !== 'front')) return json({ error: 'La tote bag debe usar talla S, M o L e impresión solo por el frente.' }, 400)
+    if (item.modelCode === 'tote' && (!['M', 'L'].includes(item.size) || item.printSides !== 'front')) return json({ error: 'La tote bag debe usar talla M o L e impresión solo por el frente.' }, 400)
   }
 
   const { data: previousPayment } = await admin.from('payments').select('order_id,amount_clp').eq('provider_reference', requestId).maybeSingle()
@@ -80,7 +81,7 @@ Deno.serve(async request => {
   const designSlugs = [...new Set(items.map((item: any) => item.catalogDesignSlug).filter(Boolean))]
   const designMap = new Map<string, any>()
   if (designSlugs.length) {
-    const { data: designs, error: designError } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,allowed_colors,allowed_product_colors,sample_color,product_artworks').in('slug', designSlugs)
+    const { data: designs, error: designError } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,allowed_colors,allowed_product_colors,sample_color,product_artworks,polera_prints').in('slug', designSlugs)
     if (designError) return json({ error: 'No pudimos validar el diseño de colección.' }, 503)
     for (const design of designs || []) if (design.active) designMap.set(design.slug, design)
     if (designSlugs.some(slug => !designMap.has(slug))) return json({ error: 'Uno de los diseños ya no está disponible.' }, 409)
@@ -99,9 +100,15 @@ Deno.serve(async request => {
     const variant=selectedVariants[index].variant!
     const modelRow=variants?.find((row:any)=>row.id===variant.id)
     const model=Array.isArray(modelRow?.product_models)?modelRow.product_models[0]:modelRow?.product_models
-    const printExtra = item.modelCode === 'tote' || isCatalogPrintIncluded(item,item.printSides,printConfigurationCount(item.printConfiguration,item.printSides)) ? 0 : printPrice(normalizePrintConfiguration(item.printConfiguration,item.printSides),item.printSides,storeSettings)
-    const qualityExtra = item.qualityReview && !isUnmodifiedCatalogItem(item) ? qualityReviewFee : 0
     const design = item.catalogDesignSlug ? designMap.get(item.catalogDesignSlug) : null
+    const composition = catalogPoleraComposition(design, item.modelCode)
+    const printSides = composition?.printSides ?? item.printSides
+    const configuration = composition ? catalogOrderConfiguration(composition, item.catalogDesignCustomerImage) : normalizePrintConfiguration(item.printConfiguration, printSides)
+    const printExtra = composition
+      ? printPrice(catalogChargeablePrints(configuration), printSides, storeSettings)
+      : item.modelCode === 'tote' || isCatalogPrintIncluded(item, printSides, printConfigurationCount(configuration, printSides))
+        ? 0 : printPrice(configuration, printSides, storeSettings)
+    const qualityExtra = item.qualityReview && !isUnmodifiedCatalogItem(item) ? qualityReviewFee : 0
     const personalized = !design || Boolean(item.catalogDesignCustomerImage)
     const unitPrice = (variantPriceForPurchase(variant, personalized) ?? variant.priceClp) + printExtra + qualityExtra
     const lineTotal = unitPrice * item.quantity
@@ -113,8 +120,8 @@ Deno.serve(async request => {
       name_snapshot: design?.name ? `${productLabel} · ${design.name}` : `${productLabel} ${item.modelCode==='body'?'personalizado':'personalizada'}`,
       sku_snapshot: variant.sku,
       color_hex: variant.color.toUpperCase(),
-      print_sides: item.printSides,
-      print_configuration: normalizePrintConfiguration(item.printConfiguration,item.printSides),
+      print_sides: printSides,
+      print_configuration: configuration,
       quantity: item.quantity,
       unit_price_clp: unitPrice,
       line_total_clp: lineTotal,

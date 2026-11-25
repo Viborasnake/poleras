@@ -1,3 +1,4 @@
+import { catalogPoleraComposition, catalogChargeablePrints, catalogOrderConfiguration } from '../_shared/catalog-polera-prints.js'
 import { printPrice } from '../_shared/print-pricing.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { designProductArtworks, modelProductSlug } from '../_shared/catalog-product-artworks.js'
@@ -69,20 +70,20 @@ Deno.serve(async request => {
 
   const product = body?.product || {}
   const variantId = Number(product.variantId)
-  const modelCode = String(product.modelCode || '').trim()
+  const modelCode = product.modelCode === 'kids' ? 'kid' : String(product.modelCode || '').trim()
   const size = String(product.size || '').trim()
   const color = String(product.color || '').trim().toLowerCase()
-  const printSides = String(product.printSides || '').trim()
+  const requestedSides = String(product.printSides || '').trim()
   const catalogDesignSlug = String(product.catalogDesignSlug || '').trim()
   const customerImage = Boolean(product.catalogDesignCustomerImage)
-  if (!Number.isInteger(variantId) || !modelCode || !size || !/^#[0-9a-f]{6}$/i.test(color) || !validSides.has(printSides)) return json({ error: 'La selección del producto no es válida.' }, 400)
+  if (!Number.isInteger(variantId) || !modelCode || !size || !/^#[0-9a-f]{6}$/i.test(color) || !validSides.has(requestedSides)) return json({ error: 'La selección del producto no es válida.' }, 400)
   const { data: variant, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,personalization_base_price_clp,active,product_models!inner(code,name,active)').eq('id', variantId).maybeSingle()
   const model = Array.isArray(variant?.product_models) ? variant.product_models[0] : variant?.product_models
-  if (variantError || !variant?.active || !model?.active || model.code !== modelCode || variant.size !== size || variant.color_hex?.toLowerCase() !== color || (model.code === 'tote' && printSides !== 'front')) return json({ error: 'La talla, color o producto ya no están disponibles.' }, 409)
+  if (variantError || !variant?.active || !model?.active || model.code !== modelCode || variant.size !== size || variant.color_hex?.toLowerCase() !== color || (model.code === 'tote' && requestedSides !== 'front')) return json({ error: 'La talla, color o producto ya no están disponibles.' }, 409)
 
   let design: any = null
   if (catalogDesignSlug) {
-    const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,product_artworks,allowed_colors,allowed_product_colors').eq('slug', catalogDesignSlug).maybeSingle()
+    const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,product_artworks,polera_prints,allowed_colors,allowed_product_colors').eq('slug', catalogDesignSlug).maybeSingle()
     if (error || !data?.active) return json({ error: 'El diseño elegido ya no está disponible.' }, 409)
     if (customerImage && !data.accepts_customer_image) return json({ error: 'Este diseño no acepta una imagen del cliente.' }, 409)
     if (catalogDesignRequiresCustomerImage(data, customerImage)) return json({ error: 'Este diseño requiere una foto del cliente.' }, 409)
@@ -98,7 +99,14 @@ Deno.serve(async request => {
     : design ? 'catalog_design' : 'own_artwork'
   const { data: storeSettings, error: settingsError } = await admin.from('storefront_settings').select('front_large_clp,front_pocket_clp,back_large_clp,arm_clp').eq('id', true).single()
   if (settingsError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
-  const printExtra = model.code === 'tote' || isCatalogPrintIncluded({catalogDesignSlug, catalogDesignCustomerImage:customerImage},printSides,printConfigurationCount(product.printConfiguration,printSides)) ? 0 : printPrice(normalizePrintConfiguration(product.printConfiguration,printSides),printSides,storeSettings)
+  const composition = catalogPoleraComposition(design, model.code)
+  const printSides = composition?.printSides ?? requestedSides
+  const configuration = composition ? catalogOrderConfiguration(composition, customerImage) : normalizePrintConfiguration(product.printConfiguration, printSides)
+  const printExtra = composition
+    ? printPrice(catalogChargeablePrints(configuration), printSides, storeSettings)
+    : model.code === 'tote' || isCatalogPrintIncluded({ catalogDesignSlug, catalogDesignCustomerImage: customerImage }, printSides, printConfigurationCount(configuration, printSides))
+      ? 0 : printPrice(configuration, printSides, storeSettings)
+
   const basePrice = variantPriceForPurchase({ priceClp: Number(variant.price_clp), personalizationBasePriceClp: Number.isInteger(variant.personalization_base_price_clp) ? Number(variant.personalization_base_price_clp) : null }, purchaseType === 'personalized') ?? Number(variant.price_clp)
   const total = basePrice + printExtra
   const productLabel = model.code === 'tote' ? 'Tote bag' : model.code === 'body' ? 'Body bebé' : `Polera ${model.name}`
@@ -114,7 +122,7 @@ Deno.serve(async request => {
     order_id: order.id, product_variant_id: variant.id, catalog_design_id: design?.id || null,
     catalog_artwork_path: design && !customerImage ? designProductArtworks(design)[modelProductSlug(model.code)] : null,
     name_snapshot: name, sku_snapshot: variant.sku, color_hex: variant.color_hex, print_sides: printSides,
-    print_configuration: normalizePrintConfiguration(product.printConfiguration,printSides),
+    print_configuration: configuration,
     quantity: 1, unit_price_clp: total, line_total_clp: total,
   })
   if (itemError) { await admin.from('orders').delete().eq('id', order.id); return json({ error: 'No pudimos guardar el detalle del pedido.' }, 503) }

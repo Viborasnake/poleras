@@ -795,3 +795,25 @@
 .admin-mockup-video [hidden]{display:none}
 .admin-mockup-video video{display:block;width:100%;max-height:280px;background:var(--ds-surface-subtle);border:1px solid var(--ds-border-subtle);border-radius:var(--ds-radius-control)}
 .admin-mockup-video output[data-tone=error]{color:var(--ds-text-primary);font-weight:700}
+
+[data-polera-prints]{display:grid;gap:12px}
+[data-polera-print]{display:grid;gap:8px}
+[data-print-mockup]{display:grid;gap:8px}
+[data-polera-prints][hidden],[data-polera-print][hidden],[data-polera-prints] [hidden]{display:none}
+.admin-print-plan{display:grid;gap:12px;padding-block:16px;border-top:1px solid var(--ds-border-subtle)}
+.admin-print-plan h3,.admin-print-plan h4,.admin-print-plan p,.admin-print-diagrams figure{margin:0}
+.admin-print-plan article{display:grid;gap:12px;padding:14px;border:1px solid var(--ds-border-subtle);border-radius:var(--ds-radius-control)}
+.admin-print-plan-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:16px;align-items:start}
+.admin-print-diagrams{display:flex;gap:8px}
+.admin-print-diagrams figure{min-width:0;width:min(50%,135px);text-align:center}
+.admin-print-diagrams svg{display:block;width:100%;height:auto}
+.admin-print-diagrams path{fill:var(--ds-surface-page);stroke:currentColor;stroke-width:1.5}
+.admin-print-diagrams circle{fill:var(--ds-color-lime);stroke:var(--ds-color-ink);stroke-width:1}
+.admin-print-diagrams text{fill:var(--ds-color-ink);font:700 11px 'DM Sans',sans-serif}
+.admin-print-diagrams figcaption,.admin-print-plan small{font-size:.8rem}
+.admin-print-plan ol{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.admin-print-plan li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center}
+.admin-print-plan li span>small{display:block;overflow-wrap:anywhere}
+.admin-print-number{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--ds-color-lime);color:var(--ds-color-ink);font-weight:700}
+.admin-print-plan li .admin-secondary{min-height:44px;text-align:center}
+@media(max-width:640px){.admin-print-plan-item{grid-template-columns:1fr}.admin-print-plan li{grid-template-columns:auto minmax(0,1fr)}.admin-print-plan li>:last-child{grid-column:2;justify-self:start}}

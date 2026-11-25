@@ -1,5 +1,6 @@
 // Provisional workshop settings; confirm with the printer before production.
 import {printPrice} from '../supabase/functions/_shared/print-pricing.js';
+import {PRINT_MAX_LAYERS} from '../supabase/functions/_shared/print-configuration.js';
 export const PRINT_POLICY = { widthCm: 28, heightCm: 40, minPpi: 150, maxBytes: 12 * 1024 * 1024 };
 // Fallback used until the public storefront settings load. The live value is managed in Admin.
 export const REVIEW_FEE_CLP = 4990;
@@ -17,8 +18,8 @@ export function paymentBreakdown(total, paidReviewCredit) {
   const depositDue = Math.max(0, Math.ceil(total / 2) - paidReviewCredit);
   return { total, reviewCredit: paidReviewCredit, depositDue, balanceDue: total - paidReviewCredit - depositDue };
 }
-export function orderTotal(basePrice, printChoice, extras = 0, printCount = printChoice === 'both' ? 2 : 1, configuration = null, prices = null, printIncluded = false) {
-  if (!Number.isSafeInteger(basePrice) || basePrice < 0 || !Number.isSafeInteger(extras) || extras < 0 || !(printChoice in PRINT_EXTRAS_CLP) || !Number.isInteger(printCount) || printCount < 0 || printCount > 4) throw new Error('Pedido inválido');
+export function orderTotal(basePrice, printChoice, extras = 0, printCount = printChoice === 'both' ? 2 : 1, configuration = null, prices = null, printIncluded = false, maxPrintCount = PRINT_MAX_LAYERS) {
+  if (!Number.isSafeInteger(basePrice) || basePrice < 0 || !Number.isSafeInteger(extras) || extras < 0 || !(printChoice in PRINT_EXTRAS_CLP) || !Number.isInteger(printCount) || printCount < 0 || printCount > maxPrintCount) throw new Error('Pedido inválido');
   const print = printIncluded ? 0 : configuration ? printPrice(configuration, printChoice, prices || undefined) : Math.max(0, printCount - 1) * PRINT_EXTRAS_CLP.both;
   return { base: basePrice, print, extras, total: basePrice + print + extras };
 }

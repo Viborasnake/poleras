@@ -4,6 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { transform } from 'esbuild';
 import vm from 'node:vm';
 import {designProductArtworks,modelProductSlug} from '../supabase/functions/_shared/catalog-product-artworks.js';
+import {catalogPoleraComposition,catalogOrderConfiguration,catalogChargeablePrints} from '../supabase/functions/_shared/catalog-polera-prints.js';
+import {printConfigurationLabel} from '../supabase/functions/_shared/print-configuration.js';
+import {printPrice} from '../supabase/functions/_shared/print-pricing.js';
 import {allowedColorsForModel} from '../supabase/functions/_shared/catalog-product-colors.js';
 
 const source = await readFile(new URL('../supabase/functions/create-design-request/index.ts', import.meta.url), 'utf8');
@@ -28,7 +31,7 @@ async function send(references,productSelection,extra={},subject='people') {
   let handler;
   vm.runInNewContext(code, {
     Deno:{env:{get:key=>key==='SUPABASE_URL'?'https://example.test':key==='SUPABASE_SECRET_KEY'||key==='TURNSTILE_SECRET_KEY'?'test-secret':undefined},serve:fn=>handler=fn},
-    designProductArtworks,modelProductSlug,allowedColorsForModel,createClient:()=>admin, headPrivateDesign:async()=>({size:1234}), sendOrderEmail:async()=>({sent:false}), verifyTurnstile:async token=>token==='valid-token', Response, console,
+    designProductArtworks,modelProductSlug,allowedColorsForModel,catalogPoleraComposition,catalogOrderConfiguration,catalogChargeablePrints,printConfigurationLabel,printPrice,createClient:()=>admin, headPrivateDesign:async()=>({size:1234}), sendOrderEmail:async()=>({sent:false}), verifyTurnstile:async token=>token==='valid-token', Response, console,
   });
   const response=await handler(new Request('https://example.test', {method:'POST',headers:{Authorization:'Bearer test'},body:JSON.stringify({
     requestId:'33333333-3333-4333-8333-333333333333', catalogDesignSlug:'pet-design',idea:'Mantener su mancha sobre el ojo.',

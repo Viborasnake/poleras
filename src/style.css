@@ -3388,3 +3388,19 @@ body.theme-dark #studio .studio-browse-benefits li>.studio-browse-benefit-icon{b
 .catalog-status-pills:has(>.catalog-featured-pill--collection){position:static}
 .catalog-status-pills>.catalog-featured-pill--collection{position:absolute;top:auto;bottom:18px}
 .catalog-status-pills:has(>.catalog-featured-pill--collection)>.catalog-new-collection-pill{position:absolute;top:62px;left:16px}
+
+.mockup-sides{flex-wrap:wrap}
+.catalog-studio-print-views button{min-height:44px}
+.catalog-print-details{margin-block:14px 0}
+.catalog-print-details p{margin:0 0 8px;font-size:14px}
+.catalog-print-details p strong{display:block}
+.catalog-print-photo-options{display:flex;flex-wrap:wrap;gap:6px}
+.catalog-print-photo-options button{min-height:44px;padding:6px 10px;font-size:13px;text-align:left;transition:none}
+body.theme-dark .catalog-print-photo-options button{background:var(--ds-brand-primary);border-color:var(--ds-text-inverse);color:var(--ds-text-inverse)}
+body.theme-dark .catalog-print-photo-options button:hover{background:var(--ds-brand-accent);color:var(--ds-neutral-900)}
+body.theme-dark .catalog-print-photo-options button:focus-visible{outline-color:var(--ds-lilac-200)}
+.catalog-print-photo-options button[aria-pressed="true"],body.theme-dark .catalog-print-photo-options button[aria-pressed="true"]{background:var(--ds-color-lime);color:var(--ds-neutral-900);text-decoration:underline}
+.catalog-visual > .catalog-print-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:2}
+.catalog-visual > .catalog-print-photo[hidden]{display:none}
+.catalog-visual.is-print-detail > :is(.catalog-3d,.catalog-pet-story,.catalog-missing-mockup){visibility:hidden}
+.catalog-visual.is-print-detail > .drop-featured-video{visibility:hidden}

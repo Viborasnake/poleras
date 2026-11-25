@@ -312,7 +312,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
       const aspect=fitted.aspect,back=layer.side==='back',sleeve=layer.placement.startsWith('sleeve_');
       const safeScale=automaticPrintScale(aspect),area=garmentPrintArea(next.kind);
       const maxScale=next.catalogPreview?2:1.7;
-      const layout=next.catalogDesign?next.catalogPrintLayout:null;
+      const layout=next.catalogDesign&&!layer.id.startsWith('catalog-')?next.catalogPrintLayout:null;
       let scale=Math.min(Number(layer.scale)||1,maxScale)*(layout?.size??1),flat=Boolean(next.catalogPreview||hero);
       const automaticOffsetY=layer.placement==='center'?automaticPrintOffsetY(aspect):0;
       const point=printPlacementCoordinates(layer.placement,area.y+(1-safeScale)*.35+automaticOffsetY-(flat?0:.12)+(layout?.y??0),layer.offsetX,layer.offsetY);

@@ -1,3 +1,5 @@
+import {catalogPoleraComposition,catalogChargeablePrints,normalizePoleraPrints,POLERA_PRINT_LOCATIONS} from '../supabase/functions/_shared/catalog-polera-prints.js';
+import {printPrice} from '../supabase/functions/_shared/print-pricing.js';
 import {studioPreviewState} from './studio-preview.js';
 import {catalogPrintLayoutFor} from './catalog-print-layout.js';
 import {mountHomeSnow} from './home-snow.js';
@@ -24,7 +26,7 @@ import { authErrorMessage } from './auth-messages.js';
 import {authWithCaptcha,requestCaptchaToken,signInAnonymouslyWithCaptcha} from './auth-captcha.js';
 import { PRINT_POLICY, PRINT_EXTRAS_CLP, QUALITY_ADJUSTMENT_CLP as DEFAULT_QUALITY_ADJUSTMENT_CLP, checkResolution, orderTotal } from './print-check.js';
 import { quoteShipping } from './shipping.js';
-import { collections as fallbackCollections, categories as fallbackCategories, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, designCountLabel, loadCatalog, normalizeSampleColor, compareCatalogPriority, collectionsWithDesigns } from './catalog.js';
+import { collections as fallbackCollections, categories as fallbackCategories, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, catalogAssetUrl, designCountLabel, loadCatalog, normalizeSampleColor, compareCatalogPriority, collectionsWithDesigns } from './catalog.js';
 import { catalogCollectionDialogPath, catalogCollectionPath, catalogDesignPath, catalogProductPath } from './catalog-routes.js';
 import { shareLink } from './share.js';
 import { createIntroTurn } from './intro-turn.js';
@@ -37,7 +39,7 @@ import {stableRequestId} from './request-attempt.js';
 import {effectiveQualityReview} from './quality-review.js';
 import {cartPriceBreakdown,cartVariantBasePrice} from './cart-pricing.js';
 import {accountFromUser,accountNavigationState} from './account-navigation.js';
-import {PRINT_MAX_LAYERS,PRINT_PLACEMENT_LABEL,PRINT_SIZE_LABEL,PRINT_SIZE_SCALE,defaultPrintSideConfiguration,normalizePrintConfiguration,normalizePrintSideConfiguration,printConfigurationCount,printConfigurationLabel,printSideConfigurationLabel} from '../supabase/functions/_shared/print-configuration.js';
+import {CATALOG_PRINT_MAX_LAYERS,PRINT_MAX_LAYERS,PRINT_PLACEMENT_LABEL,PRINT_SIZE_LABEL,PRINT_SIZE_SCALE,defaultPrintSideConfiguration,normalizePrintConfiguration,normalizePrintSideConfiguration,printConfigurationCount,printConfigurationLabel,printSideConfigurationLabel} from '../supabase/functions/_shared/print-configuration.js';
 
 const shareIcon=`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.5m-7.6 4.9 7.6 4.5"/></svg>`;
 const dropArrowIcon=`<svg class="drop-arrow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 18 18 6M6 6h12v12"/></svg>`;
@@ -141,11 +143,18 @@ const designSupportsProduct=(design,kind)=>!design||Boolean(designForProduct(des
 const familyPrice=(family,personalized=false)=>{
  const eligible=productsForFamily(family).flatMap(([kind])=>eligibleVariants(kind,null,selectedCatalogDesign()));
  const prices=eligible.map(variant=>variantPriceForPurchase(variant,personalized)).filter(Number.isInteger);
- return prices.length?Math.min(...prices):null;
+ return prices.length?catalogPriceWithPrints(Math.min(...prices),selectedCatalogDesign(),productsForFamily(family)[0]?.[0]):null;
 };
 let variantRows=[];
 let variantLoadStatus='loading';
 const selectedCatalogDesign=()=>catalogDesigns.find(item=>item.id===state.catalogDesignSlug)||null;
+function catalogPrintExtra(design,kind){
+ const composition=catalogPoleraComposition(design,kind);
+ return composition?printPrice(catalogChargeablePrints(composition.configuration),composition.printSides,PRINT_PRICES):0;
+}
+function catalogPriceWithPrints(price,design,kind){
+ return Number.isInteger(price)?price+catalogPrintExtra(design,kind):price;
+}
 const variantSelectionDesign=design=>design?.id===state.catalogDesignSlug?catalogDesignForVariantSelection(design,state.catalogDesignCustomerImage):design;
 function applyCatalogDesignPurchaseMode(design,requestedMode){
  const mode=normalizeCatalogDesignPurchaseMode(design,requestedMode);
@@ -339,7 +348,7 @@ async function loadProductPricesOnce(){
   for(const [code,available] of sizes)products[code].sizes=sortAvailableSizes(code,available);
   if(!products[state.kind].sizes.includes(state.size))state.size=products[state.kind].sizes[0]||'';
   reconcileVariant(selectedCatalogDesign()?.sampleColor,true);
-  renderCatalog();if(studio.open)renderStep();return true;
+  renderCatalog();refreshCatalogDialogPrices();if(studio.open)renderStep();return true;
  }catch(error){variantRows=[];variantLoadStatus='error';console.warn('No pudimos cargar las variantes disponibles desde Insumos:',error);if(studio.open)renderStep();return false}
 }
 const readLocal=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
@@ -495,11 +504,8 @@ async function beginCheckout(asGuest=false){
   const selected=resolveAvailableVariant(item.modelCode,item.size,item.color,design);
   if(!selected.variant)return toast('Un producto del carro ya no está disponible en ese color o talla. Quítalo y vuelve a elegirlo antes de pagar.','error');
   item.variantId=selected.variant.id;
-  item.qualityReview=effectiveQualityReview(item);
-  const basePrice=cartVariantBasePrice(selected.variant,item);
-  item.basePrice=basePrice;
-  item.price=orderTotal(basePrice,item.printSides||'front',item.qualityReview?qualityReviewFee():0,printConfigurationCount(item.printConfiguration,item.printSides||'front'),item.modelCode==='tote'?null:item.printConfiguration,PRINT_PRICES,isCatalogPrintIncluded(item,item.printSides||'front',printConfigurationCount(item.printConfiguration,item.printSides||'front'))).total;
  }
+ normalizeCartPrices();
  saveLocal(CART_KEY,cart);
  publicFlowStates.delete('checkout');state.mode='ready';state.checkoutAsGuest=!account&&asGuest;if(account)await hydrateCheckoutFromProfile();state.editingContact=!(state.firstName&&state.lastName&&state.email&&state.phone);state.shippingQuote=null;recalculateShippingQuote();state.step=3;if(!studio.open)openDialog(studio);renderStep();faceSelectedSide()
 }
@@ -523,7 +529,7 @@ async function addCurrentToCart(){
  if(!selection.variant)return toast('El color o la talla ya no está disponible. Elige una combinación válida.','error');
  addingCurrentToCart=true;
   try{
-  const product=products[state.kind],personalized=currentPurchaseType()==='personalized',basePrice=productPrice(state.kind,state.size,state.color,selectedCatalogDesign(),personalized),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:state.qualityReview}),pricing=orderTotal(basePrice,printChoice(),qualityReview?QUALITY_ADJUSTMENT_CLP:0,printCount(),state.kind==='tote'?null:currentPrintConfiguration(),PRINT_PRICES,isCatalogPrintIncluded(state,printChoice(),printCount())),id=state.cartItemId||`${state.kind==='tote'?'tote':'shirt'}-${Date.now()}`,catalogPreview=state.catalogDesignCustomerImage?'':catalogPreviewForCart(state.catalogDesignSlug,state.kind),fallback=state.images.front||state.images[state.printSide]||'',designPreview=catalogPreview||await cartPreviewPng(state.uploadFiles.front||state.uploadFiles[state.printSide],fallback),item={id,kind:product.name,modelCode:state.kind,size:state.size,sides:printSidesLabel(),printSides:printChoice(),printConfiguration:currentPrintConfiguration(),color:state.color,variantId:state.variantId,catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:Boolean(state.catalogDesignCustomerImage),purchaseType:currentPurchaseType(),qualityReview,designPreview,initial:state.files[state.printSide]?.slice(0,1).toUpperCase()||'*',basePrice,price:pricing.total,quantity:1},existing=cart.findIndex(entry=>entry.id===id);
+  const product=products[state.kind],personalized=currentPurchaseType()==='personalized',basePrice=productPrice(state.kind,state.size,state.color,selectedCatalogDesign(),personalized),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:state.qualityReview}),pricing=currentPrintPricing(basePrice,qualityReview?QUALITY_ADJUSTMENT_CLP:0),id=state.cartItemId||`${state.kind==='tote'?'tote':'shirt'}-${Date.now()}`,catalogPreview=state.catalogDesignCustomerImage?'':catalogPreviewForCart(state.catalogDesignSlug,state.kind),fallback=state.images.front||state.images[state.printSide]||'',designPreview=catalogPreview||await cartPreviewPng(state.uploadFiles.front||state.uploadFiles[state.printSide],fallback),item={id,kind:product.name,modelCode:state.kind,size:state.size,sides:printSidesLabel(),printSides:printChoice(),printConfiguration:currentPrintConfiguration(),color:state.color,variantId:state.variantId,catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:Boolean(state.catalogDesignCustomerImage),purchaseType:currentPurchaseType(),qualityReview,designPreview,initial:state.files[state.printSide]?.slice(0,1).toUpperCase()||'*',basePrice,price:pricing.total,quantity:1},existing=cart.findIndex(entry=>entry.id===id);
   let storageWarning=false;
   if(!item.catalogDesignSlug||item.catalogDesignCustomerImage){
    const front=includedSides().includes('front')?state.uploadFiles.front:null,back=includedSides().includes('back')?state.uploadFiles.back:null,prints=Object.fromEntries(state.additionalPrints.map(print=>[print.id,print.file]));
@@ -544,9 +550,26 @@ function cartItemBreakdown(item){
  const design=catalogDesigns.find(candidate=>candidate.id===item.catalogDesignSlug)||null;
  const pricingDesign=catalogDesignForVariantSelection(design,Boolean(item.catalogDesignCustomerImage));
  const currentBase=cartVariantBasePrice(resolveExactVariant(variantRows,item.modelCode,item.size,item.color,pricingDesign).variant,item);
- return cartPriceBreakdown(item,currentBase,qualityReviewFee(),PRINT_PRICES);
+ return cartPriceBreakdown(item,currentBase,qualityReviewFee(),PRINT_PRICES,catalogPoleraComposition(design,item.modelCode));
 }
-function normalizeCartPrices(){let changed=false;for(const item of cart){const breakdown=cartItemBreakdown(item);if(item.basePrice!==breakdown.base||item.price!==breakdown.unit||item.qualityReview!==breakdown.qualityReview){item.basePrice=breakdown.base;item.price=breakdown.unit;item.qualityReview=breakdown.qualityReview;changed=true}}if(changed)saveLocal(CART_KEY,cart)}
+function normalizeCartPrices(){
+ let changed=false;
+ for(const item of cart){
+  const design=catalogDesigns.find(candidate=>candidate.id===item.catalogDesignSlug);
+  const composition=catalogPoleraComposition(design,item.modelCode);
+  if(composition){
+   const configuration=normalizePrintConfiguration(composition.configuration,composition.printSides);
+   if(item.printSides!==composition.printSides||JSON.stringify(item.printConfiguration)!==JSON.stringify(configuration)||!item.catalogPoleraPrints){
+    item.printConfiguration=configuration;item.printSides=composition.printSides;item.catalogPoleraPrints=true;
+    item.sides=composition.printSides==='both'?'Frente + Espalda':sideNames[composition.printSides];
+    changed=true;
+   }
+  }
+  const breakdown=cartItemBreakdown(item);
+  if(item.basePrice!==breakdown.base||item.price!==breakdown.unit||item.qualityReview!==breakdown.qualityReview){item.basePrice=breakdown.base;item.price=breakdown.unit;item.qualityReview=breakdown.qualityReview;changed=true}
+ }
+ if(changed)saveLocal(CART_KEY,cart);
+}
 function cartBreakdownMarkup(item){const breakdown=cartItemBreakdown(item),placement=breakdown.printSides==='both'?'Frente + espalda':breakdown.printSides==='back'?'Espalda':'Frente',catalogPrintIncluded=Boolean(item.catalogDesignSlug)&&breakdown.print===0;return `<dl class="cart-item-breakdown"><div><dt>Producto base</dt><dd>${money(breakdown.base)}</dd></div>${catalogPrintIncluded?'':`<div><dt>Estampado · ${placement}</dt><dd>+${money(breakdown.print)}</dd></div>`}${breakdown.qualityReview?`<div><dt>Ajuste técnico</dt><dd>+${money(breakdown.review)}</dd></div>`:''}${item.quantity>1?`<div><dt>${item.quantity} unidades</dt><dd>${money(breakdown.unit)} c/u</dd></div>`:''}</dl>`}
 function cartPrintConfigurationLabel(item){const sides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');return printConfigurationLabel(item.printConfiguration,sides)}
 function renderCart(){normalizeCartPrices();const target=document.querySelector('#cart-content');queueMicrotask(()=>{if(!account&&cart.length&&target.isConnected)showCartAccessGate(target)});if(!cart.length){target.innerHTML='<div class="cart-empty"><span>✳</span><h3>Aún no hay poleras aquí.</h3><p>Elige un diseño del catálogo o crea una polera desde cero.</p><div class="cart-empty-actions"><button type="button" class="button dark commerce-wide ds-cta" id="cart-choose">Elegir una polera <span aria-hidden="true">→</span></button><button type="button" class="cart-empty-create" id="cart-start">Crear mi polera</button></div></div>';document.querySelector('#cart-choose').onclick=()=>closeCartDrawer(()=>{location.hash='catalogo'});document.querySelector('#cart-start').onclick=()=>closeCartDrawer(()=>openStudio('ready'));return}const visibleItems=cartExpanded?cart:cart.slice(0,2),hiddenItems=Math.max(0,cart.length-visibleItems.length),itemLabel=cart.reduce((sum,item)=>sum+item.quantity,0)===1?'producto':'productos';target.innerHTML=`<div class="cart-overview"><strong>${cart.reduce((sum,item)=>sum+item.quantity,0)} ${itemLabel} en tu pedido</strong><span>Resumen antes de pagar</span></div><div class="cart-list cart-list--compact">${visibleItems.map(item=>`<article class="cart-item cart-item--compact"><div class="cart-art" style="--cart-color:${safe(item.color)}">${item.designPreview?`<img src="${safe(item.designPreview)}" alt="Diseño elegido">`:`<span>${safe(item.initial)}</span>`}</div><div class="cart-item-copy"><strong>${safe(cartProductLabel(item))}</strong><small>Talla ${safe(sizeLabel(item.modelCode,item.size))} · ${safe(cartColorLabel(item))} · ${safe(item.sides)}</small><small class="cart-item-placement">${safe(cartPrintConfigurationLabel(item))}</small>${cartBreakdownMarkup(item)}<button type="button" data-cart-remove="${safe(item.id)}">Quitar</button></div><div class="cart-price"><strong>${money(item.price*item.quantity)}</strong><div class="quantity"><button type="button" data-cart-quantity="${safe(item.id)}" data-change="-1" aria-label="Reducir cantidad">−</button><span>${item.quantity}</span><button type="button" data-cart-quantity="${safe(item.id)}" data-change="1" aria-label="Aumentar cantidad">+</button></div></div></article>`).join('')}</div>${hiddenItems?`<button type="button" class="cart-show-more" id="cart-show-more">Ver ${hiddenItems} diseño${hiddenItems===1?'':'s'} más <span aria-hidden="true">↓</span></button>`:''}${cartExpanded&&cart.length>2?'<button type="button" class="cart-show-more" id="cart-show-less">Mostrar resumen</button>':''}<div class="cart-total"><span>Subtotal productos</span><strong>${money(cartTotal())}</strong><div class="cart-total-detail"><span>Despacho</span><b>Por calcular</b></div><small>El total final será el subtotal de productos más el despacho calculado en el checkout.</small></div><button type="button" class="button dark commerce-wide ds-cta" id="cart-checkout">Continuar compra <span>→</span></button><button type="button" class="cart-keep-shopping" id="cart-keep-shopping">← Seguir comprando</button>`;target.querySelectorAll('.cart-art').forEach((art,index)=>{const current=visibleItems[index],preview=current?.catalogDesignCustomerImage?'':catalogPreviewForCart(current?.catalogDesignSlug,current?.modelCode);if(preview)art.innerHTML=`<img src="${safe(preview)}" alt="Diseño elegido">`});target.querySelectorAll('[data-cart-remove]').forEach(button=>button.onclick=()=>{cart=cart.filter(item=>item.id!==button.dataset.cartRemove);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelectorAll('[data-cart-quantity]').forEach(button=>button.onclick=()=>{const item=cart.find(entry=>entry.id===button.dataset.cartQuantity);if(!item)return;item.quantity+=Number(button.dataset.change);if(item.quantity<1)cart=cart.filter(entry=>entry!==item);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelector('#cart-show-more')?.addEventListener('click',()=>{cartExpanded=true;renderCart()});target.querySelector('#cart-show-less')?.addEventListener('click',()=>{cartExpanded=false;renderCart()});document.querySelector('#cart-keep-shopping').onclick=()=>closeCartDrawer();document.querySelector('#cart-checkout').onclick=()=>account?closeCartDrawer(()=>beginCheckout(false)):showCartAccessGate(target)}
@@ -743,7 +766,7 @@ function showStagePhoto(index){
   stagePhoto.classList.toggle('is-artwork-fallback',Boolean(item.artworkFallback));
   const design=selectedCatalogDesign();
   const productKind=Object.keys(products).find(kind=>modelProductSlug(kind)===item.productSlug);
-  const price=productKind&&designSupportsProduct(design,productKind)?productPrice(productKind,null,null,design):null;
+  const price=productKind&&designSupportsProduct(design,productKind)?catalogPriceWithPrints(productPrice(productKind,null,null,design),design,productKind):null;
   const icon=productFamilyIcon(({poleras:'men',bodys:'body',totebags:'tote'})[item.productSlug]);
   const designType=design?.acceptsCustomerImage?'Diseño personalizable':design?.featured?'✦ Diseño destacado':'Diseño original';
   stagePhoto.querySelector('.studio-stage-photo-pills').innerHTML=`<span class="studio-stage-photo-product">${icon}<span>${escapeText(item.label)}</span></span><span class="studio-stage-photo-type">${designType}</span>${price==null?'':`<span class="studio-stage-photo-price">Desde ${money(price)}</span>`}`;
@@ -783,6 +806,10 @@ function schedulePhotoRotation(){
 function renderStudioGallery(){
  const design=selectedCatalogDesign();
  const items=studioGalleryItems(design,catalogProducts);
+ if(designForProduct(design,'poleras')&&catalogProducts.some(product=>product.slug==='poleras')){
+  const {mockups}=normalizePoleraPrints(design.poleraPrints);
+  items.push(...Object.entries(mockups).map(([location,path])=>({src:catalogAssetUrl(path),label:POLERA_PRINT_LOCATIONS[location].label,productSlug:'poleras',focusX:50,focusY:50,artworkFallback:true})));
+ }
  if(design&&!items.some(item=>item.productSlug===modelProductSlug(state.kind))){
   const selectedProduct=modelProductSlug(state.kind);
   const artwork=designForProduct(design,selectedProduct);
@@ -802,7 +829,7 @@ function renderStudioGallery(){
   const image=document.createElement('img');image.src=item.src;image.alt=`${item.label} con el diseño ${design.name}`;image.loading='lazy';image.decoding='async';image.style.objectPosition=`${item.focusX}% ${item.focusY}%`;
   const caption=document.createElement('span');caption.className='studio-gallery-caption';caption.innerHTML=`${productFamilyIcon(({poleras:'men',bodys:'body',totebags:'tote'})[item.productSlug])}<span></span>`;caption.querySelector('span').textContent=item.label;
   const productKind=Object.keys(products).find(kind=>modelProductSlug(kind)===item.productSlug);
-  const price=productKind&&designSupportsProduct(design,productKind)?productPrice(productKind,null,null,design):null;
+  const price=productKind&&designSupportsProduct(design,productKind)?catalogPriceWithPrints(productPrice(productKind,null,null,design),design,productKind):null;
   if(price!=null){const pricePill=document.createElement('span');pricePill.className='studio-gallery-price';pricePill.textContent=`Desde ${money(price)}`;button.append(pricePill)}
   button.append(image,caption);return button;
  }));
@@ -980,6 +1007,33 @@ function syncPreview(){
   const storyKey=JSON.stringify([personalizedDesign.id,personalizedDesign.customerPhotoSubject,personalizedDesign.personalizationArrow]);
   if(story.dataset.key!==storyKey){story.innerHTML=catalogPetStory(personalizedDesign.personalizationArrow,personalizedDesign.customerPhotoSubject,true);story.dataset.key=storyKey}
  }else story?.remove();
+ let printViews=livePreview.querySelector('.catalog-studio-print-views');
+ const catalogPrints=catalogPoleraComposition(selectedCatalogDesign(),state.kind);
+ const showPrintViews=catalogPrints&&state.mode==='ready'&&state.step!==2&&
+  (catalogPrints.configuration.prints.length>1||catalogPrints.configuration.prints[0].placement!=='center'||catalogPrints.printSides==='back');
+ if(showPrintViews){
+  if(!printViews){
+   printViews=document.createElement('div');printViews.className='mockup-sides catalog-studio-print-views';
+   printViews.setAttribute('role','group');printViews.setAttribute('aria-label','Vistas de estampado');
+   livePreview.append(printViews);
+   printViews.addEventListener('click',event=>{
+    const button=event.target.closest('[data-catalog-print-view]');if(!button)return;
+    activatePrintLayer(button.dataset.catalogPrintView);faceSelectedSide();syncPreview();
+   });
+  }
+  const layers=allPrintLayers();
+  const key=layers.map(print=>`${print.id}:${print.placement}`).join(',');
+  if(printViews.dataset.key!==key){
+   printViews.innerHTML=layers.map(print=>`<button type="button" data-catalog-print-view="${print.id}">${catalogPrintLabel(print)}</button>`).join('');
+   printViews.dataset.key=key;
+  }
+  const active=state.activePrintId||`primary-${state.printSide}`;
+  printViews.querySelectorAll('button').forEach(button=>{
+   const selected=button.dataset.catalogPrintView===active;
+   button.setAttribute('aria-pressed',String(selected));
+   button.classList.toggle('selected',selected);
+  });
+ }else printViews?.remove();
  const liveEyebrow=livePreview.querySelector(':scope > .eyebrow');if(liveEyebrow){liveEyebrow.hidden=false;liveEyebrow.textContent=catalogPreviewReady?`TU DISEÑO ELEGIDO, EN ${state.kind==='tote'?'LA TOTE BAG':state.kind==='body'?'EL BODY':'LA POLERA'}`:'UNA VISTA A TU PRÓXIMA FAVORITA'}
  let effects=livePreview.querySelector('.forge-3d-effects');
  if(!effects){const particles=Array.from({length:34},(_,index)=>`<i style="--i:${index};--x:${5+(index*37)%90}%;--y:${8+(index*53)%84}%;--s:${3+(index%5)*1.4}px;--drift:${-34+(index*29)%68}px;--duration:${2.6+(index%6)*.28}s"></i>`).join('');livePreview.insertAdjacentHTML('beforeend',`<div class="forge-3d-effects" aria-hidden="true"><div class="forge-3d-halo"></div><div class="forge-3d-scan"></div><div class="forge-3d-particles">${particles}</div><div class="forge-3d-status"><span></span><div><strong></strong><small></small></div></div></div>`);effects=livePreview.querySelector('.forge-3d-effects')}
@@ -987,7 +1041,7 @@ function syncPreview(){
  const panel=document.querySelector('#reference-panel');panel.hidden=true;panel.replaceChildren();
  const fallbackShell=document.querySelector('.preview-fallback');
  if(fallbackShell){fallbackShell.classList.toggle('body-fallback',state.kind==='body');fallbackShell.style.setProperty('--shirt',state.color);const fallback=fallbackShell.querySelector('img');if(fallback){fallback.hidden=!renderState.image;fallback.alt=state.kind==='body'?'Tu diseño sobre el body':'Tu diseño sobre la polera';if(!fallback.hidden)fallback.src=renderState.image}}
- if((isForging||showMockup)&&studio.open){const wantedKind=state.kind==='tote'?'tote':'shirt';if(viewerKind!==wantedKind){viewer?.dispose();viewer=null;viewerPromise=null;introTurn=null;viewerKind=wantedKind;viewerVersion++;stageAngle=0;showPreviewLoading()}viewer?.update(renderState);if(!viewerPromise){const version=viewerVersion,session=introSession;viewerPromise=import(wantedKind==='tote'?'./tote-viewer.js':'./garment.js').then(async m=>{const created=wantedKind==='tote'?await m.createToteViewer(document.querySelector('#viewer'),renderState):await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:4.9});if(version!==viewerVersion){created.dispose();return null}viewer=created;introTurn=createIntroTurn({turn:created.turn,reducedMotion:()=>introReducedMotion.matches});requestAnimationFrame(()=>requestAnimationFrame(()=>{if(session===introSession&&!introInteracted&&!introReducedMotion.matches&&studio.open&&viewer===created)introTurn.start()}));return viewer}).catch(()=>{if(version===viewerVersion){viewerPromise=null;showPreviewFallback(renderState);stageControls.hidden=true;toast('El visor 3D no está disponible en este navegador.','error')}return null})}
+ if((isForging||showMockup)&&studio.open){const wantedKind=state.kind==='tote'?'tote':'shirt';if(viewerKind!==wantedKind){viewer?.dispose();viewer=null;viewerPromise=null;introTurn=null;viewerKind=wantedKind;viewerVersion++;stageAngle=0;showPreviewLoading()}viewer?.update(renderState);if(!viewerPromise){const version=viewerVersion,session=introSession;viewerPromise=import(wantedKind==='tote'?'./tote-viewer.js':'./garment.js').then(async m=>{const created=wantedKind==='tote'?await m.createToteViewer(document.querySelector('#viewer'),renderState):await m.createViewer(document.querySelector('#viewer'),renderState,{cameraDistance:4.9});if(version!==viewerVersion){created.dispose();return null}viewer=created;introTurn=createIntroTurn({turn:created.turn,reducedMotion:()=>introReducedMotion.matches});requestAnimationFrame(()=>requestAnimationFrame(()=>{if(session!==introSession||introInteracted||!studio.open||viewer!==created)return;if(state.printSide==='back'||activePrintConfiguration().placement.startsWith('sleeve_'))created.face(state.printSide,activePrintConfiguration().placement);else if(!introReducedMotion.matches)introTurn.start()}));return viewer}).catch(()=>{if(version===viewerVersion){viewerPromise=null;showPreviewFallback(renderState);stageControls.hidden=true;toast('El visor 3D no está disponible en este navegador.','error')}return null})}
  viewerPromise?.then(created=>{created?.update(renderState);created?.resize()})}
  if(fullscreenViewerDialog?.open)fullscreenViewer?.update(renderState);
 }
@@ -1044,7 +1098,7 @@ const pageDots=document.createElement('div');pageDots.className='drop-page-dots'
 const catalogDialog=document.createElement('dialog');
 catalogDialog.className='catalog-dialog';
 catalogDialog.setAttribute('aria-labelledby','catalog-dialog-title');
-catalogDialog.innerHTML=`<div class="catalog-dialog-shell"><header class="catalog-dialog-head"><div><span class="eyebrow">DISEÑOS DE LA COLECCIÓN</span><h2 id="catalog-dialog-title"></h2><p class="catalog-dialog-count"></p></div><button type="button" class="catalog-dialog-close ds-icon-button close-button" data-close aria-label="Cerrar colección"><span aria-hidden="true"></span></button></header><div class="catalog-dialog-body"><div class="catalog-dialog-grid"></div><p class="catalog-dialog-note">Elige un diseño para abrirlo en el estudio. Después podrás seleccionar modelo, talla y ubicación del estampado.</p></div></div>`;
+catalogDialog.innerHTML=`<div class="catalog-dialog-shell"><header class="catalog-dialog-head"><div><span class="eyebrow">DISEÑOS DE LA COLECCIÓN</span><h2 id="catalog-dialog-title"></h2><p class="catalog-dialog-count"></p></div><button type="button" class="catalog-dialog-close ds-icon-button close-button" data-close aria-label="Cerrar colección"><span aria-hidden="true"></span></button></header><div class="catalog-dialog-body"><div class="catalog-dialog-grid"></div><p class="catalog-dialog-note">Elige un diseño para abrirlo en el estudio. Después podrás seleccionar modelo, talla y color, y revisar los estampados.</p></div></div>`;
 document.body.append(catalogDialog);
 const designDialog=document.createElement('dialog');
 designDialog.className='catalog-dialog catalog-design-dialog catalog-dialog--single';
@@ -1085,6 +1139,30 @@ function catalogMissingMockup(design){
  return `<div class="catalog-missing-mockup">${productFamilyIcon(catalogProductFamily(design.previewProductSlug))}<strong>${safe(product)}</strong><span>Mockup pendiente</span><small>Vista del diseño para este producto</small>${artworkUrl(design)?`<img src="${safe(artworkUrl(design))}" alt="Diseño ${safe(design.name)} sin mockup de ${safe(product)}" loading="lazy">`:''}</div>`;
 }
 function catalogPreviewDesign(design,defaultSlug,productSlug=selectedCatalogProduct){return designWithProductMockup(design,productSlug,defaultSlug,catalogProducts.filter(product=>product.active!==false).map(product=>product.slug))}
+function catalogDesignPrice(design,productSlug){
+ if(productSlug==='totebags')return productPrice('tote','M',null,design);
+ if(productSlug==='bodys')return productPrice('body',null,null,design);
+ if(productSlug==='poleras')return catalogPriceWithPrints(productPrice('basic','M',null,design),design,'basic');
+ return null;
+}
+function refreshCatalogDialogPrices(){
+ for(const dialog of [catalogDialog,designDialog]){
+  if(!dialog.open)continue;
+  for(const card of dialog.querySelectorAll('.catalog-design-card')){
+   const design=catalogDesigns.find(item=>item.id===card.dataset.designId),price=card.querySelector('.catalog-price');
+   if(design&&price)price.textContent=priceLabel(catalogDesignPrice(design,card.dataset.productSlug));
+  }
+ }
+}
+function catalogModalPrintDetails(design){
+ const {primary,additional,mockups}=normalizePoleraPrints(design.poleraPrints);
+ const locations=[primary,...Object.keys(additional)];
+ const photos=locations.filter(location=>mockups[location]);
+ if(locations.length===1&&primary==='front'&&!photos.length)return '';
+ const label=locations.map(location=>POLERA_PRINT_LOCATIONS[location].label).join(' · ');
+ const photoButton=(title,url='')=>`<button type="button" class="ds-secondary-button" data-print-photo="${safe(url)}" aria-pressed="${!url}">${title}</button>`;
+ return `<div class="catalog-print-details"><p><strong>Estampados</strong> ${label}</p>${photos.length?`<div class="catalog-print-photo-options" role="group" aria-label="Fotos de la polera">${photoButton('Vista general')}${photos.map(location=>photoButton(POLERA_PRINT_LOCATIONS[location].label,catalogAssetUrl(mockups[location]))).join('')}</div>`:''}</div>`;
+}
 function catalogDesignCard(design,index,collection,preferredProduct='',wall=false,wallFeatured=false,inDialog=false,shareCollection=false){
  const sourceDesign=design;
  const cardKey=`design:${design.id}`;
@@ -1101,16 +1179,17 @@ function catalogDesignCard(design,index,collection,preferredProduct='',wall=fals
  const petStory=Boolean(design.acceptsCustomerImage);
  const visual=design.featuredPhoto?`<img class="catalog-3d catalog-featured-photo${productSlug==='totebags'?' catalog-featured-photo--tote':''}" style="${mainFocusStyle}" src="${design.featuredPhoto}" alt="Foto principal del diseño ${safe(design.name)}">${design.featuredPhotoHover?`<img class="catalog-3d catalog-featured-photo-hover${productSlug==='totebags'?' catalog-featured-photo--tote':''}" style="${hoverFocusStyle}" src="${design.featuredPhotoHover}" alt="" aria-hidden="true">`:''}`:catalogMissingMockup(design);
  const shareUrl=collection?catalogCollectionDialogPath(collection.id):'';
+ const printDetails=inDialog&&productSlug==='poleras'?catalogModalPrintDetails(sourceDesign):'';
+ const price=priceLabel(catalogDesignPrice(design,productSlug));
  const clip=catalogDesignVideoUrl(design.id,productSlug,design.featuredVideo);
  const video=clip?`<video class="drop-featured-video" data-featured-design-video="${safe(clip)}" muted playsinline preload="none" aria-hidden="true" disablepictureinpicture></video>`:'';
  const videoControl=clip?`<button type="button" class="ds-secondary-button drop-featured-video-control" data-featured-video-control data-video-label="${safe(design.name)}" hidden>Ver video</button>`:'';
  if(wall){
-  const price=priceLabel(productSlug==='totebags'?productPrice('tote','M',null,design):productSlug==='bodys'?productPrice('body',null,null,design):productSlug==='poleras'?productPrice('basic','M',null,design):null);
   const personalizationStory=petStory&&design.featuredPhoto?catalogPetStory(personalizationArrow,design.customerPhotoSubject):'';
   return `<article class="catalog-card drop-collection drop-design-card${petStory?' catalog-card--pet-story':''}${design.featured||wallFeatured?' drop-collection--featured':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}" data-catalog-video-host><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}"><button type="button" class="drop-collection-link" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}"><span class="drop-card-media">${visual.replaceAll('<img ',`<img loading="${index<3?'eager':'lazy'}" decoding="async" `)}${video}${personalizationStory}</span><span class="drop-labels">${petStory?'<span class="drop-personalizable">Diseño personalizable</span>':`<span class="drop-collection-type">${wallFeatured?'✦ Diseño destacado':design.featured?'✦ Destacado':'Diseño original'}</span>`}</span><span class="drop-design-price">${price}</span><span class="drop-caption"><span><small>${safe(collection?.label||'Diseño original')}</small><strong>${safe(design.name)}</strong>${commerceSupported?'':'<small>Próximamente</small>'}</span>${dropArrowMarkup('Ver diseño')}</span></button>${videoControl}</div></article>`;
  }
 
- return `<article class="catalog-card catalog-design-card${petStory?' catalog-card--pet-story':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}" data-catalog-video-host><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}">${design.featured?'<span class="catalog-featured-pill">Destacado</span>':''}<span class="catalog-design-kicker"><span aria-hidden="true">✦</span> Diseño original</span><span class="catalog-design-number" aria-hidden="true">${String(index+1).padStart(2,'0')}</span>${visual}${video}${videoControl}${petStory&&design.featuredPhoto?catalogPetStory(personalizationArrow,design.customerPhotoSubject):''}<span class="catalog-price">${priceLabel(productSlug==='totebags'?productPrice('tote','M',null,design):productSlug==='bodys'?productPrice('body',null,null,design):productSlug==='poleras'?productPrice('basic','M',null,design):null)}</span></div><div class="catalog-card-info"><div>${inDialog?catalogProductBadges([sourceDesign],productChoice.selected,cardKey):''}${collection?`<span class="catalog-design-collection">${safe(collection.label)}</span>`:''}<h3>${safe(design.name)}</h3><details class="catalog-description"><summary><span class="catalog-description-show">Ver descripción</span><span class="catalog-description-hide">Ocultar descripción</span></summary><p>${safe(design.caption)}</p></details></div></div><div class="catalog-card-actions"><button type="button" class="catalog-choose ds-cta" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}">${chooseLabel} <span aria-hidden="true">→</span></button>${shareCollection?`<button type="button" class="catalog-share share-button" data-share-url="${safe(shareUrl)}" data-share-title="Colección ${safe(collection.label)} · Droska" data-share-text="Mira esta colección de Droska.">${shareIcon}<span>Compartir colección</span></button>`:''}</div></article>`;
+ return `<article class="catalog-card catalog-design-card${petStory?' catalog-card--pet-story':''}" data-design-id="${safe(design.id)}" data-preview-id="${safe(design.id)}" data-product-slug="${safe(productSlug)}" data-catalog-video-host><div class="catalog-visual catalog-visual--${safe(design.surface)} catalog-theme-${index%4}">${design.featured?'<span class="catalog-featured-pill">Destacado</span>':''}<span class="catalog-design-kicker"><span aria-hidden="true">✦</span> Diseño original</span><span class="catalog-design-number" aria-hidden="true">${String(index+1).padStart(2,'0')}</span>${visual}${video}${videoControl}${printDetails?'<img class="catalog-print-photo" hidden alt="">':''}${petStory&&design.featuredPhoto?catalogPetStory(personalizationArrow,design.customerPhotoSubject):''}<span class="catalog-price">${price}</span></div><div class="catalog-card-info"><div>${inDialog?catalogProductBadges([sourceDesign],productChoice.selected,cardKey):''}${collection?`<span class="catalog-design-collection">${safe(collection.label)}</span>`:''}<h3>${safe(design.name)}</h3><details class="catalog-description"><summary><span class="catalog-description-show">Ver descripción</span><span class="catalog-description-hide">Ocultar descripción</span></summary><p>${safe(design.caption)}</p></details>${printDetails}</div></div><div class="catalog-card-actions"><button type="button" class="catalog-choose ds-cta" data-design="${safe(design.id)}" data-product="${safe(productSlug)}"${commerceSupported?'':' disabled'} aria-label="${safe(chooseLabel)} para ${safe(design.name)}">${chooseLabel} <span aria-hidden="true">→</span></button>${shareCollection?`<button type="button" class="catalog-share share-button" data-share-url="${safe(shareUrl)}" data-share-title="Colección ${safe(collection.label)} · Droska" data-share-text="Mira esta colección de Droska.">${shareIcon}<span>Compartir colección</span></button>`:''}</div></article>`;
 }
 function catalogCollectionCard(item,index,productDesigns){
  const designs=filterCatalog(item.id,productDesigns);
@@ -1320,7 +1399,7 @@ function arrangeSingleCatalogDialog(dialog){
  label.className='catalog-single-products-label';
  label.textContent='Elige el producto';
  group.append(label,products);
- info.append(group);
+ info.insertBefore(group,info.querySelector('.catalog-print-details'));
 }
 function openCatalogCollection(collectionId,productSlug=''){
  const collection=collections.find(item=>item.id===collectionId);if(!collection)return;
@@ -1333,7 +1412,7 @@ function openCatalogCollection(collectionId,productSlug=''){
  catalogDialog.classList.toggle('catalog-dialog--three-up',designs.length===3);
  catalogDialog.querySelector('#catalog-dialog-title').textContent=collection.label;
  catalogDialog.querySelector('.catalog-dialog-count').textContent=`${designCountLabel(designs.length)} en esta colección`;
- catalogDialog.querySelector('.catalog-dialog-note').textContent=designs.some(design=>design.acceptsCustomerImage)?'Elige un diseño. Si se personaliza con una foto, podrás subirla y enviar tus indicaciones al equipo.':'Elige un diseño para abrirlo en el estudio. Después podrás seleccionar modelo, talla y ubicación del estampado.';
+ catalogDialog.querySelector('.catalog-dialog-note').textContent=designs.some(design=>design.acceptsCustomerImage)?'Elige un diseño. Si se personaliza con una foto, podrás subirla y enviar tus indicaciones al equipo.':'Elige un diseño para abrirlo en el estudio. Después podrás seleccionar modelo, talla y color, y revisar los estampados.';
  catalogDialog.querySelector('.catalog-dialog-grid').innerHTML=designs.length?designs.map((design,index)=>catalogDesignCard(design,index,collection,activeProduct==='all'?'':activeProduct,false,false,true)).join(''):`<div class="catalog-empty-collection"><span aria-hidden="true">+</span><h3>Esta colección aún no tiene diseños.</h3><p>Cuando agregues el primero desde el panel, aparecerá aquí automáticamente.</p></div>`;
  arrangeSingleCatalogDialog(catalogDialog);
  syncFeaturedDesignVideo(catalogDialog);
@@ -1447,15 +1526,26 @@ async function refreshCatalog(){
   const publicDesigns=result.designs.filter(design=>publicCollectionIds.has(design.collection));
   publishedCollections=publicCollections;
   publishedDesigns=publicDesigns;
+  const previousDesign=selectedCatalogDesign();
   const before=JSON.stringify([catalogCategories,collections,catalogDesigns]);
   const after=JSON.stringify([result.categories,publicCollections,publicDesigns]);
   catalogCategories=result.categories;collections=publicCollections;catalogDesigns=publicDesigns;
   if(state.catalogDesignSlug){
    const savedDesign=catalogDesigns.find(design=>design.id===state.catalogDesignSlug);
-   if(savedDesign){applyCatalogDesignPurchaseMode(savedDesign,state.catalogDesignPurchaseMode);state.catalogDesignName=savedDesign.name;state.catalogDesign=savedDesign.name}
+   if(savedDesign){
+    applyCatalogDesignPurchaseMode(savedDesign,state.catalogDesignPurchaseMode);state.catalogDesignName=savedDesign.name;state.catalogDesign=savedDesign.name;
+    if(JSON.stringify(savedDesign)!==JSON.stringify(previousDesign)&&designSupportsProduct(savedDesign,state.kind)){
+     const kind=state.kind;
+     try{
+      const artwork=await prepareCatalogArtwork(savedDesign,kind);
+      if(state.catalogDesignSlug===savedDesign.id&&state.kind===kind){applyCatalogArtwork(artwork);if(studio.open&&state.step!==3)renderStep()}
+     }catch(error){console.warn('No pudimos actualizar la vista del diseño:',error)}
+    }
+   }
    else{state.catalogDesign=null;state.catalogDesignName=null;state.catalogDesignSlug=null;state.catalogDesignCustomerImage=false;state.catalogDesignPurchaseMode='base'}
   }
   if(variantRows.length)reconcileVariant(selectedCatalogDesign()?.sampleColor,true);
+  normalizeCartPrices();
   if(before!==after||productsChanged||!wasAvailable){
    renderCatalog();renderHeroCatalogSamples();if(catalogRenderStarted)requestCatalogMockups();
    if(catalogDialog.open){const collection=collections.find(item=>item.id===catalogDialog.dataset.collectionId);if(collection)openCatalogCollection(collection.id,catalogDialog.dataset.productSlug);else catalogDialog.close()}
@@ -1582,33 +1672,14 @@ async function chooseCatalogDesign(button){
     const requestedProduct=button.dataset.product||(selectedCatalogProduct!=='all'?selectedCatalogProduct:new URLSearchParams(location.search).get('product'));
     const kind=requestedProduct==='totebags'&&designAppliesToProduct(design,'totebags')?'tote':requestedProduct==='bodys'&&designAppliesToProduct(design,'bodys')?'body':designForProduct(design,'poleras')?'basic':designForProduct(design,'totebags')?'tote':designForProduct(design,'bodys')?'body':null;
     if(!kind)throw new Error('Este diseño no tiene productos disponibles en el estudio.');
-    state.additionalPrints=[];state.activePrintId=null;state.catalogDesignName=design.name;state.catalogDesign=design.name;state.catalogDesignSlug=design.id;applyCatalogDesignPurchaseMode(design,'personalized');state.kind=kind;state.size=products[kind].sizes[0]||'';state.color=normalizeSampleColor(design.sampleColor);reconcileVariant(design.sampleColor,true);state.printConfigurations={front:{...defaultPrintSideConfiguration('front'),scale:CATALOG_ARTWORK_SCALE},back:{...defaultPrintSideConfiguration('back'),scale:CATALOG_ARTWORK_SCALE}};state.printScale=CATALOG_ARTWORK_SCALE;state.printSides=['front'];state.printAdjustmentsOpen=false;
+    const artwork=await prepareCatalogArtwork(design,kind);
+    state.catalogDesignName=design.name;state.catalogDesign=design.name;state.catalogDesignSlug=design.id;
+    applyCatalogDesignPurchaseMode(design,'personalized');
+    state.kind=kind;state.size=products[kind].sizes[0]||'';state.color=normalizeSampleColor(design.sampleColor);
+    reconcileVariant(design.sampleColor,true);
     if(state.petRequest?.designId!==design.id||state.petRequest?.orderId)state.petRequest={designId:design.id};
-    saveForFifteenDays(CATALOG_DRAFT_KEY,{catalogDesignSlug:state.catalogDesignSlug,catalogDesignName:state.catalogDesignName,catalogDesignCustomerImage:state.catalogDesignCustomerImage,catalogDesignPurchaseMode:state.catalogDesignPurchaseMode});
-    if(state.catalogDesignCustomerImage){
-      for(const side of ['front','back']){if(state.images[side]?.startsWith('blob:'))URL.revokeObjectURL(state.images[side]);state.images[side]='';state.files[side]='';state.uploadFiles[side]=null;state.cloudSaved[side]=false;state.assessments[side]=null}
-      state.image='';state.file='';state.uploaded=false;state.assessment=null;state.isDefault=false;state.printSide='front';
-    }
-    // El arte público ya está optimizado y vive en R2. No lo volvemos a pasar
-    // por un canvas del navegador: si el dominio de imágenes aún no propagó
-    // CORS, ese paso falla aunque la imagen sea perfectamente visible.
-    // El visor 3D puede consumir la URL pública directamente y los pedidos de
-    // catálogo no necesitan guardar una copia privada del arte.
-    const artwork=designForProduct(design,modelProductSlug(kind));
-    const image=await loadCatalogArtwork(artwork);
-    const artworkUrlValue=artworkUrl(artwork);
-    if(!artworkUrlValue||!image.naturalWidth)throw new Error('No se pudo cargar el archivo del diseño');
-    const previous=state.images.front;
-    if(previous?.startsWith('blob:'))URL.revokeObjectURL(previous);
-    state.images.front=artworkUrlValue;
-    state.files.front=`droska-${design.id}.webp`;
-    state.uploadFiles.front=null;
-    state.cloudSaved.front=false;
-    state.uploaded=true;
-    state.assessment=checkResolution(image.naturalWidth,image.naturalHeight);
-    state.assessments.front=state.assessment;
-    state.printConfigurations.front.size='large';state.printConfigurations.front.scale=CATALOG_ARTWORK_SCALE;state.printScale=CATALOG_ARTWORK_SCALE;
-    activateSide('front');
+    applyCatalogArtwork(artwork);
+    persistDraft();
     syncPreview();
     catalogDialog.close();designDialog.close();
     openStudio('browse');
@@ -1641,6 +1712,17 @@ refreshCatalog().then(async()=>{
   await openRequestedCatalogDesign();
 });
 async function handleCatalogDialogCardClick(event){
+  const photo=event.target.closest('[data-print-photo]');
+  if(photo){
+   const card=photo.closest('.catalog-design-card'),image=card.querySelector('.catalog-print-photo'),visual=image.parentElement;
+   const url=photo.dataset.printPhoto;
+   if(url){image.src=url;image.alt=`Mockup de ${photo.textContent.toLowerCase()}`;}
+   image.hidden=!url;
+   visual.classList.toggle('is-print-detail',Boolean(url));
+   visual.classList.remove('is-zoomed');
+   card.querySelectorAll('[data-print-photo]').forEach(button=>button.setAttribute('aria-pressed',String(button===photo)));
+   return;
+  }
   if(toggleCatalogZoom(event))return;
   const productButton=event.target.closest('[data-card-product]');
   if(productButton){event.preventDefault();event.stopPropagation();selectCatalogCardProduct(productButton);return}
@@ -1675,6 +1757,33 @@ document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>but
 document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('close',()=>{if(!document.querySelector('dialog[open]'))document.body.classList.remove('locked')}));
 document.querySelector('#space-create').onclick=()=>{document.querySelector('#space').close();openStudio()};
 const sideNames={front:'Frente',back:'Espalda'};
+const catalogPrintLabel=print=>Object.values(POLERA_PRINT_LOCATIONS).find(location=>location.side===print.side&&location.placement===print.placement)?.label||sideNames[print.side];
+
+async function prepareCatalogArtwork(design,kind){
+ const productArtwork=designForProduct(design,modelProductSlug(kind));
+ const composition=catalogPoleraComposition(design,kind);
+ const layers=composition?.configuration.prints||[{side:'front',...defaultPrintSideConfiguration('front'),scale:CATALOG_ARTWORK_SCALE}];
+ const main=await loadCatalogArtwork(productArtwork);
+ return layers.map((layer,index)=>({
+  ...layer,
+  image:index===0?artworkUrl(productArtwork):catalogAssetUrl(layer.catalogArtworkPath),
+  fileName:`droska-${design.id}-${layer.id||'front'}.webp`,
+  assessment:index===0?checkResolution(main.naturalWidth,main.naturalHeight):null,
+ }));
+}
+
+function applyCatalogArtwork([primary,...additional]){
+ for(const url of [...Object.values(state.images),...state.additionalPrints.map(print=>print.image)])if(url?.startsWith('blob:'))URL.revokeObjectURL(url);
+ state.images={front:'',back:'',[primary.side]:primary.image};
+ state.files={front:'',back:'',[primary.side]:primary.fileName};
+ state.uploadFiles={front:null,back:null};state.cloudSaved={front:false,back:false};
+ state.assessments={front:null,back:null,[primary.side]:primary.assessment};
+ state.printConfigurations={front:defaultPrintSideConfiguration('front'),back:defaultPrintSideConfiguration('back'),[primary.side]:normalizePrintSideConfiguration(primary,primary.side)};
+ state.printSides=[primary.side];
+ state.additionalPrints=additional.map(layer=>({id:layer.id,side:layer.side,configuration:normalizePrintSideConfiguration(layer,layer.side),image:layer.image,fileName:layer.fileName,assessment:layer.assessment}));
+ state.printAdjustmentsOpen=false;state.qualityAccepted=false;state.qualityReview=false;state.uploaded=true;
+ activateSide(primary.side);
+}
 const includedSides=()=>state.kind==='tote'?['front']:state.printSides;
 const printLayerSides=()=>[...new Set([...includedSides(),...state.additionalPrints.map(item=>item.side)])];
 const hasTwoSides=()=>printLayerSides().length===2;
@@ -1688,6 +1797,11 @@ function currentPrintConfiguration(designPaths={}){
  return normalizePrintConfiguration({...state.printConfigurations,prints},printChoice());
 }
 const printCount=()=>allPrintLayers().length;
+function currentPrintPricing(base,review){
+ const composition=catalogPoleraComposition(selectedCatalogDesign(),state.kind);
+ const configuration=composition?catalogChargeablePrints(composition.configuration):state.kind==='tote'?null:currentPrintConfiguration();
+ return orderTotal(base,printChoice(),review,printCount(),configuration,PRINT_PRICES,!composition&&isCatalogPrintIncluded(state,printChoice(),printCount()),composition?CATALOG_PRINT_MAX_LAYERS:PRINT_MAX_LAYERS);
+}
 const hasRequiredFiles=()=>includedSides().every(side=>Boolean(state.images[side]))&&state.additionalPrints.every(item=>Boolean(item.image));
 const failingSides=()=>[...includedSides().map(side=>state.assessments[side]),...state.additionalPrints.map(item=>item.assessment)].filter(assessment=>assessment&&!assessment.qualifies);
 function activateSide(side){if(!includedSides().includes(side))return;state.activePrintId=null;state.printSide=side;state.image=state.images[side]||'';state.assessment=state.assessments[side]||null;state.isDefault=!state.images.front&&!state.images.back&&!state.additionalPrints.some(item=>item.image);const config=activePrintConfiguration();state.printScale=Number(config.scale)||PRINT_SIZE_SCALE[config.size]}
@@ -1892,11 +2006,11 @@ function mountStudioDetails(container){
  }
  const price=container.querySelector('.studio-price-summary');group.after(price);
  if(!['product','model','size','color'].every(id=>Object.hasOwn(detailsDisclosure.confirmed,id))){
-  price.querySelector('strong').textContent=priceLabel(productPrice(state.kind,null));
+  price.querySelector('strong').textContent=priceLabel(catalogPriceWithPrints(productPrice(state.kind,null),selectedCatalogDesign(),state.kind));
   price.querySelector('small').textContent='Confirma producto, modelo, talla y color para ver el precio de tu selección.';
  }else if(studioDetailIncludesPrintPlacement(state.catalogDesignSlug)&&!Object.hasOwn(detailsDisclosure.confirmed,'side')){
   const variant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;
-  const personalized=currentPurchaseType()==='personalized',reviewRequired=Boolean(state.qualityReview||failingSides().length),current=variant?orderTotal(variantPriceForPurchase(variant,personalized),printChoice(),reviewRequired?QUALITY_ADJUSTMENT_CLP:0,printCount(),state.kind==='tote'?null:currentPrintConfiguration(),PRINT_PRICES,isCatalogPrintIncluded(state,printChoice(),printCount())):null;
+  const personalized=currentPurchaseType()==='personalized',reviewRequired=Boolean(state.qualityReview||failingSides().length),current=variant?currentPrintPricing(variantPriceForPurchase(variant,personalized),reviewRequired?QUALITY_ADJUSTMENT_CLP:0):null;
   price.querySelector('strong').textContent=current?money(current.total):'Precio por confirmar';price.querySelector('small').textContent=current?`Producto ${money(current.base)}${current.extras?` · Revisión +${money(current.extras)}`:''}`:'Elige la ubicación para confirmar el estampado.';
  }
  container.querySelectorAll('.sizes').forEach(node=>node.classList.add('disclosure-sizes'));
@@ -1934,7 +2048,7 @@ function renderStep(){
   const shareUrl=`/?design=${encodeURIComponent(design?.id||'')}&product=${encodeURIComponent(modelProductSlug(state.kind))}#catalogo`;
   const startingOffer=Object.keys(products)
    .filter(kind=>catalogProducts.some(product=>product.active!==false&&product.slug===modelProductSlug(kind))&&designSupportsProduct(design,kind))
-   .map(kind=>({kind,price:productPrice(kind,null,null,design)}))
+   .map(kind=>({kind,price:catalogPriceWithPrints(productPrice(kind,null,null,design),design,kind)}))
    .filter(offer=>offer.price!==null)
    .sort((a,b)=>a.price-b.price)[0];
   const startingPrice=startingOffer?.price??null;
@@ -2020,7 +2134,7 @@ function renderStep(){
  const labels=state.catalogDesignCustomerImage?['Detalles',selectedCatalogDesign()?.customerPhotoSubject==='people'?'Tu foto':'Tu mascota','Enviar solicitud']:['Detalles','Resumen','Datos y pago'];
  const railProgress=((state.step-1)/labels.length)*100,railEdge=50/labels.length;
  document.querySelector('.steps').innerHTML=`<div class="steps-rail" style="--step-count:${labels.length};--rail-progress:${railProgress.toFixed(2)}%;--rail-edge:${railEdge.toFixed(2)}%"><i aria-hidden="true"></i>${labels.map((label,index)=>`<span class="${index+1===state.step?'active':''} ${index+1<state.step?'done':''}" aria-label="Paso ${index+1} de ${labels.length}: ${label}" ${index+1===state.step?'aria-current="step"':''}><b aria-hidden="true">${index+1<state.step?'✓':String(index+1).padStart(2,'0')}</b><small>${label}</small></span>`).join('')}</div>`;
-  const p=products[state.kind],personalizedSelection=currentPurchaseType()==='personalized',choice=printChoice(),selectedVariant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant,selectedPrice=variantPriceForPurchase(selectedVariant,personalizedSelection),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:state.qualityReview}),pricing=orderTotal(selectedPrice??0,choice,qualityReview?QUALITY_ADJUSTMENT_CLP:0,printCount(),state.kind==='tote'?null:currentPrintConfiguration(),PRINT_PRICES,isCatalogPrintIncluded(state,printChoice(),printCount())),whatsappPurchase=currentPurchaseMethod()==='whatsapp';
+  const p=products[state.kind],personalizedSelection=currentPurchaseType()==='personalized',choice=printChoice(),selectedVariant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant,selectedPrice=variantPriceForPurchase(selectedVariant,personalizedSelection),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:state.qualityReview}),pricing=currentPrintPricing(selectedPrice??0,qualityReview?QUALITY_ADJUSTMENT_CLP:0),whatsappPurchase=currentPurchaseMethod()==='whatsapp';
  next.hidden=false;next.disabled=state.checking||state.step===1&&!resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;back.hidden=state.step===1;
  const ctas=['Ver resumen',purchaseMethodLabel(currentPurchaseMethod(),{purchaseType:currentPurchaseType()}),'Confirmar pedido'];next.textContent=state.catalogDesignCustomerImage?(selectedCatalogDesign()?.customerPhotoSubject==='people'?'Continuar · Tu foto':'Continuar · Foto de tu mascota'):ctas[state.step-1];
  let html='';
@@ -2071,7 +2185,17 @@ function renderStep(){
  }
  if(state.step===2){
   const placementSummary=stepContent.querySelector('.order-summary-detail strong');if(placementSummary)placementSummary.textContent=printConfigurationLabel(currentPrintConfiguration(),printChoice());
-  let mockupTabs=stepContent.querySelector('.mockup-sides');if(!mockupTabs&&printCount()>1){mockupTabs=document.createElement('div');mockupTabs.className='mockup-sides';stepContent.querySelector('.mockup-note')?.before(mockupTabs)}if(mockupTabs)mockupTabs.innerHTML=allPrintLayers().map((item,index)=>{const active=state.activePrintId?state.activePrintId===item.id:state.printSide===item.side&&item.id===`primary-${item.side}`;return `<button type="button" data-view-print-layer="${item.id}" class="${active?'selected':''}">${index+1}. ${sideNames[item.side]} · ${PRINT_PLACEMENT_LABEL[item.placement]}</button>`}).join('');
+  let mockupTabs=stepContent.querySelector('.mockup-sides');
+  if(!mockupTabs&&(printCount()>1||state.catalogDesign&&state.kind!=='tote')){
+   mockupTabs=document.createElement('div');mockupTabs.className='mockup-sides';stepContent.querySelector('.mockup-note')?.before(mockupTabs);
+  }
+  if(mockupTabs){
+    mockupTabs.innerHTML=allPrintLayers().map((item,index)=>{
+    const active=state.activePrintId?state.activePrintId===item.id:state.printSide===item.side&&item.id===`primary-${item.side}`;
+    const label=state.catalogDesign?catalogPrintLabel(item):`${index+1}. ${sideNames[item.side]}${item.placement==='center'?'':` · ${PRINT_PLACEMENT_LABEL[item.placement]}`}`;
+    return `<button type="button" data-view-print-layer="${item.id}" aria-pressed="${active}" class="${active?'selected':''}">${label}</button>`;
+   }).join('');
+  }
  }
  if(state.step===3)renderCheckoutCartPreview();
  if(state.step===3){const notice=document.querySelector('#step-content .notice');if(notice)notice.insertAdjacentHTML('beforebegin',`<section class="checkout-coupon"><label for="checkout-coupon">Cupón de descuento</label><div><input id="checkout-coupon" value="${safe(state.couponCode)}" placeholder="Ingresa tu código"><button type="button" id="apply-coupon">Aplicar</button></div><small id="checkout-coupon-status" ${state.couponLabel?'data-tone="success"':''}>${safe(state.couponLabel||'El descuento se validará antes del pago.')}</small></section>`)}
@@ -2109,16 +2233,15 @@ function renderStep(){
    const transition=++productTransitionVersion;
    const controls=[...stepContent.querySelectorAll('button,input')],disabled=controls.map(control=>control.disabled);controls.forEach(control=>control.disabled=true);
    try{
-    const image=await loadCatalogArtwork(design);
+    const artwork=await prepareCatalogArtwork(source,kind);
     if(transition!==productTransitionVersion){controls.forEach((control,index)=>control.disabled=disabled[index]);return}
-    const side=state.printSide,previous=state.images[side];
-    state.images[side]=artworkUrl(design);state.uploadFiles[side]=null;state.files[side]=`droska-${source.id}-${kind}.webp`;state.cloudSaved[side]=false;state.assessments[side]=checkResolution(image.naturalWidth,image.naturalHeight);activateSide(side);
-    if(previous?.startsWith('blob:'))URL.revokeObjectURL(previous);
+    state.kind=kind;
+    applyCatalogArtwork(artwork);
    }catch{controls.forEach((control,index)=>control.disabled=disabled[index]);return toast('No pudimos cargar el archivo para ese producto. Inténtalo otra vez.','error')}
   }
   state.kind=kind;
   if(kind==='tote'){if(!state.images.front&&state.images.back)moveCatalogDesignTo('front');state.printSides=['front'];activateSide('front')}
-  if(!products[kind].sizes.includes(state.size))state.size=products[kind].sizes[0]||'';reconcileVariant(source?.sampleColor,true);confirmDetail(decision);persistDraft();renderStep();
+  if(!products[kind].sizes.includes(state.size))state.size=products[kind].sizes[0]||'';reconcileVariant(source?.sampleColor,true);confirmDetail(decision);persistDraft();renderStep();if(changingProduct)faceSelectedSide();
  };
  document.querySelectorAll('[data-product-family]').forEach(button=>{
   button.onclick=()=>{
@@ -2245,6 +2368,7 @@ async function openWhatsAppForCurrentSelection(){
  }catch(error){popup?.close();toast(error.message||'No pudimos preparar la solicitud por WhatsApp.','error')}finally{release()}
 }
 async function restoreSavedDesigns(){
+ if(state.catalogDesignSlug)return;
  try{
   const saved=await savedDesignFiles();
   for(const stored of saved){
@@ -2282,7 +2406,7 @@ document.querySelector('#design-form').onsubmit=e=>{
    (async()=>{
     try{
      const people=selectedCatalogDesign()?.customerPhotoSubject==='people';const personalization=[draft.petName&&`${people?'Persona':'Mascota'}: ${draft.petName}`,draft.notes,people?'Adjuntaré la foto de la persona en este chat.':'Adjuntaré la foto de mi mascota en este chat.'].filter(Boolean).join(' · ');
-     const printSides=state.printSide==='back'?'back':'front',printConfiguration=normalizePrintConfiguration(state.printConfigurations,printSides);
+     const printSides=printChoice(),printConfiguration=currentPrintConfiguration();
      const order=await createWhatsAppOrder({requestType:'purchase',customer:{name:draft.firstName,email:draft.email,phone:draft.phone},details:personalization,product:{variantId:variant.id,modelCode:state.kind,size:state.size,color:state.color,printSides,printConfiguration,catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:true,purchaseType:'personalized'}});
      const message=buildWhatsAppPurchaseMessage({purchaseType:'personalized',productName:state.kind==='tote'?'Tote bag':state.kind==='body'?'Body bebé':'Polera',designName:state.catalogDesignName,model:products[state.kind].name,size:state.size,color:variant.colorName||state.color,sides:printConfigurationLabel(printConfiguration,printSides),personalization:[personalization,`Solicitud #${order.orderId}`].filter(Boolean).join(' · '),customer:{name:draft.firstName,email:draft.email,phone:draft.phone}});
      const url=whatsappPurchaseUrl(storefrontSettings.whatsapp_number,message);
@@ -2478,4 +2602,4 @@ try{const storedTheme=localStorage.getItem(THEME_STORAGE_KEY);if(storedTheme==='
 if(import.meta.env.DEV){const theme=new URLSearchParams(location.search).get('preview-theme');if(theme==='light'||theme==='dark')savedTheme=theme}
 setTheme(savedTheme,{persist:false});
 
-Promise.resolve(initialStoreSettings).then(settings=>{storefrontSettings=settings;QUALITY_ADJUSTMENT_CLP=settings.quality_review_fee_clp;PRINT_PRICES=settings;normalizeCartPrices();applyStoreSettings(settings);whatsappFloat.href=`https://wa.me/${settings.whatsapp_number}`;updateCommerceNav();renderHeroCatalogSamples();if(studio.open)renderStep()}).catch(error=>console.warn('No pudimos actualizar la información de la tienda:',error));
+Promise.resolve(initialStoreSettings).then(settings=>{storefrontSettings=settings;QUALITY_ADJUSTMENT_CLP=settings.quality_review_fee_clp;PRINT_PRICES=settings;normalizeCartPrices();if(catalogAvailable){renderCatalog();refreshCatalogDialogPrices()}applyStoreSettings(settings);whatsappFloat.href=`https://wa.me/${settings.whatsapp_number}`;updateCommerceNav();renderHeroCatalogSamples();if(studio.open)renderStep()}).catch(error=>console.warn('No pudimos actualizar la información de la tienda:',error));

@@ -19,17 +19,18 @@ function labelFor(field){
  const copy=label.cloneNode(true);copy.querySelectorAll('input,select,textarea,small,output,svg').forEach(node=>node.remove());return copy.textContent.trim().replace(/\s+/g,' ');
 }
 export function adminFieldSummary(node,{limit=180}={}){
- const result=controls(node).filter(field=>!field.disabled&&field.type!=='hidden'&&field.type!=='file'&&(field.type!=='radio'||field.checked)&&(!['design_products','allowed_colors'].includes(field.name)&&!field.name.startsWith('design_colors_')||field.checked)&&(!field.name.startsWith('clear_mockup_')||field.checked)).map(field=>{
+ const result=controls(node).filter(field=>!field.disabled&&field.type!=='hidden'&&field.type!=='file'&&(field.type!=='radio'||field.checked)&&(!['design_products','allowed_colors','polera_additional_print'].includes(field.name)&&!field.name.startsWith('design_colors_')||field.checked)&&(!/^clear_(?:polera_)?mockup_/.test(field.name)||field.checked)).map(field=>{
   const label=labelFor(field);if(field.type==='radio')return label||field.value;
-  if(field.type==='checkbox')return ['design_products','allowed_colors'].includes(field.name)||field.name.startsWith('design_colors_')?label||field.value:`${label}: ${field.checked?'Sí':'No'}`;
+  if(field.type==='checkbox')return ['design_products','allowed_colors','polera_additional_print'].includes(field.name)||field.name.startsWith('design_colors_')?label||field.value:`${label}: ${field.checked?'Sí':'No'}`;
   const value=field.tagName==='SELECT'?field.selectedOptions[0]?.textContent:field.value.trim();return value?`${label}: ${value}`:'';
  }).filter(Boolean);
- for(const field of controls(node).filter(field=>field.type==='file'&&!field.disabled)){
+ for(const field of controls(node).filter(field=>field.type==='file')){
   const current=field.closest('[data-design-product]');
   if(current&&!current.querySelector('[name="design_products"]')?.checked)continue;
+  if(field.disabled)continue;
   if(field.files.length)result.push(`${labelFor(field)}: ${[...field.files].map(file=>file.name).join(', ')}`);
-  else if(current?.dataset.currentArtwork)result.push(`${labelFor(field)}: archivo actual conservado`);
-  else if(!current&&field.closest('label')?.querySelector('output')?.textContent.includes('actual'))result.push(`${labelFor(field)}: ${field.name.startsWith('mockup_video_')?'video actual conservado':'imagen actual conservada'}`);
+  else if((field.dataset.currentArtwork&&!field.closest('[data-print-mockup]')?.querySelector('input[type=checkbox]').checked)||(current?.dataset.currentArtwork&&!/^polera_(?:print|mockup)_/.test(field.name)))result.push(`${labelFor(field)}: archivo actual conservado`);
+  else if(!current&&field.closest('label')?.querySelector('output')?.textContent.includes('actual'))result.push(`${labelFor(field)}: imagen actual conservada`);
  }
  return conciseSummary(result.join(' · ')||'Sin opciones adicionales',limit);
 }

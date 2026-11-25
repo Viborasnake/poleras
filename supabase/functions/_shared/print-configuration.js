@@ -1,6 +1,7 @@
 const PLACEMENTS = new Set(['center', 'upper_back', 'chest_left', 'chest_right', 'sleeve_left', 'sleeve_right', 'sleeve_both'])
 const SIZES = new Set(['pocket', 'small', 'medium', 'large'])
 export const PRINT_MAX_LAYERS = 4
+export const CATALOG_PRINT_MAX_LAYERS = 6
 
 export const PRINT_SIZE_SCALE = Object.freeze({ pocket: .55, small: .85, medium: 1.2, large: 1.6 })
 export const PRINT_PLACEMENT_LABEL = Object.freeze({
@@ -38,7 +39,7 @@ export function normalizePrintConfiguration(value, printSides = 'front') {
   const sides = printSides === 'both' ? ['front', 'back'] : [printSides === 'back' ? 'back' : 'front']
   const legacy = Object.fromEntries(sides.map(side => [side, normalizePrintSideConfiguration(source[side], side)]))
   if (!Array.isArray(source.prints)) return legacy
-  const prints = source.prints.slice(0, PRINT_MAX_LAYERS).map((entry, index) => {
+  const prints = source.prints.slice(0, CATALOG_PRINT_MAX_LAYERS).map((entry, index) => {
     const item = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {}
     const side = item.side === 'back' ? 'back' : 'front'
     const id = /^[a-z0-9-]{1,64}$/i.test(String(item.id || '')) ? String(item.id) : `print-${index + 1}`

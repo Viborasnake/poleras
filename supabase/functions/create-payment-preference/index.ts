@@ -1,3 +1,4 @@
+import { catalogPoleraComposition, catalogChargeablePrints, catalogOrderConfiguration } from '../_shared/catalog-polera-prints.js'
 import { printPrice } from '../_shared/print-pricing.js'
 import {designProductArtworks,modelProductSlug} from '../_shared/catalog-product-artworks.js'
 import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant,variantPriceForPurchase} from '../_shared/variant-selection.js'
@@ -50,23 +51,26 @@ Deno.serve(async request => {
   if (!items.length || items.length > 20 || !customer.firstName || !customer.lastName || !String(customer.email).includes('@') || !customer.phone) return json({ error: 'Faltan datos de contacto o productos.' }, 400)
   if (!bodyCommerceReady && items.some((item: any) => item.modelCode === 'body')) return json({ error: 'Los Bodys aún no están disponibles para compra.' }, 409)
   if (fulfillment === 'delivery' && (!body.shippingAddress?.region || !body.shippingAddress?.commune || !body.shippingAddress?.address)) return json({ error: 'Falta la dirección de despacho.' }, 400)
-  if (items.some((item: any) => !models.has(item.modelCode) || !allowedSizeForModel(item.modelCode, item.size) || !sides.has(item.printSides) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20 || !hex.test(item.color || '') || (item.catalogDesignCustomerImage != null && typeof item.catalogDesignCustomerImage !== 'boolean') || (item.catalogDesignSlug && typeof item.catalogDesignSlug !== 'string') || (item.modelCode === 'tote' && (!['S', 'M', 'L'].includes(item.size) || item.printSides !== 'front')))) return json({ error: 'Uno de los productos no es válido.' }, 400)
+  if (items.some((item: any) => !models.has(item.modelCode) || !allowedSizeForModel(item.modelCode, item.size) || !sides.has(item.printSides) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20 || !hex.test(item.color || '') || (item.catalogDesignCustomerImage != null && typeof item.catalogDesignCustomerImage !== 'boolean') || (item.catalogDesignSlug && typeof item.catalogDesignSlug !== 'string') || (item.modelCode === 'tote' && (!['M', 'L'].includes(item.size) || item.printSides !== 'front')))) return json({ error: 'Uno de los productos no es válido.' }, 400)
   const printConfigurations = items.map((item: any) => normalizePrintConfiguration(item.printConfiguration, item.printSides))
-  if (printConfigurations.some((configuration: any, index: number) => {
-    const count = printConfigurationCount(configuration, items[index].printSides)
-    const configuredSides = configuration.prints ? [...new Set(configuration.prints.map((print: any) => print.side))].sort().join(',') : items[index].printSides === 'both' ? 'back,front' : items[index].printSides
-    const declaredSides = items[index].printSides === 'both' ? 'back,front' : items[index].printSides
-    return count < 1 || count > 4 || configuredSides !== declaredSides
-  })) return json({ error: 'La composición de estampados no es válida.' }, 400)
+
 
   const { data: variants, error: variantError } = await admin.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,personalization_base_price_clp,active,product_models!inner(code,name,active)').eq('active', true).eq('product_models.active',true)
   if (variantError) return json({ error: 'No pudimos validar los precios vigentes.' }, 503)
   const normalizedVariants=normalizeVariantRows(variants||[])
   const slugs = [...new Set(items.map((item: any) => item.catalogDesignSlug).filter(Boolean))], designs = new Map<string, any>()
-  if (slugs.length) { const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,allowed_colors,allowed_product_colors,sample_color,product_artworks').in('slug', slugs); if (error) return json({ error: 'No pudimos validar los diseños.' }, 503); for (const design of data || []) if (design.active) designs.set(design.slug, design); if (slugs.some(slug => !designs.has(slug))) return json({ error: 'Uno de los diseños ya no está disponible.' }, 409) }
+  if (slugs.length) { const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,allowed_colors,allowed_product_colors,sample_color,product_artworks,polera_prints').in('slug', slugs); if (error) return json({ error: 'No pudimos validar los diseños.' }, 503); for (const design of data || []) if (design.active) designs.set(design.slug, design); if (slugs.some(slug => !designs.has(slug))) return json({ error: 'Uno de los diseños ya no está disponible.' }, 409) }
   if (items.some((item: any) => item.catalogDesignCustomerImage && !designs.get(item.catalogDesignSlug)?.accepts_customer_image)) return json({ error: 'Este diseño no admite una imagen del cliente.' }, 409)
   if (items.some((item: any) => item.catalogDesignSlug && catalogDesignRequiresCustomerImage(designs.get(item.catalogDesignSlug), item.catalogDesignCustomerImage))) return json({ error: 'Este diseño requiere una foto del cliente.' }, 409)
   if (items.some((item: any) => item.catalogDesignSlug && !item.catalogDesignCustomerImage && !designProductArtworks(designs.get(item.catalogDesignSlug))[modelProductSlug(item.modelCode)])) return json({ error: 'El diseño no tiene un archivo para el producto elegido. Vuelve a elegir el producto.' }, 409)
+  const catalogCompositions = items.map((item: any) => catalogPoleraComposition(designs.get(item.catalogDesignSlug), item.modelCode))
+  if (printConfigurations.some((configuration: any, index: number) => {
+    if (catalogCompositions[index]) return false
+    const count = printConfigurationCount(configuration, items[index].printSides)
+    const configuredSides = configuration.prints ? [...new Set(configuration.prints.map((print: any) => print.side))].sort().join(',') : items[index].printSides === 'both' ? 'back,front' : items[index].printSides
+    const declaredSides = items[index].printSides === 'both' ? 'back,front' : items[index].printSides
+    return count < 1 || count > 4 || configuredSides !== declaredSides
+  })) return json({ error: 'La composición de estampados no es válida.' }, 400)
   const selectedVariants=items.map((item: any)=>resolveExactVariant(normalizedVariants,item.modelCode,item.size,item.color,item.catalogDesignSlug?catalogDesignForVariantSelection(designs.get(item.catalogDesignSlug),item.catalogDesignCustomerImage):null))
   const unavailable=selectedVariants.find(result=>result.error)
   if(unavailable)return json({error:unavailable.error==='ambiguous'?'Hay más de una variante activa para esa combinación de modelo, talla y color.':'El color o la talla ya no está disponible para este diseño. Vuelve a elegir.'},409)
@@ -83,7 +87,8 @@ Deno.serve(async request => {
   const purchaseType = flowTypes.some(type => personalizedFlows.includes(type)) ? (flowTypes.every(type => personalizedFlows.includes(type)) ? 'personalized' : 'mixed') : 'catalog'
   if (paymentMethod !== 'draft') for (const [itemIndex, item] of items.entries()) {
     if (item.catalogDesignSlug && !item.catalogDesignCustomerImage) continue
-    const configuredPrints = printConfigurations[itemIndex].prints
+    const composition = catalogCompositions[itemIndex]
+    const configuredPrints = composition ? composition.configuration.prints.slice(0, 1).map(print => ({ ...print, designPath: print.side === 'front' ? item.frontDesignPath : item.backDesignPath })) : printConfigurations[itemIndex].prints
     const files = configuredPrints?.length ? configuredPrints.map((print: any) => ({ side: print.side, path: print.designPath })) : (item.printSides === 'both' ? ['front', 'back'] : [item.printSides]).map(side => ({ side, path: side === 'front' ? item.frontDesignPath : item.backDesignPath }))
     for (const file of files) {
       const side = file.side, path = String(file.path || '')
@@ -96,7 +101,39 @@ Deno.serve(async request => {
   if (settingsError) return json({ error: 'No pudimos validar el valor de revisión técnica.' }, 503)
   const qualityReviewFee = Number.isSafeInteger(storeSettings?.quality_review_fee_clp) && storeSettings.quality_review_fee_clp >= 0 && storeSettings.quality_review_fee_clp <= 1000000 ? storeSettings.quality_review_fee_clp : 4990
   let subtotal = 0
-  const prepared = items.map((item: any,index:number) => { const modelCode = item.modelCode === 'kids' ? 'kid' : item.modelCode; const variant=selectedVariants[index].variant!; const model=Array.isArray(variants?.find((row:any)=>row.id===variant.id)?.product_models)?variants?.find((row:any)=>row.id===variant.id)?.product_models[0]:variants?.find((row:any)=>row.id===variant.id)?.product_models; const design = item.catalogDesignSlug ? designs.get(item.catalogDesignSlug) : null; const qualityReview = Boolean(item.qualityReview) && !isUnmodifiedCatalogItem(item); const personalized = !design || Boolean(item.catalogDesignCustomerImage); const basePrice = variantPriceForPurchase(variant, personalized) ?? variant.priceClp; const unit = basePrice + (modelCode === 'tote' || isCatalogPrintIncluded(item,item.printSides,printConfigurationCount(printConfigurations[index],item.printSides)) ? 0 : printPrice(printConfigurations[index], item.printSides, storeSettings)) + (qualityReview ? qualityReviewFee : 0); const line = unit * item.quantity; subtotal += line; const label = modelCode === 'tote' ? 'Tote bag' : modelCode==='body'?'Body bebé':`Polera ${model?.name||modelCode}`; return { product_variant_id: variant.id, catalog_design_id: design?.id || null, catalog_artwork_path: design && !item.catalogDesignCustomerImage ? designProductArtworks(design)[modelProductSlug(item.modelCode)] : null, name_snapshot: design?.name ? `${label} · ${design.name}` : `${label} ${modelCode==='body'?'personalizado':'personalizada'}`, sku_snapshot: variant.sku, color_hex: variant.color.toUpperCase(), quality_review: qualityReview, print_sides: item.printSides, print_configuration: normalizePrintConfiguration(item.printConfiguration,item.printSides), front_design_path: design && !item.catalogDesignCustomerImage ? null : item.frontDesignPath || null, back_design_path: design && !item.catalogDesignCustomerImage ? null : item.backDesignPath || null, quantity: item.quantity, unit_price_clp: unit, line_total_clp: line } })
+  const prepared = items.map((item: any, index: number) => {
+    const variant = selectedVariants[index].variant!
+    const modelRow = variants?.find((row: any) => row.id === variant.id)
+    const model = Array.isArray(modelRow?.product_models) ? modelRow.product_models[0] : modelRow?.product_models
+    const design = designs.get(item.catalogDesignSlug)
+    const composition = catalogCompositions[index]
+    const printSides = composition?.printSides ?? item.printSides
+    const configuration = composition ? catalogOrderConfiguration(composition, item.catalogDesignCustomerImage) : printConfigurations[index]
+    const qualityReview = Boolean(item.qualityReview) && !isUnmodifiedCatalogItem(item)
+    const personalized = !design || Boolean(item.catalogDesignCustomerImage)
+    const catalogPrimarySide = composition?.configuration.prints[0].side
+    const saveCustomerArtwork = !design || item.catalogDesignCustomerImage
+    const basePrice = variantPriceForPurchase(variant, personalized) ?? variant.priceClp
+    const printExtra = composition
+      ? printPrice(catalogChargeablePrints(configuration), printSides, storeSettings)
+      : item.modelCode === 'tote' || isCatalogPrintIncluded(item, printSides, printConfigurationCount(configuration, printSides))
+        ? 0 : printPrice(configuration, printSides, storeSettings)
+    const unit = basePrice + printExtra + (qualityReview ? qualityReviewFee : 0)
+    const line = unit * item.quantity
+    subtotal += line
+    const label = item.modelCode === 'tote' ? 'Tote bag' : item.modelCode === 'body' ? 'Body bebé' : `Polera ${model?.name || item.modelCode}`
+    return {
+      product_variant_id: variant.id, catalog_design_id: design?.id || null,
+      catalog_artwork_path: design && !item.catalogDesignCustomerImage ? designProductArtworks(design)[modelProductSlug(item.modelCode)] : null,
+      name_snapshot: design?.name ? `${label} · ${design.name}` : `${label} ${item.modelCode === 'body' ? 'personalizado' : 'personalizada'}`,
+      sku_snapshot: variant.sku, color_hex: variant.color.toUpperCase(), quality_review: qualityReview,
+      print_sides: printSides, print_configuration: configuration,
+      front_design_path: saveCustomerArtwork && (!catalogPrimarySide || catalogPrimarySide === 'front') ? item.frontDesignPath || null : null,
+      back_design_path: saveCustomerArtwork && (!catalogPrimarySide || catalogPrimarySide === 'back') ? item.backDesignPath || null : null,
+      quantity: item.quantity, unit_price_clp: unit, line_total_clp: line,
+    }
+  })
+
   const quantity = items.reduce((sum: number, item: any) => sum + item.quantity, 0), shipping = shippingFor(fulfillment, body.shippingAddress?.region || '', quantity)
   if (body.shippingQuoteClp != null && Number(body.shippingQuoteClp) !== shipping) return json({ error: 'El valor del despacho cambió. Vuelve a calcularlo.' }, 409)
   const couponCode = String(body.couponCode || '').trim().toUpperCase(); let coupon: any = null; let discount = 0
