@@ -1,4 +1,5 @@
 import { printConfigurationLabel } from './print-configuration.js'
+import { surveyTokenPattern } from './service-survey.js'
 
 export const orderEmailLabels: Record<string, string> = {
   submitted: 'Pedido ingresado',
@@ -58,7 +59,7 @@ export const escapeHtml = (value: unknown) => String(value || '').replace(/[&<>"
 type OrderEmailItem = { name_snapshot?: string; quantity?: number; unit_price_clp?: number; line_total_clp?: number; print_sides?: string; print_configuration?: Record<string, unknown> }
 type PaymentInstructions = { transfer?: { holder?: string; bank?: string; account_type?: string; account_number?: string; rut?: string; email?: string }; mercado_pago_url?: string }
 type OrderDelivery = { fulfillment?: string; region?: string; commune?: string; address?: string; address_extra?: string; delivery_notes?: string }
-type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; discount_clp?: number; total_clp?: number; coupon_code?: string; shipping_address?: OrderDelivery; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean; creative?: boolean; request_details?: string; quote_message?: string; adminNotice?: boolean; referenceCount?: number }
+type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; discount_clp?: number; total_clp?: number; coupon_code?: string; shipping_address?: OrderDelivery; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean; creative?: boolean; request_details?: string; quote_message?: string; adminNotice?: boolean; referenceCount?: number; surveyToken?: string; surveyIdempotency?: boolean }
 const formatClp = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0))
 const lineLabel = (item: OrderEmailItem) => {
   const placement = printConfigurationLabel(item.print_configuration, item.print_sides)
@@ -144,7 +145,7 @@ function copyFor(status: string, pickup: boolean) {
       subject: pickup ? '¿Cómo fue tu retiro?' : '¿Cómo estuvo tu pedido?',
       title: pickup ? 'Gracias por retirar tu pedido.' : 'Tu pedido llegó.',
       body: pickup ? 'Gracias por retirar tu pedido en Droska. ¿Nos cuentas cómo fue tu experiencia?' : 'Gracias por confiar en Droska. Esperamos que disfrutes tu pedido. ¿Nos cuentas cómo fue tu experiencia?',
-      action: 'Responder encuesta',
+      action: 'Ver mi pedido',
     },
   }
   return copies[status] || copies.submitted
@@ -163,13 +164,14 @@ export function buildOrderEmail(name: string, orderId: string, status: string, s
     const color = active ? '#262920' : '#6B6A62'
     return `<td style="width:20%;padding:0 3px;text-align:center"><div style="height:8px;border-radius:99px;background:${background}"></div><p style="margin:7px 0 0;color:${color};font-size:11px;line-height:1.25;font-weight:${active ? 700 : 500}">${escapeHtml(stepLabel)}</p></td>`
   }).join('')
-  const safeSiteUrl = escapeHtml(siteUrl)
   const safeName = escapeHtml(name || 'creativa/o')
   const safeOrderId = escapeHtml(orderId)
-  const actionUrl = status === 'delivered' ? `${safeSiteUrl}/?encuesta=${encodeURIComponent(orderId)}` : `${safeSiteUrl}/?panel=account`
+  const surveyToken = details.surveyToken || ''
+  const hasSurvey = status === 'delivered' && (surveyTokenPattern.test(surveyToken) || surveyToken === 'vista-previa')
+  const actionUrl = hasSurvey ? `${siteUrl}/encuesta.html#${encodeURIComponent(surveyToken)}` : `${siteUrl}/?panel=account`
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hola Droska, necesito ayuda con mi pedido #${orderId}`)}`
   const summary = orderDetails(details)
-  if (details.creative) {
+  if (details.creative && status !== 'delivered') {
     const quote = status === 'quoted' || status === 'awaiting_deposit'
     const subject = `${details.adminNotice ? 'Nueva idea recibida' : quote ? 'Tu cotización está disponible' : status === 'paid' ? 'Confirmamos tu pago' : 'Recibimos tu idea'} · Solicitud #${orderId}`
     const message = details.adminNotice ? `Nueva solicitud de ${name}. Idea: ${details.request_details || ''}. Referencias adjuntas: ${details.referenceCount || 0}. Revisa los archivos en Administración.` : quote ? `Tu propuesta: ${details.quote_message || ''}. Total: ${formatClp(details.total_clp)}. Crea una cuenta con este correo o ingresa a Mis pedidos para aceptarla y continuar al pago.` : status === 'paid' ? `Confirmamos el pago de tu solicitud por ${formatClp(details.total_clp)}. Nuestro equipo continuará con tu diseño.` : 'Recibimos tu idea y la revisaremos. Crea una cuenta con este correo para seguir la solicitud en Mis pedidos.'
@@ -177,11 +179,12 @@ export function buildOrderEmail(name: string, orderId: string, status: string, s
     return { subject, text: `${message}${summary.text ? `\n\n${summary.text}` : ''}\n\nSolicitud #${orderId}\n${action}`, html: `<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif;background:#F9F7F2;color:#262920;padding:24px"><main style="max-width:600px;margin:auto;background:#FFFDFA;padding:30px;border-radius:18px"><h1 style="font-size:27px">${escapeHtml(subject)}</h1><p style="line-height:1.6;white-space:pre-wrap">${escapeHtml(message)}</p>${summary.html}<a href="${escapeHtml(action)}" style="display:inline-block;margin-top:20px;background:#262920;color:white;padding:14px 20px;border-radius:99px;text-decoration:none">${details.adminNotice ? 'Abrir pedidos' : 'Ver mi solicitud'}</a></main></body></html>` }
   }
   const hasPaymentInstructions = Boolean(details.payment_instructions && (details.payment_instructions.transfer || details.payment_instructions.mercado_pago_url))
-  const emailBody = hasPaymentInstructions ? 'Te dejamos los datos para pagar tu pedido. Cuando realices la transferencia, envíanos el comprobante por WhatsApp o responde este correo.' : details.orderEdited ? 'Actualizamos tu pedido con los cambios aprobados por nuestro equipo. Revisa el nuevo detalle y total a continuación.' : copy.body
+  const emailBody = hasPaymentInstructions ? 'Te dejamos los datos para pagar tu pedido. Cuando realices la transferencia, envíanos el comprobante por WhatsApp o responde este correo.' : details.orderEdited ? 'Actualizamos tu pedido con los cambios aprobados por nuestro equipo. Revisa el nuevo detalle y total a continuación.' : status === 'delivered' && !hasSurvey ? 'Gracias por confiar en Droska. Esperamos que disfrutes tu pedido.' : copy.body
+  const actionLabel = hasSurvey ? 'Responder encuesta' : copy.action
   return {
-    subject: `${hasPaymentInstructions ? 'Datos de pago' : details.orderEdited ? 'Tu pedido fue actualizado' : copy.subject} · Pedido #${orderId}`,
-    text: `Hola ${name || 'creativa/o'},\n\n${emailBody}\n\n${summary.text ? `${summary.text}\n\n` : ''}Estado actual: ${label}\nPedido #${orderId}\n\n${status === 'delivered' ? `Responde la encuesta: ${siteUrl}/?encuesta=${encodeURIComponent(orderId)}` : `Revisa tu pedido: ${siteUrl}/?panel=account`}\n\n¿Necesitas ayuda? Escríbenos por WhatsApp: ${whatsappUrl}\n\nDroska · Hecho a tu pinta.`,
-    html: `<!doctype html><html lang="es"><body style="margin:0;background:#F7F4EF;color:#262920;font-family:Arial,Helvetica,sans-serif"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fffdfa;border:1px solid #DEDAD1;border-radius:18px;overflow:hidden"><tr><td style="padding:28px 30px 20px;border-bottom:1px solid #E8E3DA"><div style="font-size:25px;font-weight:800;letter-spacing:-1px">droska <span style="color:#F957A4">SHIRT</span></div></td></tr><tr><td style="padding:32px 30px 20px"><p style="margin:0 0 10px;color:#B52D6B;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase">PEDIDO #${safeOrderId}</p><h1 style="margin:0 0 14px;font-size:30px;line-height:1.1;letter-spacing:-.6px">${escapeHtml(hasPaymentInstructions ? 'Datos para pagar tu pedido.' : copy.title)}</h1><p style="margin:0;color:#56564F;font-size:16px;line-height:1.6">Hola ${safeName}, ${escapeHtml(emailBody)}</p>${summary.html}</td></tr><tr><td style="padding:8px 30px 22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${stepper}</tr></table></td></tr><tr><td style="padding:0 30px 30px"><a href="${actionUrl}" style="display:inline-block;margin:0 8px 8px 0;padding:13px 18px;border-radius:999px;background:#262920;color:#fff;text-decoration:none;font-size:14px;font-weight:700">${escapeHtml(copy.action)} →</a><a href="${escapeHtml(whatsappUrl)}" style="display:inline-block;margin:0 0 8px;padding:13px 18px;border-radius:999px;background:#E4F6E8;color:#167B3C;border:1px solid #167B3C;text-decoration:none;font-size:14px;font-weight:700">💬 Hablar por WhatsApp</a></td></tr><tr><td style="padding:18px 30px;background:#F4F1EB;color:#6B6A62;font-size:12px;line-height:1.5">Estado actual: <strong style="color:#262920">${escapeHtml(label)}</strong><br>Droska · Hecho a tu pinta.</td></tr></table></td></tr></table></body></html>`,
+    subject: `${hasPaymentInstructions ? 'Datos de pago' : details.orderEdited ? 'Tu pedido fue actualizado' : status === 'delivered' && !hasSurvey ? label : copy.subject} · Pedido #${orderId}`,
+    text: `Hola ${name || 'creativa/o'},\n\n${emailBody}\n\n${summary.text ? `${summary.text}\n\n` : ''}Estado actual: ${label}\nPedido #${orderId}\n\n${hasSurvey ? 'Responde la encuesta' : 'Revisa tu pedido'}: ${actionUrl}\n\n¿Necesitas ayuda? Escríbenos por WhatsApp: ${whatsappUrl}\n\nDroska · Hecho a tu pinta.`,
+    html: `<!doctype html><html lang="es"><body style="margin:0;background:#F7F4EF;color:#262920;font-family:Arial,Helvetica,sans-serif"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fffdfa;border:1px solid #DEDAD1;border-radius:18px;overflow:hidden"><tr><td style="padding:28px 30px 20px;border-bottom:1px solid #E8E3DA"><div style="font-size:25px;font-weight:800;letter-spacing:-1px">droska <span style="color:#F957A4">SHIRT</span></div></td></tr><tr><td style="padding:32px 30px 20px"><p style="margin:0 0 10px;color:#B52D6B;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase">PEDIDO #${safeOrderId}</p><h1 style="margin:0 0 14px;font-size:30px;line-height:1.1;letter-spacing:-.6px">${escapeHtml(hasPaymentInstructions ? 'Datos para pagar tu pedido.' : copy.title)}</h1><p style="margin:0;color:#56564F;font-size:16px;line-height:1.6">Hola ${safeName}, ${escapeHtml(emailBody)}</p>${summary.html}</td></tr><tr><td style="padding:8px 30px 22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${stepper}</tr></table></td></tr><tr><td style="padding:0 30px 30px"><a href="${escapeHtml(actionUrl)}" style="display:inline-block;margin:0 8px 8px 0;padding:13px 18px;border-radius:999px;background:#262920;color:#fff;text-decoration:none;font-size:14px;font-weight:700">${escapeHtml(actionLabel)} →</a><a href="${escapeHtml(whatsappUrl)}" style="display:inline-block;margin:0 0 8px;padding:13px 18px;border-radius:999px;background:#E4F6E8;color:#167B3C;border:1px solid #167B3C;text-decoration:none;font-size:14px;font-weight:700">💬 Hablar por WhatsApp</a></td></tr><tr><td style="padding:18px 30px;background:#F4F1EB;color:#6B6A62;font-size:12px;line-height:1.5">Estado actual: <strong style="color:#262920">${escapeHtml(label)}</strong><br>Droska · Hecho a tu pinta.</td></tr></table></td></tr></table></body></html>`,
   }
 }
 
@@ -191,7 +194,9 @@ export async function sendOrderEmail(to: string, name: string, orderId: string, 
   if (!apiKey || !from) return { sent: false, reason: 'email_not_configured' }
   const siteUrl = (Deno.env.get('SITE_URL') || 'https://droska.frontbook.cl').replace(/\/$/, '')
   const email = buildOrderEmail(name, orderId, status, siteUrl, pickup, details, await configuredWhatsAppNumber())
-  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [to], subject: email.subject, text: email.text, html: email.html }) })
+  const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+  if (details.surveyIdempotency && details.surveyToken) headers['Idempotency-Key'] = `service-survey/${details.surveyToken}`
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers, body: JSON.stringify({ from, to: [to], subject: email.subject, text: email.text, html: email.html }) })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload?.message || 'No se pudo enviar el correo.')
   return { sent: true, id: payload?.id }

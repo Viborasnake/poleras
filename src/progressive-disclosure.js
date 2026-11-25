@@ -49,7 +49,7 @@ export function focusDisclosure(element,{align='nearest',scroll=true}={}){
  if(!scroll)return;
  const bounds=element.getBoundingClientRect();
  const studio=element.closest('#studio');
- const scroller=studio?.classList.contains('is-request-mode')?studio.querySelector('.studio-body'):element.closest('.studio-controls');
+ const scroller=element.closest('.admin-catalog-dialog-body')||(studio?.classList.contains('is-request-mode')?studio.querySelector('.studio-body'):element.closest('.studio-controls'));
  const clip=scroller?.getBoundingClientRect();
  if(align==='start'||bounds.top<(clip?.top??0)+12||bounds.bottom>Math.min(innerHeight,clip?.bottom??innerHeight)-12)element.scrollIntoView({block:align,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
 }

@@ -1,7 +1,32 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
+import {brushFootprint,canvasPoint} from './brush-geometry.ts'
 import {selectionBrushMask,selectionCoverage,validColorRange,type ColorRange} from './color-range.ts'
 import {halftone} from './halftone.ts'
+
+test('the on-screen brush diameter maps to both bitmap axes at different zoom levels',()=>{
+  const bitmap={width:800,height:400}
+  for(const display of [{left:275,top:95,width:320,height:159},{left:-70,top:-21,width:1200,height:600}]){
+    const point=canvasPoint(display,display.left+display.width/4,display.top+display.height*3/4)!
+    assert.deepEqual(point,{x:.25,y:.75})
+    assert.equal(canvasPoint(display,display.left-1,display.top+1),null)
+    assert.equal(canvasPoint(display,display.left+1,display.top+display.height),null)
+    const footprint=brushFootprint(point,40,display,bitmap)
+    assert.deepEqual([footprint.x,footprint.y],[200,300])
+    assert.ok(Math.abs(footprint.radiusX*2*display.width/bitmap.width-40)<1e-9)
+    assert.ok(Math.abs(footprint.radiusY*2*display.height/bitmap.height-40)<1e-9)
+  }
+})
+
+test('a selection brush wider than a narrow image retains its full radius',()=>{
+  const range:ColorRange={colors:[],tolerance:0,softness:0,useColors:false,strokes:[
+    {x:.5,y:.5,toX:.5,toY:.5,radius:2,erase:false},
+  ]}
+  assert.ok(validColorRange(JSON.parse(JSON.stringify(range))))
+  const mask=selectionBrushMask(range,10,100)!
+  assert.equal(mask[67*10+5],2)
+  assert.equal(mask[71*10+5],0)
+})
 
 test('brush segments stay connected across resolutions and exclusions override earlier paint',()=>{
   const range:ColorRange={colors:['#ffffff'],tolerance:0,softness:0,useColors:false,strokes:[

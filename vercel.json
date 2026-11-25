@@ -13,6 +13,10 @@
       "destination": "/admin.html"
     },
     {
+      "source": "/encuesta",
+      "destination": "/encuesta.html"
+    },
+    {
       "source": "/herramientas/semitonos-dtf",
       "destination": "/herramientas/semitonos-dtf/index.html"
     },

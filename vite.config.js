@@ -53,6 +53,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         admin: resolve(import.meta.dirname, 'admin.html'),
+        serviceSurvey: resolve(import.meta.dirname, 'encuesta.html'),
         designSystem: resolve(import.meta.dirname, 'design-system.html'),
         catalogPage: resolve(import.meta.dirname, 'catalog-page.html'),
       },

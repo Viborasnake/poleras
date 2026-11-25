@@ -1,3 +1,6 @@
+import {confirmOrderAction,showOrderDialog} from './admin-order-dialog.js';
+import {catalogDialogMarkup,catalogFileField,confirmCatalogDiscard,openCatalogDialog,performCatalogDialogAction,setCatalogFileStatus} from './admin-catalog-dialog.js';
+import {renderCustomerService} from './admin-customer-service.js';
 import {catalogPrintViews} from './catalog-print-presentation.js';
 import {orderPrintPlanMarkup} from './admin-order-print-plan.js';
 import {initializePoleraPrintFields,poleraPrintFields,syncPoleraPrintFields,wirePoleraPrintFields} from './admin-polera-prints.js';
@@ -12,7 +15,7 @@ import {catalogDesignVideoUrl} from './featured-design-video.js';
 import {wireStoreSettings as bindStoreSettings,wireAdminNotifications as bindAdminNotifications} from './admin-store-settings.js';
 import {mountCouponDisclosure,mountPaymentInstructionsDisclosure} from './admin-settings-disclosure.js';
 import {mountAdminOrderDisclosure} from './admin-order-disclosure.js';
-import {mountAdminFormDisclosure,unmountAdminFormDisclosure,adminFormData,submitAdminFormDisclosure} from './admin-form-disclosure.js';
+import {mountAdminFormDisclosure,unmountAdminFormDisclosure,adminFormData,adminStepSnapshot,submitAdminFormDisclosure} from './admin-form-disclosure.js';
 import {designProductArtworks, validateProductArtworks} from './catalog-product-artworks.js';
 import './design-system.css';
 import './accessibility.css';
@@ -26,13 +29,14 @@ import './admin-dark.css';
 import './admin-collections.css';
 import './admin-prices.css';
 import './admin-workspace.css';
+import './admin-order-dialog.css';
+import './admin-catalog-dialog.css';
 import { createClient } from '@supabase/supabase-js';
 import {authWithCaptcha} from './auth-captcha.js';
 import { defaultStoreSettings, normalizeStoreSettings, validateStoreSettings, fetchStoreSettings } from './store-settings.js';
 import { collections as baseCollections, catalogDesigns as baseDesigns, artworkUrl, catalogAssetUrl, catalogMockupPhoto, normalizeMockupFocus, normalizeSampleColor } from './catalog.js';
 import {compatibleSupplierVariants,supplierVariantsForPrice} from './supplier-variant-match.js';
 import { orderSteps, nextOrderStatus, orderProgressIndex, orderStatusLabel, orderKanbanStage } from './order-status.js';
-import { shouldRepairPaymentGate } from './admin-payment-gate.js';
 import { orderPaymentState, paymentStateLabels } from './payment-state.js';
 import { archivedOrderStatus, filterArchivedOrders } from './archive-history.js';
 import { orderCardOriginLabel, orderChannelLabel } from './order-card-origin.js';
@@ -279,7 +283,7 @@ function openPasswordDialog(){
  dialog.showModal();
  dialog.querySelector('input')?.focus();
 }
-function toast(message){const dialog=root.querySelector('dialog[open]');let node=dialog?.querySelector('.admin-dialog-toast');if(dialog&&!node){node=document.createElement('div');node.className='admin-toast admin-dialog-toast';node.setAttribute('role','status');node.setAttribute('aria-live','polite');dialog.append(node)}node=node||root.querySelector('.admin-toast');if(!node)return;node.textContent=message;node.classList.add('visible');setTimeout(()=>node.classList.remove('visible'),2200)}
+function toast(message){const dialog=document.activeElement?.closest('dialog[open]')||[...root.querySelectorAll('dialog[open]')].at(-1);let node=dialog?.querySelector('.admin-dialog-toast');if(dialog&&!node){node=document.createElement('div');node.className='admin-toast admin-dialog-toast';node.setAttribute('role','status');node.setAttribute('aria-live','polite');dialog.append(node)}node=node||root.querySelector('.admin-toast');if(!node)return;node.textContent=message;node.classList.add('visible');setTimeout(()=>node.classList.remove('visible'),2200)}
 function focusPageHeading(){
  const heading=root.querySelector('.admin-main h1');
  if(!heading)return;
@@ -343,7 +347,12 @@ function productColorDialogMarkup(){
  const families=COLOR_PRODUCT_FAMILIES.filter(family=>adminData.productTypes.some(product=>product.slug===family.slug));
  const tabs=families.map((family,index)=>`<button type="button" role="tab" id="product-color-tab-${family.slug}" aria-controls="product-color-panel-${family.slug}" aria-selected="${index===0}" tabindex="${index===0?'0':'-1'}" data-product-color-tab="${family.slug}">${safe(family.name)} <span data-product-color-count="${family.slug}">${activeProductColorCodes(adminData.variants,family.slug).length}</span></button>`).join('');
  const panels=families.map((family,index)=>{const active=new Set(activeProductColorCodes(adminData.variants,family.slug));return `<section role="tabpanel" id="product-color-panel-${family.slug}" aria-labelledby="product-color-tab-${family.slug}" data-product-color-panel="${family.slug}" ${index?'hidden':''}><div class="admin-color-batch-tools"><p>Se aplicará a todas las tallas y modelos publicados de ${safe(family.name.toLowerCase())}.</p><div><button type="button" class="admin-color-action" data-product-color-all="${family.slug}">Seleccionar todos</button><button type="button" class="admin-color-action" data-product-color-none="${family.slug}">Deseleccionar todos</button></div></div><div class="admin-color-groups">${productColorGroups().map(group=>`<section class="admin-color-group"><h3>${safe(group.label)}</h3><div class="admin-color-grid">${group.colors.map(color=>`<label class="admin-color-option"><input type="checkbox" name="product_colors_${family.slug}" value="${color.code}" ${active.has(color.code)?'checked':''}><i style="--sample-color:${color.hex}" aria-hidden="true"></i><span>${safe(color.name)}</span></label>`).join('')}</div></section>`).join('')}</div></section>`}).join('');
- return `<dialog class="admin-dialog admin-product-colors-dialog" id="product-colors-dialog"><form id="product-colors-form"><div class="dialog-title"><div><span class="admin-eyebrow">DISPONIBILIDAD EN LOTE</span><h2>Colores por producto</h2><p>Activa los tonos que realmente vendes. Afiches, vasos térmicos y otros productos sin color no aparecen aquí.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><div class="admin-color-product-tabs" role="tablist" aria-label="Producto afecto a color">${tabs}</div>${panels}<div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Guardar disponibilidades</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`;
+ return catalogDialogMarkup({
+  id:'product-colors-dialog',formId:'product-colors-form',className:'admin-product-colors-dialog',
+  title:'Colores globales',context:'Estos cambios se aplican a todos los diseños de cada producto.',
+  body:`<div class="admin-color-product-tabs" role="tablist" aria-label="Producto">${tabs}</div>${panels}`,
+  submit:'Guardar colores',discard:true,
+ });
 }
 function productsView(){
  const counts=new Map();for(const collection of adminData.collections)counts.set(collection.product_type_id,(counts.get(collection.product_type_id)||0)+1);
@@ -361,19 +370,67 @@ function wireProductColorDialog({triggerSelector='[data-open-product-colors]',on
   colorForm.querySelectorAll('[data-product-color-tab]').forEach(tab=>{const selected=tab.dataset.productColorTab===slug;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1});
   colorForm.querySelectorAll('[data-product-color-panel]').forEach(panel=>{panel.hidden=panel.dataset.productColorPanel!==slug});
  };
- const openFromTrigger=trigger=>{const slug=trigger.dataset.openProductColors||colorForm.querySelector('[role="tab"]')?.dataset.productColorTab;colorForm.querySelector('.admin-form-status').textContent='';if(slug)selectColorTab(slug);colorDialog.showModal();colorForm.querySelector(`[data-product-color-tab="${CSS.escape(slug||'')}"]`)?.focus()};
+ const tabs=[...colorForm.querySelectorAll('[data-product-color-tab]')];
+ let initialColors='';
+ confirmCatalogDiscard(colorDialog,()=>adminStepSnapshot(colorForm)!==initialColors);
+ const openFromTrigger=trigger=>{
+  const slug=trigger.dataset.openProductColors||tabs[0]?.dataset.productColorTab;
+  colorForm.reset();
+  tabs.forEach(tab=>syncColorCount(tab.dataset.productColorTab));
+  if(slug)selectColorTab(slug);
+  initialColors=adminStepSnapshot(colorForm);
+  openCatalogDialog(colorDialog,trigger);
+  (tabs.find(tab=>tab.dataset.productColorTab===slug)||colorDialog.querySelector('.dialog-close')).focus({preventScroll:true});
+ };
  if(root._productColorTriggerHandler)root.removeEventListener('click',root._productColorTriggerHandler);
  root._productColorTriggerHandler=event=>{const trigger=event.target.closest(triggerSelector);if(trigger&&root.contains(trigger))openFromTrigger(trigger)};
  root.addEventListener('click',root._productColorTriggerHandler);
- colorDialog.querySelector('.dialog-close').onclick=()=>colorDialog.close();colorDialog.querySelector('.dialog-cancel').onclick=()=>colorDialog.close();
- const tabs=[...colorForm.querySelectorAll('[data-product-color-tab]')];
- tabs.forEach((tab,index)=>{tab.onclick=()=>selectColorTab(tab.dataset.productColorTab);tab.onkeydown=event=>{if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();const next=(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;selectColorTab(tabs[next].dataset.productColorTab);tabs[next].focus()}});
+ tabs.forEach((tab,index)=>{
+  const select=()=>{selectColorTab(tab.dataset.productColorTab);colorForm.querySelector('.admin-catalog-dialog-body').scrollTop=0};
+  tab.onclick=select;
+  tab.onkeydown=event=>{
+   const next={ArrowLeft:(index-1+tabs.length)%tabs.length,ArrowRight:(index+1)%tabs.length,Home:0,End:tabs.length-1}[event.key];
+   if(next===undefined)return;
+   event.preventDefault();
+   tabs[next].click();
+   tabs[next].focus();
+  };
+ });
  colorForm.querySelectorAll('[data-product-color-panel]').forEach(panel=>{
   const slug=panel.dataset.productColorPanel,inputs=colorInputs(slug);inputs.forEach(input=>input.onchange=()=>syncColorCount(slug));
   panel.querySelector('[data-product-color-all]').onclick=()=>{inputs.forEach(input=>{input.checked=true});syncColorCount(slug)};
   panel.querySelector('[data-product-color-none]').onclick=()=>{inputs.forEach(input=>{input.checked=false});syncColorCount(slug)};
  });
- colorForm.onsubmit=async event=>{event.preventDefault();const button=event.submitter||colorForm.querySelector('[type="submit"]'),status=colorForm.querySelector('.admin-form-status'),availability=Object.fromEntries(COLOR_PRODUCT_FAMILIES.filter(family=>colorForm.querySelector(`[name="product_colors_${CSS.escape(family.slug)}"]`)).map(family=>[family.slug,colorInputs(family.slug).filter(input=>input.checked).map(input=>input.value)])),empty=Object.entries(availability).find(([,codes])=>!codes.length);if(empty){const family=COLOR_PRODUCT_FAMILIES.find(item=>item.slug===empty[0]);status.textContent=`Selecciona al menos un color para ${family?.name||empty[0]}.`;selectColorTab(empty[0]);return}button.disabled=true;button.textContent='Guardando…';status.textContent='Actualizando variantes de todas las tallas publicadas…';const {data,error}=await supabase.rpc('set_product_color_availability',{_availability:availability});if(error||data?.error){button.disabled=false;button.textContent='Guardar disponibilidades';status.textContent=data?.error||error?.message||'No pudimos actualizar los colores.';return}const variants=await supabase.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(name,code,active)').order('sku');if(variants.error){button.disabled=false;button.textContent='Guardar disponibilidades';status.textContent=variants.error.message;return}adminData.variants=variants.data||[];button.disabled=false;button.textContent='Guardar disponibilidades';colorDialog.close();await onSaved(availability)};
+ colorForm.onsubmit=event=>{
+  event.preventDefault();
+  const status=colorForm.querySelector('.admin-form-status');
+  const availability=Object.fromEntries(tabs.map(tab=>{
+   const slug=tab.dataset.productColorTab;
+   return [slug,colorInputs(slug).filter(input=>input.checked).map(input=>input.value)];
+  }));
+  const empty=tabs.find(tab=>!availability[tab.dataset.productColorTab].length);
+  if(empty){
+   const slug=empty.dataset.productColorTab;
+   status.textContent=`Selecciona al menos un color para ${COLOR_PRODUCT_FAMILIES.find(family=>family.slug===slug).name}.`;
+   status.dataset.tone='error';
+   empty.click();
+   empty.focus();
+   return;
+  }
+  return performCatalogDialogAction(colorForm,{message:'Actualizando la gama global…',pendingLabel:'Guardando…',action:async()=>{
+   const {data,error}=await supabase.rpc('set_product_color_availability',{_availability:availability});
+   if(error||data?.error)throw new Error(data?.error||error.message);
+   for(const [slug,codes] of Object.entries(availability)){
+    for(const input of colorInputs(slug))input.defaultChecked=codes.includes(input.value);
+   }
+   const variants=await supabase.from('product_variants').select('id,sku,size,color_name,color_hex,price_clp,active,product_models!inner(name,code,active)').order('sku');
+   if(variants.error)throw new Error(`Los colores se guardaron, pero no pudimos actualizar la lista. ${variants.error.message}`);
+   adminData.variants=variants.data||[];
+   const selectedTab=colorForm.querySelector('[aria-selected="true"]');
+   colorDialog.close();
+   await onSaved(availability,selectedTab?.dataset.productColorTab);
+  }});
+ };
 }
 function wireProducts(){
  const dialog=root.querySelector('#product-dialog'),form=dialog.querySelector('form');
@@ -580,15 +637,55 @@ function designColorOptionsMarkup(name,type,available=availableDesignColors(),se
  const groups=productColorGroups(colors.map(color=>({code:color.value,name:color.label,hex:color.value,group:color.group,shade:color.shade}))).map(group=>`<section class="admin-color-group"><h3>${safe(group.label)} <small>${safe(group.colors.map(color=>color.shade.toLowerCase()).filter((value,index,items)=>items.indexOf(value)===index).join(' · '))}</small></h3><div class="admin-color-grid">${group.colors.map(color=>`<label class="admin-color-option"><input type="${type}" name="${name}" value="${color.hex}" ${(type==='radio'&&color.hex===first)||(type==='checkbox'&&selected.includes(color.hex))?'checked':''}${type==='radio'?' required':''}><i style="--sample-color:${color.hex}" aria-hidden="true"></i><span>${safe(color.name)}</span></label>`).join('')}</div></section>`).join('');
  return `<div class="admin-color-groups">${groups}</div>`;
 }
+function designArtworkSrc(design){
+ const local=design.artwork_path?.startsWith('local:')?baseDesigns.find(item=>item.id===design.slug):null;
+ return local?artworkUrl(local):catalogAssetUrl(design.artwork_path);
+}
 function designPreview(design){
- const localDesign=design.artwork_path?.startsWith('local:')?baseDesigns.find(item=>item.id===design.slug):null;
- const src=localDesign?artworkUrl(localDesign):design.artwork_path;
+ const src=designArtworkSrc(design);
  return src?`<img src="${safe(src)}" alt="Vista previa de ${safe(design.name)}">`:`<span>${icon('image')}</span>`;
 }
 function mockupPreview(design){const entry=Object.entries(designProductMockups(design)).find(([,photo])=>photo.path);if(!entry)return '<span>Sin mockup</span>';const [slug,photo]=entry,name=adminData.productTypes.find(product=>product.slug===slug)?.name||slug;return `<img src="${safe(photo.path)}" alt="Mockup de ${safe(name)} para ${safe(design.name)}">`}
-function designProductUploadMarkup(product){
- const upload=`<label class="admin-file"><span>Archivo para ${safe(product.name)}</span><input type="file" name="artwork_${safe(product.slug)}" accept="image/png,image/jpeg,image/webp" disabled><small>PNG, JPG o WebP. Hasta 25 MB; se optimiza para R2 (máx. 2.400 px y 3 MB); se conserva la transparencia cuando corresponde.</small><output>Ningún archivo seleccionado.</output></label><div class="design-file-preview" hidden><img alt="Vista previa del diseño para ${safe(product.name)}"></div>`;
- return `<div data-product-upload hidden>${product.slug==='poleras'?poleraPrintFields(upload):upload}</div>`;
+function designProductFilesMarkup(){
+ const products=adminData.productTypes.map(product=>{
+  const slug=safe(product.slug),name=safe(product.name);
+  const file=catalogFileField({name:`artwork_${slug}`,label:`Arte ${slug==='poleras'?'principal':`para ${product.name}`}`,disabled:true});
+  const upload=`<div class="admin-catalog-upload">
+   ${file}
+   <div class="design-file-preview" hidden><img alt="Arte para ${name}"></div>
+  </div>`;
+  return `<section data-design-product="${slug}">
+   <label class="admin-check"><input type="checkbox" name="design_products" value="${slug}"><span>${name}${product.active?'':' (oculto)'}</span></label>
+   <div data-product-upload hidden>${slug==='poleras'?poleraPrintFields(upload):upload}</div>
+  </section>`;
+ }).join('');
+ return `<fieldset class="admin-product-artworks">
+  <legend>Disponibilidad por producto</legend>
+  <p>Selecciona los productos y carga su arte. PNG, JPG o WebP de hasta 25 MB.</p>
+  ${products}
+ </fieldset>`;
+}
+function designEditorMarkup(options){
+ return catalogDialogMarkup({
+  id:'design-dialog',formId:'design-form',className:'admin-design-dialog',
+  title:'Nuevo diseño',submit:'Publicar diseño',discard:true,workflow:true,
+  body:`<input type="hidden" name="id"><label>Colección<select name="collection_id" required><option value="">Selecciona una colección</option>${options}</select></label>
+   <label>Nombre<input name="name" required maxlength="80" placeholder="Ej. Reto lunar"></label>
+   <label>Slug<input name="slug" required maxlength="80" pattern="(?:[a-z0-9]|-)+" placeholder="reto-lunar"><small>Identificador único del diseño.</small></label>
+   <label>Descripción<textarea name="caption" maxlength="180" rows="3" placeholder="Una frase breve para la tarjeta."></textarea></label>${designProductFilesMarkup()}<fieldset class="admin-sample-colors admin-allowed-colors"><legend>Colores que usará este diseño</legend><p>Elige qué tonos de la gama global se ofrecerán con este diseño.</p><div class="admin-design-product-colors" data-design-product-colors></div><p data-color-config-note role="status" aria-live="polite"></p></fieldset>
+   <fieldset class="admin-sample-colors" data-design-sample-colors><legend>Color de polera para la muestra</legend><p>Este color se usa para mostrar el diseño en la vista previa.</p><div data-sample-color-options></div></fieldset>${productMockupFields(adminData.productTypes)}<fieldset class="admin-design-flags"><legend>Visibilidad y personalización</legend><label class="admin-check"><input name="accepts_customer_image" type="checkbox"><span>Este diseño comienza con una imagen del cliente</span></label><label data-customer-photo-subject hidden>¿De quién será la foto?<select name="customer_photo_subject" disabled><option value="pets">Mascotas (perro y gato)</option><option value="people">Personas (familia, amigos o colegas)</option></select><small>Cambia las fotos de ejemplo en la tarjeta y las indicaciones del pedido.</small></label><label class="admin-check admin-auto-base-purchase"><input name="allows_base_purchase" type="checkbox" disabled><span><strong>Permitir comprar el diseño tal cual</strong><small data-base-purchase-note>Se configura automáticamente según el tipo de foto.</small></span></label><label class="admin-check"><input name="is_featured" type="checkbox"><span>Mostrar primero como diseño destacado</span></label><label class="admin-check"><input name="active" type="checkbox" checked><span>Mostrar este diseño en la tienda</span></label></fieldset>`,
+ });
+}
+function deleteDesignDialogMarkup(){
+ return catalogDialogMarkup({
+  id:'delete-design-dialog',className:'admin-confirm-dialog',title:'Eliminar diseño',
+  body:`<input type="hidden" name="design_id"><div class="admin-catalog-delete-details">
+   <p><strong data-delete-design-name></strong><span data-delete-design-collection></span></p>
+   <img data-delete-design-preview alt="" hidden>
+  </div>
+  <p>El diseño y sus archivos se eliminarán de forma permanente. Para retirarlo de la tienda y conservarlo, usa «Ocultar».</p>`,
+  submit:'Eliminar diseño',danger:true,
+ });
 }
 function designsView(){
  const designColors=availableDesignColors();
@@ -606,9 +703,9 @@ function designsView(){
  const categoryOptions=populatedCategories.map(category=>`<option value="${category.id}">${safe(category.name)}</option>`).join('');
  const collectionFilterOptions=populatedCollections.map(collection=>`<option value="${collection.id}" data-category-id="${safe(collection.category_id)}">${safe(collection.name)} · ${safe(productName(collection.product_type_id))}</option>`).join('');
  const filters=`<label class="admin-filter-field" for="admin-design-category-filter">Tipo de colección<select id="admin-design-category-filter"><option value="">Todos los tipos</option>${categoryOptions}</select></label><label class="admin-filter-field" for="admin-design-collection-filter">Colección<select id="admin-design-collection-filter"><option value="">Todas</option>${collectionFilterOptions}</select></label>`;
- const list=rows?`<section class="admin-panel admin-design-panel"><div class="admin-panel-head"><div><h2>Todos los diseños</h2><p>${adminData.designs.length} en total · ${adminData.designs.filter(item=>item.active).length} activos</p></div></div>${listSearch('Buscar diseño','Nombre, colección o color',adminFilters('design-filters',filters))}<div class="admin-table-wrap"><table class="admin-table admin-design-table"><thead><tr><th>Diseño</th><th>Mockup</th><th>Colección</th><th>Polera muestra</th><th>Slug</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table></div>${searchEmpty}</section>`:'<section class="admin-panel admin-empty"><strong>Aún no hay diseños.</strong><p>Carga el primero para comenzar tu catálogo.</p></section>';
- const content=`${pageHeading('CATÁLOGO','Diseños.','Carga piezas y asígnalas a una colección. Los diseños activos aparecen en la tienda.',action)}${list}<dialog class="admin-dialog admin-design-dialog" id="design-dialog"><form method="dialog" id="design-form"><div class="dialog-title"><div><span class="admin-eyebrow">CATÁLOGO</span><h2 id="design-dialog-title">Nuevo diseño</h2></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><input type="hidden" name="id"><label>Colección<select name="collection_id" required><option value="">Selecciona una colección</option>${options}</select></label><label>Nombre<input name="name" required maxlength="80" placeholder="Ej. Reto lunar"></label><label>Slug<input name="slug" required maxlength="80" pattern="(?:[a-z0-9]|-)+" placeholder="reto-lunar"><small>Identificador único del diseño.</small></label><label>Descripción<textarea name="caption" maxlength="180" rows="3" placeholder="Una frase breve para la tarjeta."></textarea></label><fieldset class="admin-product-artworks"><legend>Productos y archivos del diseño</legend><p>Marca dónde estará disponible y sube un archivo para cada producto.</p>${adminData.productTypes.map(product=>`<section data-design-product="${safe(product.slug)}"><label class="admin-check"><input type="checkbox" name="design_products" value="${safe(product.slug)}"><span>${safe(product.name)}${product.active?'':' (oculto)'}</span></label>${designProductUploadMarkup(product)}</section>`).join('')}</fieldset><fieldset class="admin-sample-colors admin-allowed-colors"><legend>Colores que usará este diseño</legend><p>La gama global define lo que vendes. Aquí eliges, producto por producto, qué tonos de esa gama estarán disponibles para este diseño.</p><div class="admin-design-product-colors" data-design-product-colors></div><p data-color-config-note role="status" aria-live="polite"></p></fieldset><fieldset class="admin-sample-colors" data-design-sample-colors><legend>Color de polera para la muestra</legend><p>Solo aparecen los tonos de Poleras elegidos arriba.</p><div data-sample-color-options></div></fieldset>${productMockupFields(adminData.productTypes)}<fieldset class="admin-design-flags"><legend>Comportamiento en la tienda</legend><label class="admin-check"><input name="accepts_customer_image" type="checkbox"><span>Este diseño comienza con una imagen del cliente</span></label><label data-customer-photo-subject hidden>¿De quién será la foto?<select name="customer_photo_subject" disabled><option value="pets">Mascotas (perro y gato)</option><option value="people">Personas (familia, amigos o colegas)</option></select><small>Cambia las fotos de ejemplo en la tarjeta y las indicaciones del pedido.</small></label><label class="admin-check admin-auto-base-purchase"><input name="allows_base_purchase" type="checkbox" disabled><span><strong>Permitir comprar el diseño tal cual</strong><small data-base-purchase-note>Se configura automáticamente según el tipo de foto.</small></span></label><label class="admin-check"><input name="is_featured" type="checkbox"><span>Mostrar primero como diseño destacado</span></label><label class="admin-check"><input name="active" type="checkbox" checked><span>Mostrar este diseño en la tienda</span></label></fieldset><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Publicar diseño</button></div><p class="admin-form-status" role="alert"></p></form></dialog><dialog class="admin-dialog admin-confirm-dialog" id="delete-design-dialog"><form method="dialog"><div class="dialog-title"><div><span class="admin-eyebrow">ACCIÓN PERMANENTE</span><h2>Eliminar diseño</h2></div><button type="button" class="dialog-close" data-delete-design-cancel aria-label="Cerrar">×</button></div><p>Vas a eliminar <strong data-delete-design-name></strong> y sus archivos del catálogo. Esta acción no se puede deshacer.</p><input type="hidden" name="design_id"><div class="dialog-actions"><button type="button" class="admin-secondary" data-delete-design-cancel>Cancelar</button><button type="submit" class="admin-danger">Eliminar diseño</button></div><p class="admin-form-status" role="alert"></p></form></dialog>${productColorDialogMarkup()}`;
- shell(content+printLayoutDialogMarkup(),'disenos');
+ const list=rows?`<section class="admin-panel admin-design-panel"><div class="admin-panel-head"><div><h2>Todos los diseños</h2><p>${adminData.designs.length} en total · ${adminData.designs.filter(item=>item.active).length} activos</p></div></div>${listSearch('Buscar diseño','Nombre, colección o color',filters)}<div class="admin-table-wrap"><table class="admin-table admin-design-table"><thead><tr><th>Diseño</th><th>Mockup</th><th>Colección</th><th>Polera muestra</th><th>Slug</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table></div>${searchEmpty}</section>`:'<section class="admin-panel admin-empty"><strong>Aún no hay diseños.</strong><p>Carga el primero para comenzar tu catálogo.</p></section>';
+ const content=`${pageHeading('CATÁLOGO','Diseños.','Carga piezas y asígnalas a una colección. Los diseños activos aparecen en la tienda.',action)}${list}`;
+ shell(content+designEditorMarkup(options)+printLayoutDialogMarkup()+deleteDesignDialogMarkup()+productColorDialogMarkup(),'disenos');
  const categoryFilter=root.querySelector('#admin-design-category-filter');
  const collectionFilter=root.querySelector('#admin-design-collection-filter');
  const applyFilters=()=>filterCurrentView(root.querySelector('#admin-search-input')?.value||'');
@@ -624,7 +721,8 @@ function designsView(){
  filterCurrentView('');
 }
 function validateArtwork(file,required,maxBytes=CATALOG_SOURCE_MAX_BYTES){
- if(!file?.size)return required?'Selecciona un archivo para el diseño.':'';
+ if(!file)return required?'Selecciona un archivo para el diseño.':'';
+ if(!file.size)return 'El archivo está vacío. Elige otra imagen.';
  if(!IMAGE_TYPES.includes(file.type))return 'Usa un archivo PNG, JPG o WebP.';
  if(file.size>maxBytes)return `El archivo supera el máximo de ${Math.round(maxBytes/1024/1024)} MB.`;
  return '';
@@ -768,7 +866,10 @@ function syncDesignSampleColors(form,preferred=''){
  fieldset.hidden=!selectedDesignProductSlugs(form).includes('poleras');
  if(fieldset.hidden){target.innerHTML='';return}
  target.innerHTML=available.length?designColorOptionsMarkup('sample_color','radio',available,[preferred]):'<p class="admin-color-empty">Selecciona al menos un color para Poleras.</p>';
- target.querySelectorAll('[name="sample_color"]').forEach(input=>input.addEventListener('change',()=>form.querySelector('[data-design-product="poleras"] .design-file-preview')?.style.setProperty('--sample-color',input.value)));
+ const preview=form.querySelector('[data-design-product="poleras"] .design-file-preview');
+ const updatePreview=()=>{preview?.style.setProperty('--sample-color',target.querySelector(':checked')?.value||'')};
+ target.querySelectorAll('[name="sample_color"]').forEach(input=>input.addEventListener('change',updatePreview));
+ updatePreview();
 }
 function renderDesignProductColors(form,preferredColors={}){
  const container=form.querySelector('[data-design-product-colors]');if(!container)return;
@@ -783,20 +884,23 @@ function renderDesignProductColors(form,preferredColors={}){
   return `<section class="admin-design-color-product" data-design-color-product="${family.slug}"><div class="admin-design-color-heading"><div><h3>${safe(family.name)}</h3><p>${available.length} ${available.length===1?'tono disponible':'tonos disponibles'} en la gama global.</p></div><div><button type="button" class="admin-color-action" data-design-colors-all>Usar todos</button><button type="button" class="admin-color-action" data-design-colors-none>Quitar todos</button></div></div>${options||`<div class="admin-color-empty admin-color-empty-action"><strong>Falta configurar la gama global de ${safe(family.name)}.</strong><span>Hazlo aquí y vuelve a elegir sin perder los datos del diseño.</span><button type="button" class="admin-secondary" data-open-product-colors="${family.slug}">Configurar colores globales</button></div>`}</section>`;
  }).join('');
  for(const panel of container.querySelectorAll('[data-design-color-product]')){
-  const inputs=[...panel.querySelectorAll('input[type="checkbox"]')],preferredSample=form.querySelector('[name="sample_color"]:checked')?.value||'';
-  panel.querySelector('[data-design-colors-all]')?.addEventListener('click',()=>{inputs.forEach(input=>{input.checked=true});syncDesignSampleColors(form,preferredSample);syncDesignColorCompatibility(form)});
-  panel.querySelector('[data-design-colors-none]')?.addEventListener('click',()=>{inputs.forEach(input=>{input.checked=false});syncDesignSampleColors(form,preferredSample);syncDesignColorCompatibility(form)});
-  inputs.forEach(input=>input.addEventListener('change',()=>{syncDesignSampleColors(form,preferredSample);syncDesignColorCompatibility(form)}));
+  const inputs=[...panel.querySelectorAll('input[type="checkbox"]')];
+  const syncSample=()=>syncDesignSampleColors(form,form.querySelector('[name="sample_color"]:checked')?.value||'');
+  panel.querySelector('[data-design-colors-all]')?.addEventListener('click',()=>{inputs.forEach(input=>{input.checked=true});syncSample();syncDesignColorCompatibility(form)});
+  panel.querySelector('[data-design-colors-none]')?.addEventListener('click',()=>{inputs.forEach(input=>{input.checked=false});syncSample();syncDesignColorCompatibility(form)});
+  inputs.forEach(input=>input.addEventListener('change',()=>{syncSample();syncDesignColorCompatibility(form)}));
  }
  syncDesignSampleColors(form,form.querySelector('[name="sample_color"]:checked')?.value||'');
 }
-function openDesignDialog(design){
+function openDesignDialog(design,trigger){
  const dialog=root.querySelector('#design-dialog'),form=root.querySelector('#design-form');
  unmountAdminFormDisclosure(form);form.reset();
+ for(const input of form.querySelectorAll('input[type=file]'))input.setCustomValidity('');
  form.elements.id.value=design?.id||'';
  form.elements.collection_id.value=design?.collection_id||'';
  form.elements.name.value=design?.name||'';
  form.elements.slug.value=design?.slug||'';
+ form.elements.slug.dataset.manual=String(Boolean(design));
  form.elements.caption.value=design?.caption||'';
  form.elements.active.checked=design?.active??true;
  form.elements.accepts_customer_image.checked=Boolean(design?.accepts_customer_image);
@@ -805,7 +909,10 @@ function openDesignDialog(design){
  form.elements.is_featured.checked=Boolean(design?.is_featured);
  const sampleColor=normalizeSampleColor(design?.sample_color),colorNote=form.querySelector('[data-color-config-note]');colorNote.textContent='';delete colorNote.dataset.tone;
  root.querySelector('#design-dialog-title').textContent=design?'Editar diseño':'Nuevo diseño';
- form.querySelector('[type="submit"]').textContent=design?'Guardar cambios':'Publicar diseño';
+ const context=dialog.querySelector('[data-catalog-dialog-context]');
+ context.textContent=design?`${design.name} · ${collectionName(design.collection_id)}`:'Completa las secciones para publicar en el catálogo.';
+ context.hidden=false;
+ form.querySelector('[type="submit"]').textContent=design?'Guardar cambios':form.elements.active.checked?'Publicar diseño':'Guardar diseño oculto';
  initializeProductUploads(form,design);
  initializePoleraPrintFields(form,design);
  const productSlugs=Object.keys(currentProductArtworks(design));
@@ -816,14 +923,17 @@ function openDesignDialog(design){
  const photos=designProductMockups(design||{});
  for(const product of adminData.productTypes){
   const name=mockupInputName(product.slug),photo=photos[product.slug];
-  form.querySelector(`[data-mockup-name="${name}"]`).textContent=photo?.path?'Mockup actual; puedes reemplazarlo.':'Mockup pendiente para este producto.';
+  setCatalogFileStatus(form.elements[name],photo?.path?'Mockup actual':'Sin mockup',Boolean(photo?.path));
+  const clear=form.elements[`clear_${name}`];clear.closest('label').hidden=!photo?.path;
   showMockupPreview(form,name,photo?.path||'');setMockupFocus(form,name,photo?.focusX??50,photo?.focusY??50);
   showMockupVideo(form.elements[mockupVideoInputName(product.slug)],storedMockupVideo(design,product.slug));
  }
  const personalizationArrow=normalizeMockupFocus(design?.personalization_arrow_x,design?.personalization_arrow_y);
  setPersonalizationArrow(form,personalizationArrow.x,personalizationArrow.y);syncPersonalizationArrowPicker(form,photos.poleras?.path||'');
  syncProductMockupFields(form);
- dialog.showModal();mountAdminFormDisclosure(form,'design',{validateFile:(file,field)=>field.name.startsWith('mockup_video_')?catalogVideoFileError(file):validateArtwork(file,false),editableSections:Boolean(design)});
+ openCatalogDialog(dialog,trigger);
+ mountAdminFormDisclosure(form,'design',{validateFile:(file,field)=>field.name.startsWith('mockup_video_')?catalogVideoFileError(file):validateArtwork(file,false),editableSections:Boolean(design)});
+ dialog.dataset.initialDesign=adminStepSnapshot(form);
 }
 function currentProductArtworks(design){
  const collection=adminData.collections.find(item=>item.id===design?.collection_id);
@@ -831,35 +941,78 @@ function currentProductArtworks(design){
  return designProductArtworks(design,product?.slug||'poleras');
 }
 function printLayoutDialogMarkup(){
- const control=(key,label,min,max)=>`<div class="admin-layout-control"><div class="admin-layout-control-head"><span>${label}</span><div class="admin-layout-stepper" role="group" aria-label="Ajustar ${label.toLowerCase()}"><button type="button" data-layout-step="${key}" data-layout-direction="down" aria-label="Disminuir ${label.toLowerCase()}" title="Disminuir">−</button><output data-layout-value="${key}" aria-live="polite"></output><button type="button" data-layout-step="${key}" data-layout-direction="up" aria-label="Aumentar ${label.toLowerCase()}" title="Aumentar">+</button></div></div><input name="${key}" type="range" min="${min}" max="${max}" step="0.01" aria-label="${label}"></div>`;
- return `<dialog class="admin-dialog admin-print-layout-dialog" id="print-layout-dialog"><form id="print-layout-form"><div class="dialog-title"><div><span class="admin-eyebrow">DISEÑOS · ENCUADRE</span><h2 id="print-layout-title">Ajustar estampado</h2><p>Ajusta el encuadre del estampado principal de cada producto y revisa las demás ubicaciones.</p></div><button type="button" class="dialog-close" data-print-layout-close aria-label="Cerrar">×</button></div><label>Producto<select name="product" aria-label="Producto para ajustar"></select></label><label data-layout-view hidden>Vista del estampado<select name="print_view"></select></label><div class="admin-print-layout-grid"><div class="admin-print-layout-preview" id="print-layout-preview" role="img" aria-label="Vista 3D del diseño sobre la prenda"></div><fieldset class="admin-print-layout-controls"><legend>Encuadre del estampado principal</legend>${control('size','Tamaño','0.6','1.15')}${control('x','Horizontal','-0.3','0.3')}${control('y','Vertical','-0.3','0.3')}<p>Arrastra la prenda para revisar el estampado desde distintos ángulos. La vista es una referencia visual.</p><button type="button" class="admin-secondary" data-layout-reset>Restablecer este producto</button></fieldset><p data-layout-readonly hidden>Estás revisando un estampado adicional. Elige la vista principal para ajustar el encuadre.</p></div><div class="dialog-actions"><button type="button" class="admin-secondary" data-print-layout-close>Cancelar</button><button type="submit" class="admin-primary">Guardar encuadre</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`;
+ const control=(key,label,min,max)=>`<div class="admin-layout-control">
+  <div class="admin-layout-control-head"><label for="print-layout-${key}">${label}</label>
+   <div class="admin-layout-stepper" role="group" aria-label="Ajustar ${label.toLowerCase()}">
+    <button type="button" data-layout-step="${key}" data-layout-direction="down" aria-label="Disminuir ${label.toLowerCase()}">−</button>
+    <output for="print-layout-${key}" data-layout-value="${key}"></output>
+    <button type="button" data-layout-step="${key}" data-layout-direction="up" aria-label="Aumentar ${label.toLowerCase()}">+</button>
+   </div>
+  </div>
+  <input id="print-layout-${key}" name="${key}" type="range" min="${min}" max="${max}" step="0.01">
+ </div>`;
+ return catalogDialogMarkup({
+  id:'print-layout-dialog',formId:'print-layout-form',className:'admin-print-layout-dialog',
+  title:'Ajustar estampado',submit:'Guardar encuadre',discard:true,
+  body:`<div class="admin-layout-selects">
+   <label>Producto<select name="product"></select></label>
+   <label data-layout-view hidden>Ubicación en la vista<select name="print_view"></select></label>
+  </div>
+  <div class="admin-print-layout-grid">
+   <figure class="admin-layout-figure">
+    <div class="admin-print-layout-preview" id="print-layout-preview" role="group">
+     <div class="admin-layout-preview-message">
+      <p role="status"></p>
+      <button type="button" class="admin-secondary" data-layout-retry hidden>Reintentar vista 3D</button>
+     </div>
+    </div>
+    <figcaption>Arrastra para girar la prenda. El encuadre se aplica al catálogo y al estudio.</figcaption>
+   </figure>
+   <fieldset class="admin-print-layout-controls">
+    <legend>Arte principal</legend>
+    <p data-layout-readonly hidden>Esta ubicación adicional se puede revisar en la vista. Selecciona el arte principal para ajustar el encuadre.</p>
+    ${control('size','Tamaño','0.6','1.15')}
+    ${control('x','Horizontal','-0.3','0.3')}
+    ${control('y','Vertical','-0.3','0.3')}
+    <button type="button" class="admin-secondary" data-layout-reset>Restablecer encuadre</button>
+   </fieldset>
+  </div>`,
+ });
 }
 function openPrintLayoutDialog(design){
  const dialog=root.querySelector('#print-layout-dialog'),form=dialog.querySelector('form'),select=form.elements.product;
  const artworks=currentProductArtworks(design),slugs=Object.keys(artworks).filter(slug=>['poleras','bodys','totebags'].includes(slug)&&artworks[slug]);
  if(!slugs.length)return toast('Este diseño aún no tiene un archivo para mostrar.','error');
- const draft=Object.fromEntries(slugs.map(slug=>[slug,catalogPrintLayoutFor(design,slug)]));
+
+ const initial=Object.fromEntries(slugs.map(slug=>[slug,catalogPrintLayoutFor(design,slug)])),draft={...initial};
+ const preview=dialog.querySelector('#print-layout-preview'),message=preview.querySelector('.admin-layout-preview-message');
+ const status=message.querySelector('p'),retry=message.querySelector('button'),save=form.querySelector('[type="submit"]');
+ const footerStatus=form.querySelector('.admin-form-status'),controls=form.querySelector('.admin-print-layout-controls');
+ const readonly=form.querySelector('[data-layout-readonly]'),view=form.elements.print_view;
+ const context=dialog.querySelector('[data-catalog-dialog-context]');
+ const changed=()=>slugs.filter(slug=>['size','x','y'].some(key=>initial[slug][key]!==draft[slug][key]));
+ let viewer=null,stage=null,ready=false;
+
  select.innerHTML=slugs.map(slug=>`<option value="${safe(slug)}">${safe(adminData.productTypes.find(item=>item.slug===slug)?.name||slug)}</option>`).join('');
- dialog.querySelector('#print-layout-title').textContent=`Ajustar ${design.name}`;
- const preview=dialog.querySelector('#print-layout-preview'),status=form.querySelector('.admin-form-status'),save=form.querySelector('[type="submit"]');status.textContent='';
- let viewer=null,version=0,previewFailed=false;
- const composition=()=>select.value==='poleras'?catalogPoleraComposition({...design,product_artworks:artworks},'basic'):null;
- const prints=()=>composition()?.configuration.prints||[];
- const view=form.elements.print_view;
+ context.textContent=design.name;
+ context.hidden=false;
+ preview.setAttribute('aria-label',`Vista 3D de ${design.name}`);
+
+ const prints=()=>select.value==='poleras'?catalogPoleraComposition({...design,product_artworks:artworks},'basic')?.configuration.prints||[]:[];
  const imageFor=path=>{
   const local=path?.startsWith('local:')?baseDesigns.find(item=>`local:${item.id}`===path):null;
   return artworkUrl(local||{artworkPath:catalogAssetUrl(path)});
  };
- const adjustments=form.querySelector('.admin-print-layout-controls'),readonly=form.querySelector('[data-layout-readonly]');
+ const views=()=>catalogPrintViews(prints());
+ const selectedView=()=>views().find(print=>print.key===view.value);
  const updateViews=()=>{
-  const views=catalogPrintViews(prints());
-  view.closest('label').hidden=views.length<2;
-  view.innerHTML=views.map(print=>`<option value="${print.key}">${print.label}${print.id.startsWith('primary-')?' · Principal':''}</option>`).join('');
+  const options=views();
+  view.closest('label').hidden=options.length<2;
+  view.disabled=options.length<2;
+  view.innerHTML=options.map(print=>`<option value="${safe(print.key)}">${safe(print.label)}${print.id.startsWith('primary-')?' · Principal':''}</option>`).join('');
  };
  const face=()=>{
-  const print=catalogPrintViews(prints()).find(print=>print.key===view.value);
-  const extra=Boolean(print&&!print.id.startsWith('primary-'));
-  adjustments.hidden=extra;adjustments.disabled=extra;readonly.hidden=!extra;
+  const print=selectedView();
   if(print)viewer?.face(print.side,print.placement);
  };
  const state=()=>{
@@ -870,20 +1023,106 @@ function openPrintLayoutDialog(design){
    ...(layers.length?{printLayers:layers.map(layer=>({...layer,image:imageFor(layer.catalogArtworkPath)}))}:{}),
   };
  };
- const showValues=()=>{const layout=draft[select.value];for(const key of ['size','x','y'])form.elements[key].value=layout[key];form.querySelector('[data-layout-value="size"]').textContent=`${Math.round(layout.size*100)}%`;for(const key of ['x','y'])form.querySelector(`[data-layout-value="${key}"]`).textContent=layout[key]===0?'Centro':`${Math.round(Math.abs(layout[key])*100)} ${layout[key]>0?(key==='x'?'derecha':'arriba'):(key==='x'?'izquierda':'abajo')}`;};
- const onPreviewError=()=>{previewFailed=true;save.disabled=true;status.textContent='No pudimos mostrar el estampado. Revisa el archivo del diseño e inténtalo otra vez.'};
- preview.addEventListener('preview-error',onPreviewError);
- const loadPreview=async()=>{const token=++version;viewer?.dispose();viewer=null;previewFailed=false;save.disabled=true;status.textContent='';preview.textContent='Preparando vista 3D…';try{const module=await import(select.value==='totebags'?'./tote-viewer.js':'./garment.js');const created=select.value==='totebags'?await module.createToteViewer(preview,state()):await module.createViewer(preview,state());if(token!==version||!dialog.open){created.dispose();return}viewer=created;face();if(!previewFailed)save.disabled=false}catch{if(token===version){preview.textContent='No pudimos cargar la vista 3D de este producto.';onPreviewError()}}};
- select.onchange=()=>{updateViews();showValues();face();void loadPreview()};
- view.onchange=face;
- for(const key of ['size','x','y'])form.elements[key].oninput=()=>{draft[select.value]=normalizeCatalogPrintLayout({...draft[select.value],[key]:form.elements[key].value});showValues();void viewer?.update(state())};
- form.querySelectorAll('[data-layout-step]').forEach(button=>button.onclick=()=>{const input=form.elements[button.dataset.layoutStep];if(!input)return;if(button.dataset.layoutDirection==='up')input.stepUp();else input.stepDown();input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()});
- form.querySelector('[data-layout-reset]').onclick=()=>{draft[select.value]=normalizeCatalogPrintLayout();showValues();void viewer?.update(state())};
- form.querySelectorAll('[data-print-layout-close]').forEach(button=>button.onclick=()=>dialog.close());
- dialog.onclose=()=>{++version;viewer?.dispose();viewer=null;preview.removeEventListener('preview-error',onPreviewError)};
- form.onsubmit=async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;status.textContent='Guardando…';const {error}=await supabase.from('catalog_designs').update({print_layouts:{...(design.print_layouts||{}),...draft}}).eq('id',design.id);button.disabled=false;if(error){status.textContent=`No pudimos guardar: ${error.message}`;return}dialog.close();await refreshData('Encuadre guardado para el diseño.',false)};
- updateViews();showValues();face();dialog.showModal();void loadPreview();
+ const syncActions=()=>{
+  const print=selectedView();
+  const reviewingAdditional=Boolean(print&&!print.id.startsWith('primary-'));
+  readonly.hidden=!reviewingAdditional;
+  controls.disabled=!ready||reviewingAdditional;
+  save.disabled=!ready||!changed().length;
+ };
+ const showValues=()=>{
+  const layout=draft[select.value];
+  for(const key of ['size','x','y'])form.elements[key].value=layout[key];
+  form.querySelector('[data-layout-value="size"]').textContent=`${Math.round(layout.size*100)}%`;
+  for(const key of ['x','y']){
+   const direction=key==='x'?(layout[key]>0?'derecha':'izquierda'):(layout[key]>0?'arriba':'abajo');
+   form.querySelector(`[data-layout-value="${key}"]`).textContent=layout[key]===0?'Centro':`${Math.round(Math.abs(layout[key])*100)}% ${direction}`;
+  }
+ };
+ const releasePreview=()=>{
+  viewer?.dispose();
+  viewer=null;
+  stage?.remove();
+  stage=null;
+ };
+ const loadPreview=async()=>{
+  releasePreview();
+  const slug=select.value,target=document.createElement('div');
+  target.className='admin-layout-stage';
+  stage=target;
+  preview.prepend(target);
+  ready=false;
+  syncActions();
+  message.hidden=false;
+  retry.hidden=true;
+  status.textContent='Preparando vista 3D…';
+  target.setAttribute('aria-busy','true');
+  let failed=false;
+  const fail=()=>{
+   if(stage!==target)return;
+   failed=true;
+   ready=false;
+   syncActions();
+   target.removeAttribute('aria-busy');
+   message.hidden=false;
+   retry.hidden=false;
+   status.textContent='No pudimos cargar la vista 3D de este producto.';
+  };
+  target.addEventListener('preview-error',fail);
+  try{
+   const module=await import(slug==='totebags'?'./tote-viewer.js':'./garment.js');
+   if(stage!==target)return;
+   const create=slug==='totebags'?module.createToteViewer:module.createViewer;
+   const created=await create(target,state());
+   if(stage!==target||!dialog.open){created.dispose();return}
+   viewer=created;
+   face();
+   if(failed)return;
+   ready=true;
+   target.removeAttribute('aria-busy');
+   message.hidden=true;
+   syncActions();
+  }catch{fail()}
+ };
+ const updateLayout=layout=>{
+  draft[select.value]=normalizeCatalogPrintLayout(layout);
+  showValues();
+  syncActions();
+  delete footerStatus.dataset.tone;
+  footerStatus.textContent=changed().length?'Encuadre sin guardar.':'';
+  void viewer?.update(state());
+ };
+ select.onchange=()=>{updateViews();showValues();void loadPreview()};
+ view.onchange=()=>{face();syncActions()};
+ retry.onclick=()=>{select.focus({preventScroll:true});void loadPreview()};
+ for(const key of ['size','x','y'])form.elements[key].oninput=event=>updateLayout({...draft[select.value],[key]:event.target.value});
+ form.querySelectorAll('[data-layout-step]').forEach(button=>button.onclick=()=>{
+  const input=form.elements[button.dataset.layoutStep];
+  if(button.dataset.layoutDirection==='up')input.stepUp();else input.stepDown();
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+ });
+ form.querySelector('[data-layout-reset]').onclick=()=>updateLayout();
+ dialog.onclose=releasePreview;
+ dialog.catalogHasChanges=()=>Boolean(changed().length);
+ form.onsubmit=event=>{
+  event.preventDefault();
+  if(!ready||!changed().length)return;
+  return performCatalogDialogAction(form,{message:'Guardando el encuadre…',pendingLabel:'Guardando…',action:async()=>{
+   const layouts=Object.fromEntries(changed().map(slug=>[slug,draft[slug]]));
+   const {error}=await supabase.from('catalog_designs').update({print_layouts:{...(design.print_layouts||{}),...layouts}}).eq('id',design.id);
+   if(error)throw new Error(`No pudimos guardar el encuadre. ${error.message}`);
+   dialog.close();
+   await refreshData('Encuadre guardado para el diseño.',false);
+   root.querySelector(`[data-edit-design="${design.id}"]`)?.focus({preventScroll:true});
+  }});
+ };
+ updateViews();
+ showValues();
+ openCatalogDialog(dialog);
+ select.focus({preventScroll:true});
+ void loadPreview();
 }
+
 function syncProductMockupFields(form){
  form.querySelectorAll('[data-mockup-product]').forEach(section=>{
   const slug=section.dataset.mockupProduct,selected=form.querySelector(`[name="design_products"][value="${CSS.escape(slug)}"]`)?.checked;
@@ -894,22 +1133,25 @@ function syncProductMockupFields(form){
 function updateProductUpload(section){
  const selected=section.querySelector('[name="design_products"]').checked,input=section.querySelector('[type="file"]');
  section.querySelector('[data-product-upload]').hidden=!selected;input.disabled=!selected;input.required=selected&&!section.dataset.currentArtwork;
- const form=section.closest('form');syncProductMockupFields(form);form.querySelector('.admin-sample-colors').hidden=!form.querySelector('[name="design_products"][value="poleras"]')?.checked;
+ syncProductMockupFields(section.closest('form'));
 }
 function initializeProductUploads(form,design){
  const existing=currentProductArtworks(design);
  form.querySelectorAll('[data-design-product]').forEach(section=>{
   const slug=section.dataset.designProduct,path=existing[slug]||'';
   section.dataset.currentArtwork=path;section.querySelector('[name="design_products"]').checked=Boolean(path);
-  section.querySelector('output').textContent=path?'Archivo actual guardado. Puedes reemplazarlo.':'Ningún archivo seleccionado.';
+  setCatalogFileStatus(section.querySelector('[type=file]'),path?'Archivo guardado':'Sin archivo',Boolean(path));
   const preview=section.querySelector('.design-file-preview'),image=preview.querySelector('img');
   if(image.src.startsWith('blob:'))URL.revokeObjectURL(image.src);
-  if(path&&!path.startsWith('local:')){image.src=path;preview.hidden=false}else{image.removeAttribute('src');preview.hidden=true}
+  const local=path.startsWith('local:')?baseDesigns.find(item=>`local:${item.id}`===path):null;
+  const src=local?artworkUrl(local):catalogAssetUrl(path);
+  if(src){image.src=src;preview.hidden=false}else{image.removeAttribute('src');preview.hidden=true}
   updateProductUpload(section);
  });
 }
 async function submitDesign(form,event){
  event.preventDefault();const button=event.submitter||form.querySelector('[type="submit"]'),status=form.querySelector('.admin-form-status'),values=adminFormData(form),id=Number(values.get('id')),current=id?adminData.designs.find(item=>item.id===id):null;
+ status.dataset.tone='error';
  const selected=adminData.productTypes.filter(product=>values.getAll('design_products').includes(product.slug)),existing=currentProductArtworks(current);
  const supported=new Set(COLOR_PRODUCT_FAMILIES.map(family=>family.slug)),colorProductSlugs=selected.map(product=>product.slug).filter(slug=>supported.has(slug)),allowedProductColors=currentDesignProductColors(form);
  const colorIssues=invalidDesignProductColors(adminData.variants,allowedProductColors,colorProductSlugs);
@@ -948,9 +1190,9 @@ async function submitDesign(form,event){
  const personalizationArrow=normalizeMockupFocus(values.get('personalization_arrow_x'),values.get('personalization_arrow_y'));
  const payload={collection_id:Number(values.get('collection_id')),name:String(values.get('name')).trim(),slug:slugify(values.get('slug')),caption:String(values.get('caption')).trim()||null,sample_color:sampleColor,allowed_colors:allowedColors.length?allowedColors:null,allowed_product_colors:Object.fromEntries(colorProductSlugs.map(slug=>[slug,allowedProductColors[slug]])),personalization_arrow_x:personalizationArrow.x,personalization_arrow_y:personalizationArrow.y,accepts_customer_image:values.get('accepts_customer_image')==='on',customer_photo_subject:values.get('accepts_customer_image')==='on'&&values.get('customer_photo_subject')==='people'?'people':'pets',is_featured:values.get('is_featured')==='on',active:values.get('active')==='on'};if(!payload.collection_id||!payload.name||!payload.slug){status.textContent='Completa colección, nombre y slug.';return}
  payload.polera_prints=poleraPrints;
- payload.product_mockups=productMockupDraft(current,selected,values);
+ payload.product_mockups=productMockupDraft(current,adminData.productTypes,values);
  payload.product_artworks=Object.fromEntries(selected.filter(product=>existing[product.slug]).map(product=>[product.slug,existing[product.slug]]));
- button.disabled=true;status.textContent='';
+ button.disabled=true;status.textContent='Guardando el diseño…';status.dataset.tone='busy';
  try{
  const collection=adminData.collections.find(item=>item.id===payload.collection_id),prepared=[];
  for(const [kind,sourceFile] of Object.entries(files)){
@@ -1014,36 +1256,98 @@ function syncDesignColorCompatibility(form){
  return issues;
 }
 function wireDesigns(){
- const dialog=root.querySelector('#design-dialog');const form=root.querySelector('#design-form');const deleteDialog=root.querySelector('#delete-design-dialog');const deleteForm=deleteDialog.querySelector('form');const name=form.elements.name;const slug=form.elements.slug;const mockupInputs=adminData.productTypes.map(product=>form.elements[mockupInputName(product.slug)]);let slugTouched=false;
+ const dialog=root.querySelector('#design-dialog'),form=root.querySelector('#design-form');
+ const deleteDialog=root.querySelector('#delete-design-dialog'),deleteForm=deleteDialog.querySelector('form');
+ const {name,slug}=form.elements;
+ const printLayoutDialog=root.querySelector('#print-layout-dialog');
+ confirmCatalogDiscard(printLayoutDialog,()=>printLayoutDialog.catalogHasChanges?.());
+ confirmCatalogDiscard(dialog,()=>adminStepSnapshot(form)!==dialog.dataset.initialDesign);
+ dialog.addEventListener('close',()=>{
+  unmountAdminFormDisclosure(form);
+  clearMockupVideoPreviews(form);
+  for(const image of form.querySelectorAll('img[src^="blob:"]')){
+   URL.revokeObjectURL(image.src);
+   image.removeAttribute('src');
+  }
+  for(const details of form.querySelectorAll('details[open]'))details.open=false;
+ });
  adminData.productTypes.forEach(product=>mountMockupFocusPicker(form,mockupInputName(product.slug),`Foco de ${product.name}`,form.querySelector(`[data-mockup-product="${product.slug}"]`)));
  mountPersonalizationArrowPicker(form);
  wirePoleraPrintFields(form);
- wireProductColorDialog({onSaved:async()=>{const previous=currentDesignProductColors(form),completed=Object.fromEntries(selectedDesignProductSlugs(form).map(slug=>[slug,previous[slug]?.length?previous[slug]:productColorAvailability(adminData.variants,slug).map(color=>color.hex)]));renderDesignProductColors(form,completed);syncDesignColorCompatibility(form);toast('Gama global actualizada. Ya puedes elegir los colores del diseño.','success')}});
- root.querySelector('#new-design').onclick=()=>openDesignDialog();root.querySelector('.dialog-close').onclick=()=>dialog.close();root.querySelector('.dialog-cancel').onclick=()=>dialog.close();slug.addEventListener('input',()=>{slugTouched=true});name.addEventListener('input',()=>{if(!slugTouched)slug.value=slugify(name.value)});
- root.querySelectorAll('[data-edit-design]').forEach(button=>button.onclick=()=>openDesignDialog(adminData.designs.find(item=>item.id===Number(button.dataset.editDesign))));
+ wireProductColorDialog({onSaved:async(_availability,slug)=>{
+  const previous=currentDesignProductColors(form);
+  const completed=Object.fromEntries(selectedDesignProductSlugs(form).map(product=>[
+   product,previous[product]?.length?previous[product]:productColorAvailability(adminData.variants,product).map(color=>color.hex),
+  ]));
+  renderDesignProductColors(form,completed);
+  syncDesignColorCompatibility(form);
+  form.querySelector('[data-design-product-colors]').dispatchEvent(new Event('change',{bubbles:true}));
+  const colorPanel=[...form.querySelectorAll('[data-design-color-product]')].find(panel=>panel.dataset.designColorProduct===slug);
+  colorPanel?.querySelector('input[type="checkbox"], [data-open-product-colors]')?.focus();
+  toast('Gama global actualizada.','success');
+ }});
+ root.querySelector('#new-design').onclick=event=>openDesignDialog(null,event.currentTarget);
+ slug.addEventListener('input',()=>{slug.dataset.manual='true'});
+ name.addEventListener('input',()=>{if(slug.dataset.manual!=='true')slug.value=slugify(name.value)});
+ form.elements.active.addEventListener('change',()=>{
+  if(!form.elements.id.value)form.querySelector('[type="submit"]').textContent=form.elements.active.checked?'Publicar diseño':'Guardar diseño oculto';
+ });
+ root.querySelectorAll('[data-edit-design]').forEach(button=>button.onclick=()=>openDesignDialog(adminData.designs.find(item=>item.id===Number(button.dataset.editDesign)),button));
  root.querySelectorAll('[data-adjust-design]').forEach(button=>button.onclick=()=>openPrintLayoutDialog(adminData.designs.find(item=>item.id===Number(button.dataset.adjustDesign))));
  root.querySelectorAll('[data-toggle-design]').forEach(button=>button.onclick=async()=>{const design=adminData.designs.find(item=>item.id===Number(button.dataset.toggleDesign));if(!design.active){const slugs=Object.keys(currentProductArtworks(design)).filter(slug=>COLOR_PRODUCT_FAMILIES.some(family=>family.slug===slug)),colors=designProductColorMap(design,slugs),issues=invalidDesignProductColors(adminData.variants,colors,slugs);if(issues.length){const names=issues.map(slug=>adminData.productTypes.find(product=>product.slug===slug)?.name||slug);return toast(`No se puede activar: elige colores por producto para ${names.join(' y ')}.`,'error')}}button.disabled=true;const {error}=await supabase.from('catalog_designs').update({active:!design.active}).eq('id',design.id);if(error){button.disabled=false;return toast(`No se pudo cambiar el estado: ${error.message}`)}await refreshData('Estado del diseño actualizado.',true)});
- root.querySelectorAll('[data-delete-design]').forEach(button=>button.onclick=()=>{const design=adminData.designs.find(item=>item.id===Number(button.dataset.deleteDesign));if(!design)return;deleteForm.elements.design_id.value=design.id;deleteDialog.querySelector('[data-delete-design-name]').textContent=`“${design.name}”`;deleteDialog.showModal();deleteDialog.querySelector('[data-delete-design-cancel]').focus()});
- deleteDialog.querySelectorAll('[data-delete-design-cancel]').forEach(button=>button.onclick=()=>deleteDialog.close());
- deleteForm.onsubmit=async event=>{event.preventDefault();const button=event.submitter,status=deleteForm.querySelector('.admin-form-status'),id=Number(deleteForm.elements.design_id.value),design=adminData.designs.find(item=>item.id===id);button.disabled=true;button.textContent='Eliminando…';const {error}=await supabase.from('catalog_designs').delete().eq('id',id);if(error){button.disabled=false;button.textContent='Eliminar diseño';status.textContent=error.code==='23503'?'Este diseño está asociado a un carro o pedido y no se puede eliminar. Puedes ocultarlo.':error.message;return}const assetError=await removeCatalogAssets([design?.artwork_path,...Object.values(currentProductArtworks(design)),...Object.values(normalizePoleraPrints(design?.polera_prints).additional),...Object.values(normalizePoleraPrints(design?.polera_prints).mockups),design?.mockup_path,design?.mockup_hover_path,...Object.values(designProductMockups(design||{})).flatMap(photo=>[photo.path,photo.hoverPath,photo.videoPath])]);deleteDialog.close();await refreshData(assetError?'Diseño eliminado; quedó un archivo pendiente de limpieza.':'Diseño eliminado.',true)};
+ root.querySelectorAll('[data-delete-design]').forEach(button=>button.onclick=()=>{
+  const design=adminData.designs.find(item=>item.id===Number(button.dataset.deleteDesign));
+  if(!design)return;
+  deleteForm.elements.design_id.value=design.id;
+  deleteDialog.querySelector('[data-delete-design-name]').textContent=design.name;
+  deleteDialog.querySelector('[data-delete-design-collection]').textContent=collectionName(design.collection_id);
+  const image=deleteDialog.querySelector('[data-delete-design-preview]');
+  const src=Object.values(designProductMockups(design)).find(photo=>photo.path)?.path||designArtworkSrc(design);
+  image.hidden=!src;
+  if(src)image.src=src;else image.removeAttribute('src');
+  openCatalogDialog(deleteDialog);
+  deleteForm.querySelector('.dialog-cancel').focus({preventScroll:true});
+ });
+ deleteForm.onsubmit=event=>{
+  event.preventDefault();
+  const id=Number(deleteForm.elements.design_id.value),design=adminData.designs.find(item=>item.id===id);
+  return performCatalogDialogAction(deleteForm,{message:'Eliminando el diseño y sus archivos…',pendingLabel:'Eliminando…',action:async()=>{
+   const {error}=await supabase.from('catalog_designs').delete().eq('id',id);
+   if(error)throw new Error(error.code==='23503'?'Este diseño está asociado a un carro o pedido. Puedes ocultarlo desde Más acciones.':error.message);
+   const prints=normalizePoleraPrints(design?.polera_prints);
+   const assetError=await removeCatalogAssets([design?.artwork_path,...Object.values(currentProductArtworks(design)),...Object.values(prints.additional),...Object.values(prints.mockups),design?.mockup_path,design?.mockup_hover_path,...Object.values(designProductMockups(design||{})).flatMap(photo=>[photo.path,photo.hoverPath,photo.videoPath])]).catch(error=>error);
+   deleteDialog.close();
+   await refreshData(assetError?'Diseño eliminado; quedó un archivo pendiente de limpieza.':'Diseño eliminado.',true);
+   root.querySelector('#new-design')?.focus({preventScroll:true});
+  }});
+ };
  form.querySelectorAll('[data-design-product]').forEach(section=>{
   section.querySelector('[name="design_products"]').addEventListener('change',()=>{const previous=currentDesignProductColors(form);updateProductUpload(section);syncPoleraPrintFields(form);renderDesignProductColors(form,previous);syncDesignColorCompatibility(form)});
   section.querySelector('[type="file"]').addEventListener('change',event=>{
    const file=event.target.files[0],preview=section.querySelector('.design-file-preview'),image=preview.querySelector('img'),path=section.dataset.currentArtwork;
    if(image.src.startsWith('blob:'))URL.revokeObjectURL(image.src);
-   section.querySelector('output').textContent=file?`${form.elements.name.value.trim()||form.elements.slug.value||'Diseño'} · ${fileSizeLabel(file.size)}`:path?'Archivo actual guardado. Puedes reemplazarlo.':'Ningún archivo seleccionado.';
-   const src=file?URL.createObjectURL(file):path&&!path.startsWith('local:')?path:'';preview.hidden=!src;if(src)image.src=src;else image.removeAttribute('src');
+   setCatalogFileStatus(event.target,file?file.name:path?'Archivo guardado':'Sin archivo',Boolean(file||path));
+    const local=path.startsWith('local:')?baseDesigns.find(item=>`local:${item.id}`===path):null;
+   const src=file?URL.createObjectURL(file):local?artworkUrl(local):catalogAssetUrl(path);
+   preview.hidden=!src;
+   if(src)image.src=src;else image.removeAttribute('src');
   });
  });
- mockupInputs.forEach(input=>input.addEventListener('change',()=>{
-  const file=input.files[0],name=input.name,section=input.closest('[data-mockup-product]'),slug=section.dataset.mockupProduct;
-  const output=form.querySelector(`[data-mockup-name="${name}"]`),current=adminData.designs.find(design=>design.id===Number(form.elements.id.value));
-  const previous=section.querySelector('[data-preview] img')?.getAttribute('src');if(previous?.startsWith('blob:'))URL.revokeObjectURL(previous);
-  const src=file?URL.createObjectURL(file):designProductMockups(current||{})[slug]?.path||'';
-  if(file)form.elements[`clear_${name}`].checked=false;
-  output.textContent=mockupFileLabel(file,src?'Mockup actual conservado.':'Mockup pendiente para este producto.');
-  showMockupPreview(form,name,src);if(slug==='poleras')syncPersonalizationArrowPicker(form,src);
- }));
+ for(const product of adminData.productTypes){
+  const name=mockupInputName(product.slug),input=form.elements[name],clear=form.elements[`clear_${name}`];
+  const update=()=>{
+   const current=adminData.designs.find(design=>design.id===Number(form.elements.id.value));
+   const path=designProductMockups(current||{})[product.slug]?.path;
+   const previous=form.querySelector(`[data-preview="${name}"] img`)?.getAttribute('src');
+   if(previous?.startsWith('blob:'))URL.revokeObjectURL(previous);
+   const file=input.files[0],src=clear.checked?'':file?URL.createObjectURL(file):catalogAssetUrl(path);
+   setCatalogFileStatus(input,clear.checked?'Se quitará al guardar':file?file.name:path?'Mockup actual':'Sin mockup',Boolean(src));
+   showMockupPreview(form,name,src);
+   if(product.slug==='poleras')syncPersonalizationArrowPicker(form,src);
+  };
+  input.addEventListener('change',()=>{if(input.files.length)clear.checked=false;update()});
+  clear.addEventListener('change',()=>{if(clear.checked)input.value='';update()});
+ }
  adminData.productTypes.forEach(product=>{
   const name=mockupVideoInputName(product.slug),input=form.elements[name],clear=form.elements[`clear_${name}`];
   const current=()=>storedMockupVideo(adminData.designs.find(design=>design.id===Number(form.elements.id.value)),product.slug);
@@ -1056,13 +1360,20 @@ function wireDesigns(){
    showMockupVideo(input,current());
   });
  });
- dialog.addEventListener('close',()=>clearMockupVideoPreviews(form));
  form.elements.accepts_customer_image.addEventListener('change',()=>{syncCustomerPhotoSubject(form);const image=form.querySelector('[data-preview="mockup_poleras"] img');syncPersonalizationArrowPicker(form,image?.getAttribute('src')||'')});
  form.elements.customer_photo_subject.addEventListener('change',()=>syncCustomerPhotoSubject(form));
+ form.addEventListener('change',event=>{
+  const input=event.target;
+  if(input.type!=='file')return;
+  const file=input.files[0];
+  const error=file&&(input.name.startsWith('mockup_video_')?catalogVideoFileError(file):validateArtwork(file,false));
+  input.setCustomValidity(error||'');
+  if(error)input.reportValidity();
+ });
  form.onsubmit=event=>submitDesign(form,event);
 }
 
-function adminOrderStepper(order){const steps=orderSteps(order),current=orderProgressIndex(order.status,order);return `<ol class="admin-order-progress${order.status==='cancelled'?' is-cancelled':''}" style="--order-step-count:${steps.length}" aria-label="Avance del pedido">${steps.map((step,index)=>`<li class="${index<current?'complete':index===current?'current':''}"><span aria-hidden="true">${index<current?'✓':String(index+1).padStart(2,'0')}</span><strong>${safe(step.label)}</strong></li>`).join('')}</ol>`}
+function adminOrderStepper(order){const steps=orderSteps(order),current=orderProgressIndex(order.status,order);return `<ol class="admin-order-progress${order.status==='cancelled'?' is-cancelled':''}" style="--order-step-count:${steps.length}" aria-label="Avance del pedido">${steps.map((step,index)=>`<li class="${index<current?'complete':index===current?'current':''}"${index===current?' aria-current="step"':''}><span aria-hidden="true">${index<current?'✓':String(index+1).padStart(2,'0')}</span><strong>${safe(step.label)}</strong></li>`).join('')}</ol>`}
 function orderCustomer(order){return order.shipping_address?.customer||{}}
 function orderCustomerName(order){const customer=orderCustomer(order);return [customer.first_name,customer.last_name].filter(Boolean).join(' ')||'Cliente sin nombre'}
 function orderDestination(order){const address=order.shipping_address||{};return address.fulfillment==='pickup'?'Retiro en tienda':[address.address,address.address_extra,address.commune,address.region].filter(Boolean).join(', ')||'Dirección pendiente'}
@@ -1072,28 +1383,222 @@ function orderCard(order){
  return `<article class="admin-kanban-card${overdue?' is-overdue':''}${archived?' is-archived':''}${isLastOpened?' is-last-opened':''}" data-admin-searchable="${safe(search)}"><div class="admin-kanban-card-top"><span class="admin-eyebrow">#${safe(order.id)}</span><div><span class="admin-source-pill" title="${safe(orderCardOriginLabel(order))}">${safe(orderCardOriginLabel(order))}</span>${isDemo?'<span class="admin-demo-pill">Simulado</span>':''}</div></div><h3>${safe(orderCustomerName(order))}</h3><div class="admin-kanban-card-type"><span>Tipo:</span> <strong>${safe(orderTypeLabel(order))}</strong></div>${traceBadge}<p>${['idea_request','whatsapp'].includes(order.source)?'Solicitud por WhatsApp':safe(order.shipping_address?.fulfillment==='pickup'?'Retiro en tienda':'Despacho')} · ${units} ${units===1?'unidad':'unidades'}</p><div class="admin-kanban-card-meta"><span class="admin-payment-badge is-${orderPaymentState(order)}">${paymentStateLabels[orderPaymentState(order)]}</span><strong>${(order.source==='idea_request'||order.request_type==='creative')&&order.status!=='quoted'?'Por definir':money(order.total_clp)}</strong></div>${overdue?'<span class="admin-overdue-label">⚠ Demorado · más de 24 h</span>':''}<small>${dateTime(order.created_at)}</small><button type="button" class="admin-card-open" data-open-order="${safe(order.id)}">Ver pedido <span>→</span></button></article>`;
 }
 function rememberOpenedOrder(orderId){lastOpenedOrderId=String(orderId);try{sessionStorage.setItem(LAST_OPENED_ORDER_KEY,lastOpenedOrderId)}catch{}root.querySelectorAll('.admin-kanban-card.is-last-opened').forEach(card=>card.classList.remove('is-last-opened'));root.querySelectorAll('[data-open-order]').forEach(button=>{if(String(button.dataset.openOrder)===lastOpenedOrderId)button.closest('.admin-kanban-card')?.classList.add('is-last-opened')})}
-function orderHistoryMarkup(history,order){if(!history.length)return '';return `<section class="admin-order-history-wrap"><span class="admin-eyebrow">HISTORIAL</span><details class="admin-order-history-details"><summary>Ver detalle de actividad <span>${history.length} ${history.length===1?'evento':'eventos'}</span></summary><ul class="admin-order-history">${history.map(item=>`<li><div><strong>${safe(orderStatusLabel(item.status,order))}</strong>${item.note?`<small>${safe(item.note)}</small>`:''}</div><time datetime="${safe(item.created_at)}">${date(item.created_at)} · ${new Date(item.created_at).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</time></li>`).join('')}</ul></details></section>`}
+function orderHistoryMarkup(history,order){if(!history.length)return '';return `<section class="admin-order-history-wrap"><details class="admin-order-history-details"><summary>Historial de actividad <span>${history.length} ${history.length===1?'evento':'eventos'}</span></summary><ul class="admin-order-history">${history.map(item=>`<li><div><strong>${safe(orderStatusLabel(item.status,order))}</strong>${item.note?`<small>${safe(item.note)}</small>`:''}</div><time datetime="${safe(item.created_at)}">${date(item.created_at)} · ${new Date(item.created_at).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</time></li>`).join('')}</ul></details></section>`}
 function orderTraceabilityMarkup(order){
- const trace=orderTraceability(order);if(!trace.personalized)return '';
- const attachmentLabel=trace.attachmentCount?`${trace.attachmentCount} ${trace.attachmentCount===1?'archivo vinculado':'archivos vinculados'}`:'Ningún archivo vinculado';
- return `<section class="admin-order-traceability is-${safe(trace.state)}" aria-labelledby="order-trace-${safe(order.id)}"><div class="admin-order-traceability-heading"><div><span class="admin-eyebrow">TRAZABILIDAD</span><h3 id="order-trace-${safe(order.id)}">${safe(trace.title)}</h3></div><span class="admin-trace-badge is-${safe(trace.state)}">${trace.state==='recovered'?'Acción requerida':trace.state==='attached'?'Completo':'Pendiente'}</span></div><p>${safe(trace.message)}</p><dl><div><dt>Tipo</dt><dd>Personalizado</dd></div><div><dt>Canal</dt><dd>${safe(trace.channel)}</dd></div><div><dt>Adjuntos</dt><dd>${safe(attachmentLabel)}</dd></div>${trace.requestId?`<div><dt>ID de solicitud</dt><dd><code>${safe(trace.requestId)}</code></dd></div>`:''}${trace.recoveryReason?`<div><dt>Motivo registrado</dt><dd>${safe(trace.recoveryReason)}</dd></div>`:''}</dl></section>`;
+ const trace=orderTraceability(order);
+ if(!trace.personalized)return '';
+ const attached=trace.state==='attached';
+ const badge=attached?'Archivos recibidos':trace.state==='recovered'?'Requiere revisión':'Archivos pendientes';
+ return `<details class="admin-order-traceability is-${safe(trace.state)}"${attached?'':' open'}>
+  <summary><strong>Trazabilidad</strong><span class="admin-trace-badge is-${safe(trace.state)}">${badge}</span></summary>
+  <div class="admin-order-trace-content">
+   <h4>${safe(trace.title)}</h4>
+   <p>${safe(trace.message)}</p>
+   <dl><div><dt>Canal</dt><dd>${safe(trace.channel)}</dd></div>${trace.requestId?`<div><dt>ID de solicitud</dt><dd><code>${safe(trace.requestId)}</code></dd></div>`:''}${trace.recoveryReason?`<div><dt>Motivo registrado</dt><dd>${safe(trace.recoveryReason)}</dd></div>`:''}</dl>
+  </div>
+ </details>`;
 }
-function orderDetailMarkup(order){const address=order.shipping_address||{},customer=orderCustomer(order),items=order.order_items||[],payments=order.payments||[],payment=payments.find(item=>item.provider==='mercado_pago')||payments.find(item=>item.provider==='transferencia_bancaria')||payments[0],paymentWarning=payment&&([...paymentIssueStatuses,'rejected','cancelled'].includes(payment.status))?`<p class="admin-payment-transfer-notice">Mercado Pago ${paymentStatusLabel(payment.status).toLowerCase()}. No inicies producción${paymentIssueStatuses.has(payment.status)?' hasta resolver la incidencia':': pide al cliente que reintente'}.</p>`:'',archived=Boolean(order.archived_at),next=archived||order.status==='draft'||order.request_type==='creative'&&['submitted','quoted'].includes(order.status)?null:nextOrderStatus(order.status,order),phone=String(customer.phone||'').replace(/[^\d+]/g,''),wa=String(customer.phone||'').replace(/\D/g,''),history=[...(order.order_status_history||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)),historyMarkup=orderHistoryMarkup(history,order),productsMarkup=`<div class="admin-order-products"><span class="admin-eyebrow">PRODUCTOS</span>${items.map(item=>`<div><span><strong>${safe(item.name_snapshot)}</strong><small>${safe(item.sku_snapshot||'Sin SKU')} · ${safe(item.print_sides)} · ${item.quantity} un.${item.quality_review?' · Revisión técnica':''}</small></span><b>${money(item.line_total_clp)}</b></div>`).join('')||'<p>Sin productos registrados.</p>'}<a class="admin-order-semitone" href="${DTF_SEMITONE_URL}" target="_blank" rel="noreferrer"><span><strong>Preparar semitonos DTF</strong><small>Abre el editor para procesar el arte de este pedido.</small></span><b aria-hidden="true">↗</b></a></div>`;return `<div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · ${order.source==='manual'?'MANUAL':'ONLINE'}${archived?' · ARCHIVADO':''}</span><h2>${safe(orderCustomerName(order))}</h2><small class="admin-order-created">Creado el ${dateTime(order.created_at)}</small></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div>${adminOrderStepper(order)}${archived?'':`<div class="admin-order-contact">${phone?`<a href="tel:${safe(phone)}" data-order-contact="0">Llamar</a>`:''}${wa?`<a href="https://wa.me/${safe(wa)}" target="_blank" rel="noreferrer" data-order-contact="1">WhatsApp</a>`:''}${customer.email?`<a href="mailto:${safe(customer.email)}" data-order-contact="2">Email</a>`:''}</div>`}<div class="admin-order-detail-grid"><section><span class="admin-eyebrow">CLIENTE Y ENTREGA</span><dl><div><dt>Tipo de pedido</dt><dd>${safe(orderTypeLabel(order))}</dd></div><div><dt>Nombre</dt><dd>${safe(orderCustomerName(order))}</dd></div><div><dt>Email</dt><dd>${safe(customer.email||'No informado')}</dd></div><div><dt>Teléfono</dt><dd>${safe(customer.phone||'No informado')}</dd></div><div><dt>${address.fulfillment==='pickup'?'Entrega':'Dirección'}</dt><dd>${safe(orderDestination(order))}</dd></div>${address.delivery_notes?`<div><dt>Entrega</dt><dd>${safe(address.delivery_notes)}</dd></div>`:''}${address.notes?`<div><dt>Notas</dt><dd>${safe(address.notes)}</dd></div>`:''}</dl>${historyMarkup}</section><section><span class="admin-eyebrow">COBRO</span><span class="admin-payment-badge is-${orderPaymentState(order)}">${paymentStateLabels[orderPaymentState(order)]}</span>${productsMarkup}<dl><div><dt>Subtotal</dt><dd>${money(order.subtotal_clp)}</dd></div><div><dt>Despacho</dt><dd>${order.shipping_clp?money(order.shipping_clp):'Gratis'}</dd></div>${order.discount_clp?`<div><dt>Descuento ${safe(order.coupon_code||'')}</dt><dd>−${money(order.discount_clp)}</dd></div>`:''}<div><dt>Pago</dt><dd>${payment?`${safe(payment.provider)} · ${safe(paymentStatusLabel(payment.status))}`:'Sin registro de pago'}</dd></div><div class="admin-order-total"><dt>Total</dt><dd><strong>${money(order.total_clp)}</strong></dd></div></dl>${paymentWarning}</section></div>${orderPrintPlanMarkup(order,orderPrintAssetUrl)}<div class="dialog-actions admin-order-dialog-actions${archived?' is-archived':''}"><div class="admin-order-edit-blocker" hidden><strong>Cambios pendientes</strong><span>Revisa y aprueba o rechaza la edición para continuar.</span></div><div class="admin-order-action-group admin-order-tools">${adminActions({id:'order-detail-actions',label:'Herramientas',items:`${order.source==='manual'?`<button type="button" class="admin-secondary" data-classify-manual-order="${safe(order.id)}">Cambiar tipo</button>`:''}${archived?`<button type="button" class="admin-secondary" data-restore-archived-order="${safe(order.id)}">Restaurar pedido</button>`:`${customer.email?`<button type="button" class="admin-secondary" data-resend-email="${safe(order.id)}">Reenviar email</button>`:''}<button type="button" class="admin-secondary" data-print-order="${safe(order.id)}">Imprimir etiqueta</button><button type="button" class="admin-secondary" data-archive-order="${safe(order.id)}">Archivar pedido</button>`}`})}</div><div class="admin-order-action-group admin-order-progress-actions"><span class="admin-order-action-label">Siguiente paso</span><div>${next?`<button type="button" class="admin-primary" data-order-id="${safe(order.id)}" data-next-status="${safe(next.status)}"${order.edit_pending_approval?' disabled aria-disabled="true" title="Hay cambios pendientes de revisión"':''}>${safe(next.adminAction)}</button>`:'<span class="admin-order-complete">✓ Operación terminada</span>'}</div></div></div>`}
+
+function creativeRequestMarkup(order){
+ if(order.request_type!=='creative')return '';
+ const details=String(order.request_details||'Sin detalle').trim()||'Sin detalle';
+ const previewLimit=420;
+ const preview=details.length>previewLimit?details.slice(0,previewLimit).split(/\s+\S*$/)[0]:details;
+ return `<section class="admin-creative-request admin-order-section" data-creative-request>
+  <h3>Idea del cliente</h3>
+  <p class="admin-creative-brief-preview">${safe(preview)}${preview===details?'':'…'}</p>
+  ${preview===details?'':`<details class="admin-creative-brief"><summary>Ver indicaciones completas</summary><p>${safe(details)}</p></details>`}
+  ${order.request_references?.length?`<div class="admin-creative-references"><h4>Referencias (${order.request_references.length})</h4>
+   ${order.request_references.map((item,index)=>`<button type="button" class="admin-secondary" data-creative-reference="${index}" data-order-id="${safe(order.id)}">Abrir ${safe(item.name||'referencia')}</button>`).join('')}
+  </div>`:''}
+  ${order.quote_message?`<div class="admin-quote-saved"><strong>Cotización guardada · ${money(order.quoted_total_clp)}</strong><p>${safe(order.quote_message)}</p></div>`:''}
+ </section>`;
+}
+
+function orderDetailMarkup(order){
+ const address=order.shipping_address||{},customer=orderCustomer(order),items=order.order_items||[],payments=order.payments||[];
+ const payment=payments.find(item=>item.provider==='mercado_pago')||payments.find(item=>item.provider==='transferencia_bancaria')||payments[0];
+ const paymentState=orderPaymentState(order),archived=Boolean(order.archived_at);
+ const canQuote=!archived&&order.request_type==='creative'&&['submitted','quoted'].includes(order.status);
+ const next=archived||order.status==='draft'||canQuote?null:nextOrderStatus(order.status,order);
+ const canRollBack=!archived&&!order.edit_pending_approval&&!['paid','submitted','draft','delivered','cancelled'].includes(order.status);
+ const phone=String(customer.phone||'').replace(/[^\d+]/g,''),wa=String(customer.phone||'').replace(/\D/g,'');
+ const history=[...(order.order_status_history||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+ const paymentWarning=payment&&[...paymentIssueStatuses,'rejected','cancelled'].includes(payment.status)
+  ?`<p class="admin-payment-transfer-notice">Mercado Pago ${safe(paymentStatusLabel(payment.status).toLowerCase())}. No inicies producción${paymentIssueStatuses.has(payment.status)?' hasta resolver la incidencia':': pide al cliente que reintente'}.</p>`:'';
+ const pendingEdit=Boolean(order.edit_pending_approval);
+ const unsentEdit=!pendingEdit&&Number(order.order_edit_version||0)&&!order.order_edit_email_sent_at;
+ const primaryAction=canQuote
+  ?`<button type="button" class="admin-primary" data-quote-order>${order.status==='quoted'?'Editar cotización':'Responder con cotización'}</button>`
+  :next?`<button type="button" class="admin-primary" data-order-id="${safe(order.id)}" data-next-status="${safe(next.status)}"${pendingEdit?' disabled':''}>${safe(next.adminAction)}</button>`:'';
+
+ return `<header class="dialog-title">
+  <div>
+   <span class="admin-eyebrow">PEDIDO #${safe(order.id)}${archived?' · ARCHIVADO':''}</span>
+   <h2 id="order-detail-title">${safe(orderCustomerName(order))}</h2>
+   <p class="admin-order-created">${safe(orderCardOriginLabel(order))} · ${dateTime(order.created_at)}</p>
+  </div>
+  <button type="button" class="ds-icon-button close-button dialog-close" aria-label="Cerrar pedido"><span></span></button>
+ </header>
+ <div class="admin-order-body">
+  <dl class="admin-order-overview">
+   <div><dt>Estado del pedido</dt><dd>${safe(orderStatusLabel(order.status,order))}</dd></div>
+   <div><dt>Pago</dt><dd><span class="admin-payment-badge is-${paymentState}">${paymentStateLabels[paymentState]}</span></dd></div>
+   <div><dt>Total</dt><dd class="admin-order-overview-total">${money(order.total_clp)}</dd></div>
+  </dl>
+  <details class="admin-order-journey">
+   <summary>Ver avance del pedido</summary>
+   ${adminOrderStepper(order)}
+  </details>
+  ${technicalReviewMarkup(order)}
+  ${pendingEdit&&!archived?`<div class="admin-order-edit-blocker"><strong>Cambios pendientes</strong><span>Aprueba o rechaza la edición para continuar.</span><button type="button" class="admin-secondary" data-review-order>Comparar cambios</button></div>`:''}
+  <div class="admin-order-detail-grid">
+   <div class="admin-order-column">
+    ${creativeRequestMarkup(order)}
+    <section class="admin-order-section admin-order-products">
+     <h3>Productos <span>${items.length}</span></h3>
+     ${items.map(item=>{
+      const product=readableOrderItem(item);
+      return `<div><span><strong>${safe(product.name)}</strong><small>${product.details?`${safe(product.details)} · `:''}${item.quantity} ${item.quantity===1?'unidad':'unidades'}${item.quality_review?' · Revisión técnica':''}</small></span><b>${money(item.line_total_clp)}</b></div>`;
+     }).join('')||'<p>Sin productos registrados.</p>'}
+     ${archived?'':`<a class="admin-order-semitone-link" href="${DTF_SEMITONE_URL}" target="_blank" rel="noreferrer">Preparar semitonos DTF <span aria-hidden="true">↗</span></a>`}
+    </section>
+   </div>
+   <div class="admin-order-column">
+    <section class="admin-order-section admin-order-customer">
+     <h3>Cliente y entrega</h3>
+     <dl class="admin-order-facts">
+      <div><dt>Tipo de pedido</dt><dd>${safe(orderTypeLabel(order))}</dd></div>
+      <div><dt>Email</dt><dd>${safe(customer.email||'No informado')}</dd></div>
+      <div><dt>Teléfono</dt><dd>${safe(customer.phone||'No informado')}</dd></div>
+      <div><dt>${address.fulfillment==='pickup'?'Entrega':'Dirección'}</dt><dd>${safe(orderDestination(order))}</dd></div>
+      ${address.delivery_notes?`<div><dt>Indicaciones de entrega</dt><dd>${safe(address.delivery_notes)}</dd></div>`:''}
+      ${address.notes?`<div><dt>Notas</dt><dd>${safe(address.notes)}</dd></div>`:''}
+     </dl>
+    </section>
+    <section class="admin-order-section" data-order-charge>
+     <h3>Cobro</h3>
+     ${paymentWarning}
+     <dl class="admin-order-facts">
+      <div><dt>Subtotal</dt><dd>${money(order.subtotal_clp)}</dd></div>
+      <div><dt>Despacho</dt><dd>${order.shipping_clp?money(order.shipping_clp):'Gratis'}</dd></div>
+      ${order.discount_clp?`<div><dt>Descuento ${safe(order.coupon_code||'')}</dt><dd>−${money(order.discount_clp)}</dd></div>`:''}
+      <div><dt>Registro de pago</dt><dd>${payment?`${safe(payment.provider)} · ${safe(paymentStatusLabel(payment.status))}`:'Sin registro de pago'}</dd></div>
+     </dl>
+    </section>
+   </div>
+  </div>
+  ${orderPrintPlanMarkup(order,orderPrintAssetUrl)}
+  ${orderTraceabilityMarkup(order)}
+  ${orderHistoryMarkup(history,order)}
+  ${order.order_edit_email_sent_at&&!pendingEdit?`<p class="admin-order-edit-receipt">Edición #${order.order_edit_version||1} enviada al cliente · ${date(order.order_edit_email_sent_at)}</p>`:''}
+ </div>
+ <footer class="dialog-actions admin-order-dialog-actions">
+  <div class="admin-order-tools">${adminActions({id:'order-detail-actions',label:'Herramientas',items:`
+   ${archived?'':`
+    ${pendingEdit?'':`<button type="button" data-edit-order>Editar pedido</button>`}
+    ${phone?`<a href="tel:${safe(phone)}">Llamar al cliente</a>`:''}
+    ${wa?`<a href="https://wa.me/${safe(wa)}" target="_blank" rel="noreferrer">Abrir WhatsApp</a>`:''}
+    ${customer.email?`<a href="mailto:${safe(customer.email)}">Redactar email al cliente</a>`:''}
+    ${customer.email&&!pendingEdit?`<button type="button" ${unsentEdit?'data-approved-edit-email':'data-resend-email'}="${safe(order.id)}">${unsentEdit?'Enviar email de cambios':'Reenviar email'}</button>`:''}
+    <button type="button" data-print-order>Imprimir etiqueta</button>
+    ${canRollBack?`<button type="button" data-rollback-order="${safe(order.id)}">Volver a ingresado</button>`:''}
+    <button type="button" data-archive-order="${safe(order.id)}">Archivar pedido</button>`}
+   ${order.source==='manual'?`<button type="button" data-classify-manual-order>Cambiar tipo</button>`:''}
+   ${archived?`<button type="button" data-restore-archived-order="${safe(order.id)}">Restaurar pedido</button>`:''}
+  `})}</div>
+  ${primaryAction?`<div class="admin-order-progress-actions"><div>${primaryAction}</div></div>`:''}
+ </footer>`;
+}
+
 function manualItemMarkup(index){const productOptions=manualProductOptions.map(product=>`<option value="${product.id}">${product.label}</option>`).join('');const firstProduct=manualProductOptions[0];const sizeOptions=firstProduct.sizes.map(size=>`<option value="${size}">${size}</option>`).join('');const colorOptions=manualColorOptions.map(([color,label],colorIndex)=>`<label class="admin-manual-color" style="--sample-color:${color}"><input type="radio" name="item_color_${index}" value="${label}" ${colorIndex===0?'checked':''}><i aria-hidden="true"></i><span>${label}</span></label>`).join('');return `<article class="admin-manual-item" data-item-index="${index}"><div class="admin-manual-item-head"><strong>Producto ${index+1}</strong><button type="button" class="admin-danger-link" data-remove-item ${index===0?'hidden':''}>Quitar</button></div><div class="admin-form-grid"><label>Tipo de sustrato<select name="item_product_type">${productOptions}</select></label><label>Talla<select name="item_size">${sizeOptions}</select></label><fieldset class="admin-manual-colors admin-form-wide"><legend>Color del sustrato</legend><div>${colorOptions}</div></fieldset><label>Cantidad<input name="item_quantity" type="number" min="1" max="20" value="1" required></label><label>Precio unitario<input name="item_unit_price" type="number" min="0" step="10" required></label><label>Ubicación del estampado<select name="item_print_placement"><option value="front">Frente</option><option value="back">Espalda</option><option value="both">Frente y espalda</option><option value="none">Sin estampado</option></select></label><label>Detalle corto<input name="item_name" required placeholder="Ej. Nombre Emilia en arcoíris"></label><label class="admin-form-wide">Detalles del diseño<textarea name="item_design_details" rows="2" placeholder="Texto, colores, medidas, referencia o instrucciones para producción."></textarea></label></div></article>`}
 function editOrderItemMarkup(item,index){return `<div class="admin-edit-order-item" data-edit-item-id="${safe(item.id||'')}" data-edit-item-index="${index}"><div class="admin-edit-order-item-head"><strong>Producto ${index+1}</strong><button type="button" class="admin-danger-link" data-remove-edit-item>Quitar</button></div><div class="admin-form-grid"><label>Detalle<input name="edit_item_name" value="${safe(item.name_snapshot||'')}" required></label><label>Cantidad<input name="edit_item_quantity" type="number" min="1" step="1" value="${item.quantity||1}" required></label><label>Precio unitario<input name="edit_item_price" type="number" min="0" step="1" value="${item.unit_price_clp||0}" required></label><label>Ubicación<select name="edit_item_print_sides"${item.print_configuration?.prints?.length||item.front_design_path||item.back_design_path||item.catalog_artwork_path?' disabled':''}><option value="front" ${item.print_sides==='front'?'selected':''}>Frente</option><option value="back" ${item.print_sides==='back'?'selected':''}>Espalda</option><option value="both" ${item.print_sides==='both'?'selected':''}>Frente y espalda</option></select></label></div></div>`}
 function editOrderDialogMarkup(order){const address=order.shipping_address||{},customer=orderCustomer(order),items=order.order_items||[];return `<dialog class="admin-dialog admin-edit-order-dialog" id="edit-order-dialog"><form id="edit-order-form"><div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · EDICIÓN</span><h2>Editar pedido</h2><p>Los cambios quedan pendientes hasta que los apruebes y envíes el email.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><fieldset class="admin-form-section"><legend>Cliente</legend><div class="admin-form-grid"><label>Nombre<input name="first_name" value="${safe(customer.first_name||'')}" required></label><label>Apellido<input name="last_name" value="${safe(customer.last_name||'')}"></label><label>Email<input name="email" type="email" value="${safe(customer.email||'')}" required></label><label>Teléfono<input name="phone" type="tel" value="${safe(customer.phone||'')}" required></label></div></fieldset><fieldset class="admin-form-section"><legend>Entrega</legend><div class="admin-form-grid"><label>Modalidad<select name="fulfillment"><option value="pickup" ${address.fulfillment==='pickup'?'selected':''}>Retiro en tienda</option><option value="delivery" ${address.fulfillment!=='pickup'?'selected':''}>Despacho</option></select></label><label>Región<input name="region" value="${safe(address.region||'')}" placeholder="Región"></label><label>Comuna<input name="commune" value="${safe(address.commune||'')}"></label><label>Dirección<input name="address" value="${safe(address.address||'')}"></label><label>Depto. / casa / oficina<input name="address_extra" value="${safe(address.address_extra||'')}"></label><label class="admin-form-wide">Indicaciones<textarea name="delivery_notes" rows="2">${safe(address.delivery_notes||'')}</textarea></label></div></fieldset><fieldset class="admin-form-section"><legend>Productos</legend><div id="edit-order-items">${items.map(editOrderItemMarkup).join('')}</div><button type="button" class="admin-secondary admin-add-item" id="add-edit-order-item">+ Agregar producto</button></fieldset><fieldset class="admin-form-section"><legend>Notas internas</legend><label>Notas<textarea name="notes" rows="3">${safe(address.notes||'')}</textarea></label></fieldset><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Guardar cambios</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`}
-function openOrderEditor(order){const existing=root.querySelector('#edit-order-dialog');existing?.remove();root.insertAdjacentHTML('beforeend',editOrderDialogMarkup(order));const dialog=root.querySelector('#edit-order-dialog'),form=dialog.querySelector('form'),items=dialog.querySelector('#edit-order-items');const wireItem=row=>row.querySelector('[data-remove-edit-item]')?.addEventListener('click',()=>{if(items.children.length>1)row.remove()});items.querySelectorAll('.admin-edit-order-item').forEach(wireItem);dialog.querySelector('#add-edit-order-item').onclick=()=>{const holder=document.createElement('div');holder.innerHTML=editOrderItemMarkup({},items.children.length);const row=holder.firstElementChild;items.append(row);wireItem(row)};dialog.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.querySelector('.dialog-cancel').onclick=()=>dialog.close();form.onsubmit=event=>saveOrderEdit(event,order);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();mountAdminOrderDisclosure(form,'edit')}
+function openOrderEditor(order){const existing=root.querySelector('#edit-order-dialog');existing?.remove();root.insertAdjacentHTML('beforeend',editOrderDialogMarkup(order));const dialog=root.querySelector('#edit-order-dialog'),form=dialog.querySelector('form'),items=dialog.querySelector('#edit-order-items');const wireItem=row=>row.querySelector('[data-remove-edit-item]')?.addEventListener('click',()=>{if(items.children.length>1)row.remove()});items.querySelectorAll('.admin-edit-order-item').forEach(wireItem);dialog.querySelector('#add-edit-order-item').onclick=()=>{const holder=document.createElement('div');holder.innerHTML=editOrderItemMarkup({},items.children.length);const row=holder.firstElementChild;items.append(row);wireItem(row)};dialog.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.querySelector('.dialog-cancel').onclick=()=>dialog.close();form.onsubmit=event=>saveOrderEdit(event,order);dialog.addEventListener('close',()=>dialog.remove(),{once:true});mountAdminOrderDisclosure(form,'edit');showOrderDialog(dialog)}
 async function saveOrderEdit(event,order){event.preventDefault();const form=event.currentTarget,button=event.submitter||form.querySelector('[type="submit"]'),status=form.querySelector('.admin-form-status'),rows=[...form.querySelectorAll('.admin-edit-order-item')];if(!rows.length){status.textContent='Agrega al menos un producto.';return}const items=rows.map(row=>({id:row.dataset.editItemId||null,name_snapshot:String(row.querySelector('[name="edit_item_name"]').value).trim(),quantity:Number(row.querySelector('[name="edit_item_quantity"]').value),unit_price_clp:Number(row.querySelector('[name="edit_item_price"]').value),print_sides:row.querySelector('[name="edit_item_print_sides"]').value,sku_snapshot:order.order_items.find(item=>String(item.id)===String(row.dataset.editItemId))?.sku_snapshot||'MANUAL-EDITADO'}));if(items.some(item=>!item.name_snapshot||item.quantity<1||item.unit_price_clp<0)){status.textContent='Revisa el nombre, cantidad y precio de cada producto.';return}button.disabled=true;button.textContent='Guardando…';const shippingAddress={...(order.shipping_address||{}),fulfillment:form.elements.fulfillment.value,region:String(form.elements.region.value).trim(),commune:String(form.elements.commune.value).trim(),address:String(form.elements.address.value).trim(),address_extra:String(form.elements.address_extra.value).trim(),delivery_notes:String(form.elements.delivery_notes.value).trim(),notes:String(form.elements.notes.value).trim(),customer:{first_name:String(form.elements.first_name.value).trim(),last_name:String(form.elements.last_name.value).trim(),email:String(form.elements.email.value).trim(),phone:String(form.elements.phone.value).trim()}},subtotal=items.reduce((sum,item)=>sum+item.quantity*item.unit_price_clp,0),total=subtotal+Number(order.shipping_clp||0)-Number(order.discount_clp||0),now=new Date().toISOString(),snapshot={shipping_address:order.shipping_address,items:order.order_items,subtotal_clp:order.subtotal_clp,shipping_clp:order.shipping_clp,discount_clp:order.discount_clp,total_clp:order.total_clp};const {error}=await supabase.from('orders').update({shipping_address:shippingAddress,subtotal_clp:subtotal,total_clp:total,edit_pending_approval:true,edit_pending_at:now,edit_pending_by:sessionUser?.id||null,edit_pending_snapshot:snapshot,updated_at:now}).eq('id',order.id);if(error){button.disabled=false;button.textContent='Guardar cambios';status.textContent=error.message;return}const keepIds=items.map(item=>item.id).filter(Boolean);const removed=order.order_items.filter(item=>item.id&&!keepIds.includes(String(item.id)));if(removed.length){const {error:removeError}=await supabase.from('order_items').delete().in('id',removed.map(item=>item.id));if(removeError){status.textContent=removeError.message;return}}for(const item of items){const payload={name_snapshot:item.name_snapshot,quantity:item.quantity,unit_price_clp:item.unit_price_clp,line_total_clp:item.quantity*item.unit_price_clp,print_sides:item.print_sides,sku_snapshot:item.sku_snapshot};const result=item.id?await supabase.from('order_items').update(payload).eq('id',item.id):await supabase.from('order_items').insert({...payload,order_id:order.id});if(result.error){status.textContent=result.error.message;return}}await supabase.from('order_status_history').insert({order_id:order.id,status:order.status,note:'Edición guardada por administración; pendiente de aprobación y envío al cliente.'});form.closest('dialog').close();await refreshData('Cambios guardados. Abre el pedido para comparar y aprobar la edición.')}
 const editValue=value=>value===null||value===undefined||value===''?'—':safe(value)
 function editAddressSummary(address={}){return [address.fulfillment==='pickup'?'Retiro en tienda':'Despacho',address.region,address.commune,address.address,address.address_extra].filter(Boolean).join(' · ')||'—'}
 function editDiffRow(label,before,after,format=value=>editValue(value)){const changed=String(before??'')!==String(after??'');return `<div class="admin-edit-diff-row${changed?' is-changed':''}"><strong>${label}</strong><span>${format(before)}</span><span>${format(after)}</span></div>`}
-function openEditApproval(order){const snapshot=order.edit_pending_snapshot||{},beforeCustomer=snapshot.shipping_address?.customer||{},afterCustomer=order.shipping_address?.customer||{},beforeItems=snapshot.items||[],afterItems=order.order_items||[];root.querySelector('#edit-approval-dialog')?.remove();const html=`<dialog class="admin-dialog admin-edit-approval-dialog" id="edit-approval-dialog"><div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · REVISIÓN</span><h2>Comparar cambios</h2><p>Revisa exactamente qué cambiará antes de enviar la actualización al cliente.</p></div><button type="button" class="ds-icon-button close-button dialog-close" aria-label="Cerrar"><span></span></button></div><div class="admin-edit-approval-body"><div class="admin-edit-diff-legend"><span></span><span>Antes</span><span>Después</span></div><section class="admin-edit-diff-section"><h3>Cliente</h3>${editDiffRow('Nombre',`${beforeCustomer.first_name||''} ${beforeCustomer.last_name||''}`.trim(),`${afterCustomer.first_name||''} ${afterCustomer.last_name||''}`.trim())}${editDiffRow('Email',beforeCustomer.email,afterCustomer.email)}${editDiffRow('Teléfono',beforeCustomer.phone,afterCustomer.phone)}</section><section class="admin-edit-diff-section"><h3>Entrega</h3>${editDiffRow('Destino',editAddressSummary(snapshot.shipping_address),editAddressSummary(order.shipping_address))}${editDiffRow('Indicaciones',snapshot.shipping_address?.delivery_notes,order.shipping_address?.delivery_notes)}${editDiffRow('Notas',snapshot.shipping_address?.notes,order.shipping_address?.notes)}</section><section class="admin-edit-diff-section"><h3>Productos</h3><div class="admin-edit-diff-products">${Math.max(beforeItems.length,afterItems.length)?Array.from({length:Math.max(beforeItems.length,afterItems.length)},(_,index)=>{const before=beforeItems[index]||{},after=afterItems[index]||{};return `<div class="admin-edit-diff-product"><strong>Producto ${index+1}</strong>${editDiffRow('Detalle',before.name_snapshot,after.name_snapshot)}${editDiffRow('Cantidad',before.quantity,after.quantity)}${editDiffRow('Precio unitario',before.unit_price_clp,after.unit_price_clp,money)}${editDiffRow('Total línea',before.line_total_clp,after.line_total_clp,money)}</div>`}).join(''):'<p>No hay productos para comparar.</p>'}</div></section><section class="admin-edit-diff-section admin-edit-diff-total"><h3>Resumen</h3>${editDiffRow('Subtotal',snapshot.subtotal_clp,order.subtotal_clp,money)}${editDiffRow('Despacho',snapshot.shipping_clp,order.shipping_clp,money)}${editDiffRow('Descuento',snapshot.discount_clp,order.discount_clp,money)}${editDiffRow('Total',snapshot.total_clp,order.total_clp,money)}</section></div><div class="dialog-actions admin-edit-approval-actions"><button type="button" class="admin-secondary" data-edit-again>Volver a editar</button><button type="button" class="admin-danger" data-reject-edit>Rechazar cambios</button><button type="button" class="admin-primary" data-approve-edit="${safe(order.id)}">Aprobar cambios</button></div></dialog>`;root.insertAdjacentHTML('beforeend',html);const dialog=root.querySelector('#edit-approval-dialog');dialog.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.querySelector('[data-edit-again]').onclick=()=>{dialog.close();openOrderEditor(order)};dialog.querySelector('[data-reject-edit]').onclick=event=>rejectOrderEdit(event.currentTarget);dialog.querySelector('[data-approve-edit]').onclick=event=>approveOrderEdit(event.currentTarget);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal()}
-async function rejectOrderEdit(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.rejectEdit));if(!order)return;const snapshot=order.edit_pending_snapshot;if(!snapshot){toast('No encontramos la versión anterior para restaurar.');return}if(!window.confirm(`¿Rechazar y restaurar los cambios del pedido #${order.id}?`))return;button.disabled=true;button.textContent='Restaurando…';const {error:orderError}=await supabase.from('orders').update({shipping_address:snapshot.shipping_address,subtotal_clp:snapshot.subtotal_clp,shipping_clp:snapshot.shipping_clp,discount_clp:snapshot.discount_clp,total_clp:snapshot.total_clp,edit_pending_approval:false,edit_pending_at:null,edit_pending_by:null,edit_pending_snapshot:null,updated_at:new Date().toISOString()}).eq('id',order.id).eq('edit_pending_approval',true);if(orderError){button.disabled=false;button.textContent='Rechazar cambios';toast(orderError.message);return}const {error:deleteError}=await supabase.from('order_items').delete().eq('order_id',order.id);if(deleteError){toast(deleteError.message);return}const restored=(snapshot.items||[]).map(item=>({order_id:order.id,name_snapshot:item.name_snapshot,sku_snapshot:item.sku_snapshot,print_sides:item.print_sides,print_configuration:item.print_configuration||{},product_variant_id:item.product_variant_id,color_hex:item.color_hex,quality_review:item.quality_review,catalog_design_id:item.catalog_design_id,catalog_artwork_path:item.catalog_artwork_path,front_design_path:item.front_design_path,back_design_path:item.back_design_path,quantity:item.quantity,unit_price_clp:item.unit_price_clp,line_total_clp:item.line_total_clp}));if(restored.length){const {error:restoreError}=await supabase.from('order_items').insert(restored);if(restoreError){toast(restoreError.message);return}}await supabase.from('order_status_history').insert({order_id:order.id,status:order.status,note:'Edición rechazada por administración; se restauró la versión anterior.'});await refreshData('Cambios rechazados. Se restauró la versión anterior sin enviar email.')}
-function emailRequestBody(order,kind,preview=false){const body={orderId:order.id,resend:true};if(kind==='payment'){body.resend=undefined;body.paymentEmail=true;body.paymentInstructions=order.payment_instructions}if(kind==='edit')body.orderEditEmail=true;if(preview)body.preview=true;return body}
-async function sendOrderEmailAction(order,kind){const {data,error}=await supabase.functions.invoke('send-order-email',{body:emailRequestBody(order,kind)});if(error||data?.error){toast(data?.error||error?.message||'No pudimos enviar el email.');return false}await refreshData(kind==='edit'?(data.email?.sent?'Edición aprobada y email enviado al cliente.':'Edición aprobada; email pendiente de configuración.'):kind==='payment'?(data.email?.sent?'Datos de pago enviados y registrados.':'Email pendiente de configuración.'):data.email?.sent?'Email reenviado al cliente.':'Email pendiente de configuración.');return true}
-async function openOrderEmailPreview(order,kind='resend'){const {data,error}=await supabase.functions.invoke('send-order-email',{body:emailRequestBody(order,kind,true)});if(error||data?.error){toast(data?.error||error?.message||'No pudimos cargar la vista previa.');return}root.querySelector('#order-email-preview-dialog')?.remove();const email=data.email||{},label=kind==='payment'?'Enviar datos de pago':kind==='edit'?'Aprobar y enviar email':'Reenviar email',dialog=document.createElement('dialog');dialog.id='order-email-preview-dialog';dialog.className='admin-dialog admin-email-preview-dialog';dialog.innerHTML=`<div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · EMAIL</span><h2>Vista previa del email</h2><p>Revisa la plantilla completa con los datos reales antes de enviarla.</p></div><button type="button" class="ds-icon-button close-button dialog-close" aria-label="Cerrar"><span></span></button></div><div class="admin-email-preview-meta"><div><span>Para</span><strong>${safe(data.recipient||orderCustomer(order).email||'Sin email')}</strong></div><div><span>Asunto</span><strong>${safe(email.subject||'')}</strong></div></div><iframe class="admin-email-preview-frame admin-email-preview-live-frame" title="Vista previa del email" sandbox=""></iframe><div class="dialog-actions admin-email-preview-actions"><button type="button" class="admin-secondary dialog-cancel">Volver</button><button type="button" class="admin-primary" data-confirm-email>${label}</button></div>`;root.append(dialog);const frame=dialog.querySelector('iframe');frame.srcdoc=email.html||'<p>No hay contenido disponible.</p>';const close=()=>{dialog.close();dialog.remove()};dialog.querySelector('.dialog-close').onclick=close;dialog.querySelector('.dialog-cancel').onclick=close;dialog.querySelector('[data-confirm-email]').onclick=async event=>{const button=event.currentTarget;button.disabled=true;button.textContent='Enviando…';const sent=await sendOrderEmailAction(order,kind);if(sent)close();else{button.disabled=false;button.textContent=label}};dialog.showModal()}
-async function approveOrderEdit(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.editOrderApproval||button.dataset.editOrder||button.dataset.approveEdit));if(!order)return;await openOrderEmailPreview(order,'edit')}
-function manualOrderDialog(){return `<dialog class="admin-dialog admin-manual-dialog" id="manual-order-dialog"><form id="manual-order-form"><div class="dialog-title"><div><span class="admin-eyebrow">VENTA PRESENCIAL · EN REVISIÓN</span><h2>Nuevo pedido manual</h2><p>Quedará en “Pedido ingresado” para revisarlo antes de tomarlo.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><fieldset class="admin-form-section"><legend>1. Comprador</legend><div class="admin-form-grid"><label>Nombre<input name="first_name" required></label><label>Apellido<input name="last_name"></label><label>Email<input name="email" type="email" required></label><label>Teléfono<input name="phone" type="tel" required></label></div></fieldset><fieldset class="admin-form-section"><legend>2. Despacho o retiro</legend><div class="admin-form-grid"><label>Modalidad<select name="fulfillment"><option value="pickup">Retiro en tienda</option><option value="delivery">Despacho</option></select></label><label>Región${regionFilterHtml('manual-order-region')}</label><label>Comuna<input name="commune"></label><label>Dirección<input name="address"></label><label>Depto. / casa / oficina<input name="address_extra"></label><label class="admin-form-wide">Indicaciones de entrega<textarea name="delivery_notes" rows="2" placeholder="Referencia para encontrar la dirección o coordinar retiro."></textarea></label></div></fieldset><fieldset class="admin-form-section"><legend>3. Productos</legend><label class="admin-manual-order-type">Tipo de pedido<select name="order_type" required><option value="" selected disabled>Selecciona el tipo</option><option value="catalog">Catálogo</option><option value="artwork">Personalizado · diseño adjunto</option><option value="idea">Personalizado · idea</option></select></label><div id="manual-items">${manualItemMarkup(0)}</div><button type="button" class="admin-secondary admin-add-item" id="add-manual-item">+ Agregar producto</button></fieldset><fieldset class="admin-form-section"><legend>4. Datos de pago</legend><label class="admin-check"><input name="send_payment_email" type="checkbox" checked><span>Enviar datos de pago al crear el pedido</span></label><p class="admin-form-hint">Se registrará la fecha y la cuenta administradora cuando el proveedor confirme el envío.</p><div class="admin-payment-fields"><label class="admin-check"><input name="payment_transfer_enabled" type="checkbox" checked><span>Transferencia bancaria</span></label><div class="admin-form-grid"><label>Titular<input name="transfer_holder" placeholder="Nombre o razón social"></label><label>Banco<input name="transfer_bank"></label><label>Tipo de cuenta<input name="transfer_account_type" placeholder="Cuenta corriente"></label><label>Número de cuenta<input name="transfer_account_number"></label><label>RUT<input name="transfer_rut"></label><label>Email de transferencia<input name="transfer_email" type="email"></label></div><label class="admin-check"><input name="payment_mercado_pago_enabled" type="checkbox"><span>Link de pago Mercado Pago</span></label><label>Link de pago<input name="mercado_pago_url" type="url" placeholder="https://mpago.la/..."></label></div></fieldset><fieldset class="admin-form-section"><legend>5. Observaciones</legend><label>Notas del pedido<textarea name="notes" rows="3" placeholder="Acuerdos comerciales u otras notas internas."></textarea></label></fieldset><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Ingresar a revisión</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`}
+function openEditApproval(order){const snapshot=order.edit_pending_snapshot||{},beforeCustomer=snapshot.shipping_address?.customer||{},afterCustomer=order.shipping_address?.customer||{},beforeItems=snapshot.items||[],afterItems=order.order_items||[];root.querySelector('#edit-approval-dialog')?.remove();const html=`<dialog class="admin-dialog admin-edit-approval-dialog" id="edit-approval-dialog"><div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · REVISIÓN</span><h2>Comparar cambios</h2><p>Revisa exactamente qué cambiará antes de enviar la actualización al cliente.</p></div><button type="button" class="ds-icon-button close-button dialog-close" aria-label="Cerrar"><span></span></button></div><div class="admin-edit-approval-body"><div class="admin-edit-diff-legend"><span></span><span>Antes</span><span>Después</span></div><section class="admin-edit-diff-section"><h3>Cliente</h3>${editDiffRow('Nombre',`${beforeCustomer.first_name||''} ${beforeCustomer.last_name||''}`.trim(),`${afterCustomer.first_name||''} ${afterCustomer.last_name||''}`.trim())}${editDiffRow('Email',beforeCustomer.email,afterCustomer.email)}${editDiffRow('Teléfono',beforeCustomer.phone,afterCustomer.phone)}</section><section class="admin-edit-diff-section"><h3>Entrega</h3>${editDiffRow('Destino',editAddressSummary(snapshot.shipping_address),editAddressSummary(order.shipping_address))}${editDiffRow('Indicaciones',snapshot.shipping_address?.delivery_notes,order.shipping_address?.delivery_notes)}${editDiffRow('Notas',snapshot.shipping_address?.notes,order.shipping_address?.notes)}</section><section class="admin-edit-diff-section"><h3>Productos</h3><div class="admin-edit-diff-products">${Math.max(beforeItems.length,afterItems.length)?Array.from({length:Math.max(beforeItems.length,afterItems.length)},(_,index)=>{const before=beforeItems[index]||{},after=afterItems[index]||{};return `<div class="admin-edit-diff-product"><strong>Producto ${index+1}</strong>${editDiffRow('Detalle',before.name_snapshot,after.name_snapshot)}${editDiffRow('Cantidad',before.quantity,after.quantity)}${editDiffRow('Precio unitario',before.unit_price_clp,after.unit_price_clp,money)}${editDiffRow('Total línea',before.line_total_clp,after.line_total_clp,money)}</div>`}).join(''):'<p>No hay productos para comparar.</p>'}</div></section><section class="admin-edit-diff-section admin-edit-diff-total"><h3>Resumen</h3>${editDiffRow('Subtotal',snapshot.subtotal_clp,order.subtotal_clp,money)}${editDiffRow('Despacho',snapshot.shipping_clp,order.shipping_clp,money)}${editDiffRow('Descuento',snapshot.discount_clp,order.discount_clp,money)}${editDiffRow('Total',snapshot.total_clp,order.total_clp,money)}</section></div><div class="admin-edit-approval-options"><label class="admin-check"><input type="checkbox" data-send-edit-email-toggle checked><span>Enviar email al cliente</span></label><p>Podrás revisar el correo antes de enviarlo.</p></div><div class="dialog-actions admin-edit-approval-actions"><button type="button" class="admin-secondary" data-edit-again>Volver a editar</button><button type="button" class="admin-danger" data-reject-edit="${safe(order.id)}">Rechazar cambios</button><button type="button" class="admin-primary" data-approve-edit>Aprobar cambios</button></div></dialog>`;root.insertAdjacentHTML('beforeend',html);const dialog=root.querySelector('#edit-approval-dialog');dialog.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.querySelector('[data-edit-again]').onclick=()=>{dialog.close();openOrderEditor(order)};dialog.querySelector('[data-reject-edit]').onclick=event=>rejectOrderEdit(event.currentTarget);dialog.querySelector('[data-approve-edit]').onclick=event=>{const button=event.currentTarget;if(dialog.querySelector('[data-send-edit-email-toggle]').checked)return openOrderEmailPreview(order,'edit',button);return approveOrderEditWithoutEmail(order,button)};dialog.addEventListener('close',()=>dialog.remove(),{once:true});showOrderDialog(dialog)}
+async function rejectOrderEdit(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.rejectEdit));if(!order)return;const snapshot=order.edit_pending_snapshot;if(!snapshot){toast('No encontramos la versión anterior para restaurar.');return}if(!await confirmOrderAction(root,{orderId:order.id,title:'Rechazar cambios',message:'Se restaurarán los datos anteriores del pedido.',action:'Rechazar cambios',danger:true}))return;button.disabled=true;button.textContent='Restaurando…';const {error:orderError}=await supabase.from('orders').update({shipping_address:snapshot.shipping_address,subtotal_clp:snapshot.subtotal_clp,shipping_clp:snapshot.shipping_clp,discount_clp:snapshot.discount_clp,total_clp:snapshot.total_clp,edit_pending_approval:false,edit_pending_at:null,edit_pending_by:null,edit_pending_snapshot:null,updated_at:new Date().toISOString()}).eq('id',order.id).eq('edit_pending_approval',true);if(orderError){button.disabled=false;button.textContent='Rechazar cambios';toast(orderError.message);return}const {error:deleteError}=await supabase.from('order_items').delete().eq('order_id',order.id);if(deleteError){toast(deleteError.message);return}const restored=(snapshot.items||[]).map(item=>({order_id:order.id,name_snapshot:item.name_snapshot,sku_snapshot:item.sku_snapshot,print_sides:item.print_sides,print_configuration:item.print_configuration||{},product_variant_id:item.product_variant_id,color_hex:item.color_hex,quality_review:item.quality_review,catalog_design_id:item.catalog_design_id,catalog_artwork_path:item.catalog_artwork_path,front_design_path:item.front_design_path,back_design_path:item.back_design_path,quantity:item.quantity,unit_price_clp:item.unit_price_clp,line_total_clp:item.line_total_clp}));if(restored.length){const {error:restoreError}=await supabase.from('order_items').insert(restored);if(restoreError){toast(restoreError.message);return}}await supabase.from('order_status_history').insert({order_id:order.id,status:order.status,note:'Edición rechazada por administración; se restauró la versión anterior.'});await refreshData('Cambios rechazados. Se restauró la versión anterior sin enviar email.')}
+function emailRequestBody(order,kind,preview=false){const body={orderId:order.id,resend:true};if(kind==='payment'){body.resend=undefined;body.paymentEmail=true;body.paymentInstructions=order.payment_instructions}if(kind==='edit')body.orderEditEmail=true;if(kind==='survey')body.surveyEmail=true;if(preview)body.preview=true;return body}
+async function emailActionError(error,data,fallback){
+ const payload=await error?.context?.json?.().catch(()=>null);
+ return data?.error||payload?.error||fallback;
+}
+async function sendOrderEmailAction(order,kind){const {data,error}=await supabase.functions.invoke('send-order-email',{body:emailRequestBody(order,kind)});if(error||data?.error){toast(await emailActionError(error,data,'No pudimos enviar el email.'));return false}if(kind==='survey'&&!data?.email?.sent){toast('El envío de correos todavía está pendiente de configuración.');return false}await refreshData(kind==='edit'?(data.email?.sent?'Edición aprobada y email enviado al cliente.':'Edición aprobada; email pendiente de configuración.'):kind==='payment'?(data.email?.sent?'Datos de pago enviados y registrados.':'Email pendiente de configuración.'):data.email?.sent?(kind==='survey'?'Encuesta enviada al cliente.':'Email reenviado al cliente.'):'Email pendiente de configuración.');return true}
+async function loadOrderEmailPreview(body, {trigger, isCurrent = () => true} = {}) {
+ const parent=trigger?.closest('dialog');
+ if(trigger?.disabled)return null;
+ if(trigger){trigger.disabled=true;trigger.setAttribute('aria-busy','true')}
+ try{
+  const {data,error}=await supabase.functions.invoke('send-order-email',{body});
+  if(!isCurrent()||trigger&&!trigger.isConnected||parent&&!parent.open)return null;
+  if(error||data?.error)return {errorMessage:await emailActionError(error,data,'No pudimos cargar la vista previa.')};
+  return {data};
+ }finally{
+  if(trigger){
+   trigger.removeAttribute('aria-busy');
+   trigger.disabled=false;
+   if(trigger.isConnected&&!trigger.closest('[popover]')&&(!parent||parent.open)&&document.activeElement===document.body){
+    trigger.focus({preventScroll:true});
+   }
+  }
+ }
+}
+
+function showOrderEmailPreview(order,{id,title,description,label,data,confirmAttribute,send}){
+ if(root.querySelector(`#${id}[open]`))return;
+ const email=data.email||{},dialog=document.createElement('dialog');
+ dialog.id=id;
+ dialog.className='admin-dialog admin-email-preview-dialog';
+ dialog.innerHTML=`<header class="dialog-title">
+  <div><span class="admin-eyebrow">PEDIDO #${safe(order.id)}</span><h2>${safe(title)}</h2>${description?`<p>${safe(description)}</p>`:''}</div>
+  <button type="button" class="dialog-close" aria-label="Cerrar vista previa"></button>
+ </header>
+ <div class="admin-email-preview-meta">
+  <div><span>Para</span><strong>${safe(data.recipient||orderCustomer(order).email||'Sin email')}</strong></div>
+  <div><span>Asunto</span><strong>${safe(email.subject||'Sin asunto')}</strong></div>
+ </div>
+ <iframe class="admin-email-preview-frame admin-email-preview-live-frame" title="Contenido del email" sandbox=""></iframe>
+ <footer class="dialog-actions admin-email-preview-actions">
+  <button type="button" class="admin-secondary dialog-cancel">Volver</button>
+  <button type="button" class="admin-primary" ${confirmAttribute}>${safe(label)}</button>
+ </footer>`;
+ root.append(dialog);
+ dialog.querySelector('iframe').srcdoc=email.html||'<p>No hay contenido disponible.</p>';
+ dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ dialog.querySelector(`[${confirmAttribute}]`).onclick=async event=>{
+  const button=event.currentTarget;
+  button.disabled=true;
+  button.textContent='Procesando…';
+  dialog.setAttribute('aria-busy','true');
+  try{
+   if(await send()&&dialog.open)dialog.close();
+  }finally{
+   dialog.removeAttribute('aria-busy');
+   button.disabled=false;
+   button.textContent=label;
+   if(dialog.open)button.focus();
+  }
+ };
+ showOrderDialog(dialog);
+}
+
+async function openOrderEmailPreview(order,kind='resend',trigger){
+ const preview=await loadOrderEmailPreview(emailRequestBody(order,kind,true),{
+  trigger,isCurrent:()=>kind!=='survey'||Boolean(root.querySelector('#service-panel'))
+ });
+ if(!preview)return;
+ if(preview.errorMessage){toast(preview.errorMessage);return}
+ const label=kind==='payment'?'Enviar datos de pago':kind==='edit'?(order.edit_pending_approval?'Aprobar y enviar email':'Enviar email de cambios'):kind==='survey'?'Enviar encuesta':'Reenviar email';
+ showOrderEmailPreview(order,{
+  id:'order-email-preview-dialog',title:'Vista previa del email',description:'',
+  label,data:preview.data,confirmAttribute:'data-confirm-email',send:()=>sendOrderEmailAction(order,kind)
+ });
+}
+
+function manualOrderDialog(){return `<dialog class="admin-dialog admin-manual-dialog" id="manual-order-dialog"><form id="manual-order-form"><div class="dialog-title"><div><h2>Nuevo pedido manual</h2><p>Quedará en «Pedido ingresado» para su revisión.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><fieldset class="admin-form-section"><legend>1. Comprador</legend><div class="admin-form-grid"><label>Nombre<input name="first_name" required></label><label>Apellido<input name="last_name"></label><label>Email<input name="email" type="email" required></label><label>Teléfono<input name="phone" type="tel" required></label></div></fieldset><fieldset class="admin-form-section"><legend>2. Despacho o retiro</legend><div class="admin-form-grid"><label>Modalidad<select name="fulfillment"><option value="pickup">Retiro en tienda</option><option value="delivery">Despacho</option></select></label><label>Región${regionFilterHtml('manual-order-region')}</label><label>Comuna<input name="commune"></label><label>Dirección<input name="address"></label><label>Depto. / casa / oficina<input name="address_extra"></label><label class="admin-form-wide">Indicaciones de entrega<textarea name="delivery_notes" rows="2" placeholder="Referencia para encontrar la dirección o coordinar retiro."></textarea></label></div></fieldset><fieldset class="admin-form-section"><legend>3. Productos</legend><label class="admin-manual-order-type">Tipo de pedido<select name="order_type" required><option value="" selected disabled>Selecciona el tipo</option><option value="catalog">Catálogo</option><option value="artwork">Personalizado · diseño adjunto</option><option value="idea">Personalizado · idea</option></select></label><div id="manual-items">${manualItemMarkup(0)}</div><button type="button" class="admin-secondary admin-add-item" id="add-manual-item">+ Agregar producto</button></fieldset><fieldset class="admin-form-section"><legend>4. Datos de pago</legend><label class="admin-check"><input name="send_payment_email" type="checkbox" checked><span>Enviar datos de pago al crear el pedido</span></label><p class="admin-form-hint">Se registrará la fecha y la cuenta administradora cuando el proveedor confirme el envío.</p><div class="admin-payment-fields"><label class="admin-check"><input name="payment_transfer_enabled" type="checkbox" checked><span>Transferencia bancaria</span></label><div class="admin-form-grid"><label>Titular<input name="transfer_holder" placeholder="Nombre o razón social"></label><label>Banco<input name="transfer_bank"></label><label>Tipo de cuenta<input name="transfer_account_type" placeholder="Cuenta corriente"></label><label>Número de cuenta<input name="transfer_account_number"></label><label>RUT<input name="transfer_rut"></label><label>Email de transferencia<input name="transfer_email" type="email"></label></div><label class="admin-check"><input name="payment_mercado_pago_enabled" type="checkbox"><span>Link de pago Mercado Pago</span></label><label>Link de pago<input name="mercado_pago_url" type="url" placeholder="https://mpago.la/..."></label></div></fieldset><fieldset class="admin-form-section"><legend>5. Observaciones</legend><label>Notas del pedido<textarea name="notes" rows="3" placeholder="Acuerdos comerciales u otras notas internas."></textarea></label></fieldset><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Ingresar a revisión</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`}
 async function exportAllOrders(button){
  button.disabled=true;
  button.setAttribute('aria-busy','true');
@@ -1139,51 +1644,58 @@ function ordersView(){
   const stageOrders=activeOrders.filter(order=>stages.includes(orderKanbanStage(order)));
   return `<section class="admin-kanban-column" data-order-stage="${id}"><header><h2>${label}</h2><span data-stage-count>${stageOrders.length}</span></header><div>${stageOrders.map(orderCard).join('')}<p class="admin-kanban-empty" hidden></p></div></section>`;
  }).join('');
- const content=`${pageHeading('OPERACIÓN','Pedidos.','Vista resumida por etapa. Abre un pedido para contactar, revisar datos, avanzar o imprimir su etiqueta.',action)}<section class="admin-orders-toolbar"><strong>${activeOrders.length} ${activeOrders.length===1?'pedido activo':'pedidos activos'}</strong><span>${activeOrders.filter(order=>order.source==='manual').length} manuales</span>${overdueCount?`<span class="admin-overdue-counter">⚠ ${overdueCount} ${overdueCount===1?'demorado':'demorados'}</span>`:''}</section><section class="admin-panel admin-order-filters" aria-label="Filtrar pedidos">${listSearch('Buscar pedido','N° de pedido, cliente, RUT o correo',adminFilters('order-stage-filter',stageFilter))}</section><section class="admin-kanban" aria-label="Pedidos por etapa">${board}</section><dialog class="admin-dialog admin-order-dialog" id="order-dialog"><div id="order-dialog-content"></div></dialog><dialog class="admin-dialog admin-archive-history-dialog" id="archive-history-dialog" aria-labelledby="archive-history-title"><div class="admin-archive-history-content"><div class="dialog-title"><div><span class="admin-eyebrow">PEDIDOS ARCHIVADOS</span><h2 id="archive-history-title">Historial de pedidos</h2><p>Todos los pedidos archivados, del más reciente al más antiguo.</p></div><button type="button" class="ds-icon-button close-button dialog-close" aria-label="Cerrar historial"><span></span></button></div><div id="archive-history-filters" class="admin-list-toolbar admin-archive-history-filters" hidden>${adminSearch({label:'Buscar pedido archivado',placeholder:'Nombre, RUT, correo o N° de pedido',input:'id="archive-search"'})}${adminFilters('archive-filter-options',`<label class="admin-filter-field">Estado<select id="archive-status"><option value="">Todos los estados</option></select></label><label class="admin-filter-field">Pago<select id="archive-payment"><option value="">Todos los pagos</option><option value="unpaid">No pagado</option><option value="review">Pagado por revisar</option><option value="paid">Pagado</option></select></label><label class="admin-filter-field">Desde<input id="archive-from" type="date"></label><label class="admin-filter-field">Hasta<input id="archive-to" type="date"></label><button type="button" class="admin-secondary" id="archive-clear-filters">Limpiar</button>`)}</div><div id="archive-history-list" class="admin-archive-history-list"></div></div></dialog>${manualOrderDialog()}`;
+ const content=`${pageHeading('OPERACIÓN','Pedidos.','Vista resumida por etapa. Abre un pedido para contactar, revisar datos, avanzar o imprimir su etiqueta.',action)}<section class="admin-orders-toolbar"><strong>${activeOrders.length} ${activeOrders.length===1?'pedido activo':'pedidos activos'}</strong><span>${activeOrders.filter(order=>order.source==='manual').length} manuales</span>${overdueCount?`<span class="admin-overdue-counter">⚠ ${overdueCount} ${overdueCount===1?'demorado':'demorados'}</span>`:''}</section><section class="admin-panel admin-order-filters" aria-label="Filtrar pedidos">${listSearch('Buscar pedido','N° de pedido, cliente, RUT o correo',stageFilter)}</section><section class="admin-kanban" aria-label="Pedidos por etapa">${board}</section><dialog class="admin-dialog admin-order-dialog" id="order-dialog" aria-labelledby="order-detail-title"><div id="order-dialog-content"></div></dialog><dialog class="admin-dialog admin-archive-history-dialog" id="archive-history-dialog" aria-labelledby="archive-history-title"><div class="admin-archive-history-content"><div class="dialog-title"><div><h2 id="archive-history-title">Pedidos archivados</h2></div><button type="button" class="ds-icon-button close-button dialog-close" aria-label="Cerrar historial"><span></span></button></div><div id="archive-history-filters" class="admin-archive-history-filters" hidden><label>Buscar pedido<input id="archive-search" type="search" placeholder="Nombre, RUT, correo o N° de pedido" autocomplete="off"></label><label>Estado<select id="archive-status"><option value="">Todos los estados</option></select></label><label>Pago<select id="archive-payment"><option value="">Todos los pagos</option><option value="unpaid">No pagado</option><option value="review">Pagado por revisar</option><option value="paid">Pagado</option></select></label><label>Desde<input id="archive-from" type="date"></label><label>Hasta<input id="archive-to" type="date"></label><button type="button" class="admin-secondary" id="archive-clear-filters">Limpiar</button></div><div id="archive-history-list" class="admin-archive-history-list"></div></div></dialog>${manualOrderDialog()}`;
  shell(content,'pedidos');
  root.querySelector('#admin-order-stage').onchange=()=>filterCurrentView(root.querySelector('#admin-search-input').value);
  filterCurrentView('');
  wireOrders();
 }
 
-async function openStatusChangePreview(order,button){const status=button.dataset.nextStatus,{data,error}=await supabase.functions.invoke('send-order-email',{body:{orderId:order.id,status,preview:true}});if(error||data?.error){console.error('No pudimos cargar la vista previa del email',error||data?.error);await advanceOrder(button,true);return}root.querySelector('#order-status-email-preview-dialog')?.remove();const email=data.email||{},dialog=document.createElement('dialog');dialog.id='order-status-email-preview-dialog';dialog.className='admin-dialog admin-email-preview-dialog';dialog.innerHTML=`<div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · EMAIL</span><h2>Vista previa del email</h2><p>Este mensaje se enviará al cliente al tomar el pedido.</p></div><button type="button" class="ds-icon-button close-button dialog-close" aria-label="Cerrar"><span></span></button></div><div class="admin-email-preview-meta"><div><span>Para</span><strong>${safe(data.recipient||orderCustomer(order).email||'Sin email')}</strong></div><div><span>Asunto</span><strong>${safe(email.subject||'')}</strong></div></div><iframe class="admin-email-preview-frame admin-email-preview-live-frame" title="Vista previa del email" sandbox></iframe><div class="dialog-actions admin-email-preview-actions"><button type="button" class="admin-secondary dialog-cancel">Volver</button><button type="button" class="admin-primary" data-confirm-status-email>Tomar pedido y enviar email</button></div>`;root.append(dialog);dialog.querySelector('iframe').srcdoc=email.html||'<p>No hay contenido disponible.</p>';const close=()=>{dialog.close();dialog.remove()};dialog.querySelector('.dialog-close').onclick=close;dialog.querySelector('.dialog-cancel').onclick=close;dialog.querySelector('[data-confirm-status-email]').onclick=async event=>{const confirmButton=event.currentTarget;confirmButton.disabled=true;confirmButton.textContent='Actualizando…';close();await advanceOrder(button,true)};dialog.showModal()}
-async function advanceOrder(button,confirmed=false){const order=adminData.orders.find(item=>String(item.id)===button.dataset.orderId),status=button.dataset.nextStatus,label=orderStatusLabel(status);if(!order)return;if(order.edit_pending_approval){toast('No puedes avanzar: hay cambios pendientes de revisión.');lockPendingOrderActions();return}if(status==='in_production'&&orderPaymentState(order)!=='paid'){toast('Confirma primero que recibiste el pago antes de preparar el pedido.');installPaymentGate();return}if(!confirmed){await openStatusChangePreview(order,button);return}button.disabled=true;button.textContent='Actualizando…';if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){const now=new Date().toISOString();local.status=status;local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status,note:'Estado actualizado en el panel local.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData(`${label} · actualización local.`);return}}const {data,error}=await supabase.functions.invoke('update-order-status',{body:{orderId:order.id,status}});if(error||data?.error){button.disabled=false;button.textContent=nextOrderStatus(order.status,order)?.adminAction||'Reintentar';toast(data?.error||error?.message||'No pudimos actualizar el pedido.');return}await refreshData(data.email?.sent?`${label} · email enviado al cliente.`:`${label} · estado actualizado; email pendiente.`)}
-async function resendOrderEmail(button){const order=adminData.orders.find(item=>String(item.id)===button.dataset.resendEmail);if(!order)return;await openOrderEmailPreview(order,'resend')}
-async function sendPaymentEmail(button){const order=adminData.orders.find(item=>String(item.id)===button.dataset.sendPaymentEmail);if(!order)return;await openOrderEmailPreview(order,'payment')}
+async function openStatusChangePreview(order,button){
+ const status=button.dataset.nextStatus;
+ const preview=await loadOrderEmailPreview({orderId:order.id,status,preview:true},{trigger:button});
+ if(!preview)return;
+ if(preview.errorMessage){
+  const confirmed=await confirmOrderAction(root,{
+   orderId:order.id,title:button.textContent.trim(),
+   message:`${preview.errorMessage} Puedes actualizar el estado sin revisar el correo.`,
+   action:'Actualizar estado'
+  });
+  if(confirmed&&button.isConnected)await advanceOrder(button,true);
+  return;
+ }
+ showOrderEmailPreview(order,{
+  id:'order-status-email-preview-dialog',title:button.textContent.trim(),
+  description:`El pedido pasará a «${orderStatusLabel(status,order)}» y se enviará este email al cliente.`,
+  label:'Actualizar y enviar email',data:preview.data,confirmAttribute:'data-confirm-status-email',
+  send:()=>advanceOrder(button,true)
+ });
+}
+async function advanceOrder(button,confirmed=false){const order=adminData.orders.find(item=>String(item.id)===button.dataset.orderId),status=button.dataset.nextStatus,label=orderStatusLabel(status);if(!order)return;if(order.edit_pending_approval){toast('No puedes avanzar: hay cambios pendientes de revisión.');lockPendingOrderActions();return}if(status==='in_production'&&orderPaymentState(order)!=='paid'){toast('Confirma primero que recibiste el pago antes de preparar el pedido.');installPaymentGate();return}if(!confirmed){await openStatusChangePreview(order,button);return}button.disabled=true;button.textContent='Actualizando…';if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){const now=new Date().toISOString();local.status=status;local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status,note:'Estado actualizado en el panel local.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData(`${label} · actualización local.`);return true}}const {data,error}=await supabase.functions.invoke('update-order-status',{body:{orderId:order.id,status}});if(error||data?.error){button.disabled=false;button.textContent=nextOrderStatus(order.status,order)?.adminAction||'Reintentar';toast(data?.error||error?.message||'No pudimos actualizar el pedido.');return}await refreshData(data.email?.sent?`${label} · email enviado al cliente.`:`${label} · estado actualizado; email pendiente.`);return true}
+async function resendOrderEmail(button){const order=adminData.orders.find(item=>String(item.id)===button.dataset.resendEmail);if(!order)return;await openOrderEmailPreview(order,'resend',button)}
+async function sendPaymentEmail(button){const order=adminData.orders.find(item=>String(item.id)===button.dataset.sendPaymentEmail);if(!order)return;await openOrderEmailPreview(order,'payment',button)}
 function paymentInstructionsDialogMarkup(order){const instructions=order.payment_instructions||{},transfer=instructions.transfer||{},hasTransfer=Boolean(instructions.transfer),hasMercado=Boolean(instructions.mercado_pago_url);return `<dialog class="admin-dialog admin-payment-dialog" id="payment-instructions-dialog"><form id="payment-instructions-form"><div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · COBRO</span><h2>Configurar datos de pago</h2><p>Estos datos se usarán en la plantilla de cobro que verá el cliente.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><fieldset class="admin-form-section"><legend>Transferencia bancaria</legend><label class="admin-check"><input name="payment_transfer_enabled" type="checkbox" ${hasTransfer?'checked':''}><span>Incluir transferencia bancaria</span></label><div class="admin-payment-fields"><div class="admin-form-grid"><label>Titular<input name="transfer_holder" value="${safe(transfer.holder||'')}" placeholder="Nombre o razón social"></label><label>Banco<input name="transfer_bank" value="${safe(transfer.bank||'')}"></label><label>Tipo de cuenta<input name="transfer_account_type" value="${safe(transfer.account_type||'')}" placeholder="Cuenta corriente"></label><label>Número de cuenta<input name="transfer_account_number" value="${safe(transfer.account_number||'')}"></label><label>RUT<input name="transfer_rut" value="${safe(transfer.rut||'')}"></label><label>Email de transferencia<input name="transfer_email" type="email" value="${safe(transfer.email||'')}"></label></div></div></fieldset><fieldset class="admin-form-section"><legend>Mercado Pago</legend><label class="admin-check"><input name="payment_mercado_pago_enabled" type="checkbox" ${hasMercado?'checked':''}><span>Incluir link de pago Mercado Pago</span></label><label>Link de pago<input name="mercado_pago_url" type="url" value="${safe(instructions.mercado_pago_url||'')}" placeholder="https://mpago.la/..."></label></fieldset><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Guardar datos de pago</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`}
-function openPaymentInstructionsEditor(order){root.querySelector('#payment-instructions-dialog')?.remove();root.insertAdjacentHTML('beforeend',paymentInstructionsDialogMarkup(order));const dialog=root.querySelector('#payment-instructions-dialog'),form=dialog.querySelector('form');dialog.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.querySelector('.dialog-cancel').onclick=()=>dialog.close();form.onsubmit=async event=>{event.preventDefault();const button=event.submitter||form.querySelector('[type="submit"]'),status=form.querySelector('.admin-form-status'),transfer=form.elements.payment_transfer_enabled.checked?{holder:String(form.elements.transfer_holder.value||'').trim(),bank:String(form.elements.transfer_bank.value||'').trim(),account_type:String(form.elements.transfer_account_type.value||'').trim(),account_number:String(form.elements.transfer_account_number.value||'').trim(),rut:String(form.elements.transfer_rut.value||'').trim(),email:String(form.elements.transfer_email.value||'').trim()}:null,mercadoPago=form.elements.payment_mercado_pago_enabled.checked?String(form.elements.mercado_pago_url.value||'').trim():'';if(!transfer&&!mercadoPago){status.textContent='Incluye una transferencia o un link de Mercado Pago.';return}if(mercadoPago&&!/^https?:\/\//i.test(mercadoPago)){status.textContent='Ingresa un link válido de Mercado Pago.';return}button.disabled=true;button.textContent='Guardando…';const {error}=await supabase.from('orders').update({payment_instructions:{transfer,mercado_pago_url:mercadoPago||null},updated_at:new Date().toISOString()}).eq('id',order.id);if(error){button.disabled=false;button.textContent='Guardar datos de pago';status.textContent=error.message;return}dialog.close();await refreshData('Datos de pago guardados. Ahora puedes previsualizar y enviarlos.')};dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();mountPaymentInstructionsDisclosure(form)}
-function unlockPaymentInstructions(order){root.querySelector('#payment-auth-dialog')?.remove();const dialog=document.createElement('dialog');dialog.id='payment-auth-dialog';dialog.className='admin-dialog admin-payment-auth-dialog';dialog.innerHTML=`<form><div class="dialog-title"><div><span class="admin-eyebrow">DATOS DE PAGO · SEGURIDAD</span><h2>Confirmar identidad</h2><p>Ingresa la contraseña de tu cuenta para editar los datos bancarios.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><div class="admin-payment-auth-body"><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><p class="admin-form-status" role="alert"></p></div><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Continuar</button></div></form>`;root.append(dialog);const form=dialog.querySelector('form'),close=()=>{dialog.close();dialog.remove()};dialog.querySelector('.dialog-close').onclick=close;dialog.querySelector('.dialog-cancel').onclick=close;form.onsubmit=async event=>{event.preventDefault();const button=event.submitter,status=form.querySelector('.admin-form-status'),password=String(form.elements.password.value||'');button.disabled=true;button.textContent='Verificando…';const {data:{user}}=await supabase.auth.getUser();const {error}=await authWithCaptcha(captchaToken=>supabase.auth.signInWithPassword({email:user?.email||'',password,options:{captchaToken}}));if(error){button.disabled=false;button.textContent='Continuar';status.textContent='La contraseña no es correcta.';form.elements.password.select();return}close();openPaymentInstructionsEditor(order)};dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();dialog.querySelector('input')?.focus()}
-function enhancePaymentDialog(){const content=root.querySelector('#order-dialog-content');if(!content||content.dataset.paymentEnhanced)return;const match=content.textContent.match(/PEDIDO #([^\s·]+)/);const order=match&&adminData.orders.find(item=>String(item.id)===match[1]),supportsPaymentInstructions=order?.source==='manual'||order?.price_snapshot?.provider==='bank_transfer';if(!order||!supportsPaymentInstructions)return;content.dataset.paymentEnhanced='true';const instructions=order.payment_instructions||{},transfer=instructions.transfer||{},hasPayment=Object.values(transfer).some(Boolean)||Boolean(instructions.mercado_pago_url),charge=content.querySelector('.admin-order-detail-grid>section:nth-child(2)');if(!charge)return;const actions=document.createElement('div');actions.className='admin-payment-actions admin-payment-actions-inline';actions.innerHTML=`<button type="button" class="admin-secondary" data-edit-payment>${hasPayment?'Editar datos':'Incorporar datos de pago'}</button><button type="button" class="admin-secondary" data-send-payment-email="${safe(order.id)}" ${hasPayment&&orderCustomer(order).email?'':'disabled'}>${order.payment_email_sent_at?'Reenviar datos de pago':'Enviar datos de pago'}</button>`;charge.append(actions);actions.querySelector('[data-edit-payment]')?.addEventListener('click',()=>unlockPaymentInstructions(order));actions.querySelector('[data-send-payment-email]')?.addEventListener('click',event=>sendPaymentEmail(event.currentTarget))}
-function lockPendingOrderActions(){const content=root.querySelector('#order-dialog-content');if(!content)return;const next=content.querySelector('[data-next-status]'),resend=content.querySelector('[data-resend-email]'),payment=content.querySelector('[data-send-payment-email]'),id=next?.dataset.orderId||resend?.dataset.resendEmail||payment?.dataset.sendPaymentEmail||content.textContent.match(/PEDIDO #([^\s·]+)/)?.[1],order=id&&adminData.orders.find(item=>String(item.id)===String(id));if(!order?.edit_pending_approval)return;content.querySelector('.admin-order-edit-status.is-pending')?.remove();if(next){next.disabled=true;next.hidden=false;next.setAttribute('aria-disabled','true');next.title='Hay cambios pendientes de revisión'}[resend,payment].filter(Boolean).forEach(button=>{button.hidden=true});const blocker=content.querySelector('.admin-order-edit-blocker');if(blocker)blocker.hidden=false}
-root.addEventListener('click',event=>{const button=event.target.closest('[data-next-status],[data-resend-email],[data-send-payment-email]');if(!button)return;const content=button.closest('#order-dialog-content'),id=button.dataset.orderId||button.dataset.resendEmail||button.dataset.sendPaymentEmail||content?.textContent.match(/PEDIDO #([^\s·]+)/)?.[1],order=id&&adminData.orders.find(item=>String(item.id)===String(id));if(order?.edit_pending_approval){event.preventDefault();event.stopImmediatePropagation();button.disabled=true;if(!button.matches('[data-next-status]'))button.hidden=true;toast('Primero debes comparar y aprobar o rechazar los cambios pendientes.')}});
-async function approveOrderEditWithoutEmail(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.approveWithoutEmail));if(!order)return;if(!window.confirm('¿Aprobar los cambios sin enviar todavía el email al cliente?'))return;button.disabled=true;button.textContent='Aprobando…';const nextVersion=Number(order.order_edit_version||0)+1;const {error}=await supabase.from('orders').update({edit_pending_approval:false,edit_pending_at:null,edit_pending_by:null,edit_pending_snapshot:null,order_edit_version:nextVersion,order_edit_email_sent_at:null,order_edit_email_sent_by:null,updated_at:new Date().toISOString()}).eq('id',order.id).eq('edit_pending_approval',true);if(error){button.disabled=false;button.textContent='Aprobar sin enviar email';toast(error.message);return}await supabase.from('order_status_history').insert({order_id:order.id,status:order.status,note:`Edición #${nextVersion} aprobada por administración; email pendiente de envío.`});await refreshData('Cambios aprobados. El email queda pendiente de envío.')}
-function addApproveWithoutEmailAction(){const dialog=root.querySelector('#edit-approval-dialog'),actions=dialog?.querySelector('.admin-edit-approval-actions'),approve=dialog?.querySelector('[data-approve-edit]');if(!actions||!approve||actions.querySelector('[data-send-edit-email-toggle]'))return;const orderId=approve.dataset.approveEdit;if(!orderId)return;const option=document.createElement('label');option.className='admin-edit-email-toggle';option.innerHTML='<input type="checkbox" data-send-edit-email-toggle checked><span><strong>Enviar email al cliente</strong><small>Se mostrará una vista previa antes de enviarlo.</small></span>';actions.insertBefore(option,approve);approve.textContent='Aprobar';approve.onclick=async()=>{const order=adminData.orders.find(item=>String(item.id)===String(orderId));if(!order)return;if(option.querySelector('input').checked){await openOrderEmailPreview(order,'edit')}else{await approveOrderEditWithoutEmail({dataset:{approveWithoutEmail:orderId},disabled:false,textContent:'Aprobar'})}}}
-function addApprovedEditEmailAction(){const content=root.querySelector('#order-dialog-content');if(!content||content.querySelector('[data-approved-edit-email]'))return;const match=content.textContent.match(/PEDIDO #([^\s·]+)/),order=match&&adminData.orders.find(item=>String(item.id)===match[1]);if(!order||order.edit_pending_approval||!Number(order.order_edit_version||0)||order.order_edit_email_sent_at)return;content.querySelector('[data-resend-email]')?.remove();const tools=content.querySelector('.admin-order-tools .admin-actions-popover');if(!tools)return;const button=document.createElement('button');button.type='button';button.className='admin-secondary admin-icon-action';button.dataset.approvedEditEmail=order.id;button.title='Enviar email de cambios';button.setAttribute('aria-label','Enviar email de cambios');button.innerHTML=`${orderToolIcons.email}<span>Enviar email</span>`;button.onclick=()=>openOrderEmailPreview(order,'edit');tools.append(button)}
-const orderToolIcons={edit:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l11.2-11.2a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.8 6.2 4 4"/></svg>',email:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',print:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v7H7z"/></svg>',archive:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"/></svg>'};
-function compactOrderTools(){root.querySelectorAll('[data-edit-order],[data-resend-email],[data-print-order],[data-archive-order]').forEach(button=>{if(button.dataset.iconified)return;const kind=button.dataset.editOrder?'edit':button.dataset.resendEmail?'email':button.dataset.printOrder?'print':'archive',label=button.dataset.editOrder?(button.textContent.trim()||'Editar pedido'):button.dataset.resendEmail?'Reenviar email al cliente':button.dataset.printOrder?'Imprimir etiqueta del pedido':'Archivar pedido';button.dataset.iconified='true';button.classList.add('admin-icon-action');button.title=label;button.setAttribute('aria-label',label);button.innerHTML=`${orderToolIcons[kind]}<span>${safe(label)}</span>`})}
-const reviewOrderIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.2-6 9.5-6 9.5 6 9.5 6-3.2 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>';
-const footerContactIcons=['<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h3l1.5 4-2 1.5a14 14 0 0 0 6 6l1.5-2 4 1.5v3c0 1-1 1.5-2.5 1.5C10.5 19 5 13.5 5 6c0-1.5.5-2.5 1.5-2.5Z"/></svg>','<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a8.5 8.5 0 0 0-7.4 12.7L3.5 21l5.5-1.1A8.5 8.5 0 1 0 12 3Z"/><path d="M8.5 8.5c.4-.8.8-.8 1.2-.8h.6l.8 2-1 1a7 7 0 0 0 2.7 2.7l1-1 2 .8v.6c0 .4 0 .8-.8 1.2-1 .5-4.8-1.4-6.5-3.1S8 9.5 8.5 8.5Z"/></svg>','<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>'];
-function moveOrderContactToFooter(){const content=root.querySelector('#order-dialog-content'),contact=content?.querySelector('.admin-order-contact'),toolButtons=content?.querySelector('.admin-order-tools .admin-actions-popover');if(!contact||!toolButtons)return;const links=[...contact.querySelectorAll('a')];links.forEach(link=>{const index=Number(link.dataset.orderContact),labels=['Llamar al cliente','Abrir WhatsApp','Redactar email al cliente'],label=labels[index]||link.textContent.trim();link.classList.add('admin-secondary','admin-icon-action');link.title=label;link.setAttribute('aria-label',label);link.innerHTML=`${footerContactIcons[index]}<span>${safe(label)}</span>`});toolButtons.prepend(...links);contact.remove()}
-function updatePendingEditToolIcon(){root.querySelectorAll('[data-edit-order]').forEach(button=>{const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.editOrder));if(!order?.edit_pending_approval)return;button.classList.add('has-notification');button.dataset.notification='Cambios pendientes';if(button.dataset.reviewIconified)return;button.dataset.reviewIconified='true';button.title='Revisar cambios pendientes';button.setAttribute('aria-label','Revisar cambios pendientes');button.innerHTML=`${reviewOrderIcon}<span>Revisar cambios pendientes</span>`})}
-const pendingOrderObserver=new MutationObserver(()=>{moveOrderContactToFooter();compactOrderTools();updatePendingEditToolIcon();lockPendingOrderActions();addApproveWithoutEmailAction();addApprovedEditEmailAction()});pendingOrderObserver.observe(root,{childList:true,subtree:true});moveOrderContactToFooter();compactOrderTools();updatePendingEditToolIcon();addApproveWithoutEmailAction();addApprovedEditEmailAction();
-const emailPreviewCopyObserver=new MutationObserver(()=>{const button=root.querySelector('#order-email-preview-dialog [data-confirm-email]');if(button&&button.textContent.trim()==='Aprobar y enviar email'&&!button.dataset.copyNormalized){button.dataset.copyNormalized='true';button.textContent='Enviar email'}});emailPreviewCopyObserver.observe(root,{childList:true,subtree:true});
-function addTransferNoticeToPaymentDialog(){const content=root.querySelector('#order-dialog-content'),section=content?.querySelector('.admin-order-detail-grid>section:nth-child(2)');if(!content||!section||section.querySelector('[data-transfer-notice]'))return;const match=content.textContent.match(/PEDIDO #([^\s·]+)/),order=match&&adminData.orders.find(item=>String(item.id)===String(match[1]));if(!order?.payment_transfer_notice_at)return;const notice=document.createElement('p');notice.className='admin-payment-transfer-notice';notice.dataset.transferNotice='true';notice.textContent=`Cliente avisó que realizó la transferencia · ${date(order.payment_transfer_notice_at)}`;section.append(notice)}
-const paymentDialogObserver=new MutationObserver(()=>{enhancePaymentDialog();addTransferNoticeToPaymentDialog()});paymentDialogObserver.observe(root,{childList:true,subtree:true});
+function openPaymentInstructionsEditor(order){root.querySelector('#payment-instructions-dialog')?.remove();root.insertAdjacentHTML('beforeend',paymentInstructionsDialogMarkup(order));const dialog=root.querySelector('#payment-instructions-dialog'),form=dialog.querySelector('form');dialog.querySelector('.dialog-close').onclick=()=>dialog.close();dialog.querySelector('.dialog-cancel').onclick=()=>dialog.close();form.onsubmit=async event=>{event.preventDefault();const button=event.submitter||form.querySelector('[type="submit"]'),status=form.querySelector('.admin-form-status'),transfer=form.elements.payment_transfer_enabled.checked?{holder:String(form.elements.transfer_holder.value||'').trim(),bank:String(form.elements.transfer_bank.value||'').trim(),account_type:String(form.elements.transfer_account_type.value||'').trim(),account_number:String(form.elements.transfer_account_number.value||'').trim(),rut:String(form.elements.transfer_rut.value||'').trim(),email:String(form.elements.transfer_email.value||'').trim()}:null,mercadoPago=form.elements.payment_mercado_pago_enabled.checked?String(form.elements.mercado_pago_url.value||'').trim():'';if(!transfer&&!mercadoPago){status.textContent='Incluye una transferencia o un link de Mercado Pago.';return}if(mercadoPago&&!/^https?:\/\//i.test(mercadoPago)){status.textContent='Ingresa un link válido de Mercado Pago.';return}button.disabled=true;button.textContent='Guardando…';const {error}=await supabase.from('orders').update({payment_instructions:{transfer,mercado_pago_url:mercadoPago||null},updated_at:new Date().toISOString()}).eq('id',order.id);if(error){button.disabled=false;button.textContent='Guardar datos de pago';status.textContent=error.message;return}dialog.close();await refreshData('Datos de pago guardados. Ahora puedes previsualizar y enviarlos.')};dialog.addEventListener('close',()=>dialog.remove(),{once:true});showOrderDialog(dialog);mountPaymentInstructionsDisclosure(form)}
+function unlockPaymentInstructions(order){root.querySelector('#payment-auth-dialog')?.remove();const dialog=document.createElement('dialog');dialog.id='payment-auth-dialog';dialog.className='admin-dialog admin-payment-auth-dialog';dialog.innerHTML=`<form><div class="dialog-title"><div><span class="admin-eyebrow">DATOS DE PAGO · SEGURIDAD</span><h2>Confirmar identidad</h2><p>Ingresa la contraseña de tu cuenta para editar los datos bancarios.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><div class="admin-payment-auth-body"><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><p class="admin-form-status" role="alert"></p></div><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Continuar</button></div></form>`;root.append(dialog);const form=dialog.querySelector('form'),close=()=>{dialog.close();dialog.remove()};dialog.querySelector('.dialog-close').onclick=close;dialog.querySelector('.dialog-cancel').onclick=close;form.onsubmit=async event=>{event.preventDefault();const button=event.submitter,status=form.querySelector('.admin-form-status'),password=String(form.elements.password.value||'');button.disabled=true;button.textContent='Verificando…';const {data:{user}}=await supabase.auth.getUser();const {error}=await authWithCaptcha(captchaToken=>supabase.auth.signInWithPassword({email:user?.email||'',password,options:{captchaToken}}));if(error){button.disabled=false;button.textContent='Continuar';status.textContent='La contraseña no es correcta.';form.elements.password.select();return}close();openPaymentInstructionsEditor(order)};dialog.addEventListener('close',()=>dialog.remove(),{once:true});showOrderDialog(dialog,{focus:form.elements.password})}
+function enhancePaymentDialog(){const content=root.querySelector('#order-dialog-content');if(!content||content.dataset.paymentEnhanced)return;const match=content.dataset.orderId;const order=match&&adminData.orders.find(item=>String(item.id)===match),supportsPaymentInstructions=order?.source==='manual'||order?.price_snapshot?.provider==='bank_transfer';if(!order||!supportsPaymentInstructions)return;content.dataset.paymentEnhanced='true';const instructions=order.payment_instructions||{},transfer=instructions.transfer||{},hasPayment=Object.values(transfer).some(Boolean)||Boolean(instructions.mercado_pago_url),charge=content.querySelector('[data-order-charge]');if(!charge)return;const actions=document.createElement('div');actions.className='admin-payment-actions admin-payment-actions-inline';actions.innerHTML=`<button type="button" class="admin-secondary" data-edit-payment>${hasPayment?'Editar datos':'Incorporar datos de pago'}</button><button type="button" class="admin-secondary" data-send-payment-email="${safe(order.id)}" ${hasPayment&&orderCustomer(order).email?'':'disabled'}>${order.payment_email_sent_at?'Reenviar datos de pago':'Enviar datos de pago'}</button>`;charge.append(actions);actions.querySelector('[data-edit-payment]')?.addEventListener('click',()=>unlockPaymentInstructions(order));actions.querySelector('[data-send-payment-email]')?.addEventListener('click',event=>sendPaymentEmail(event.currentTarget))}
+function lockPendingOrderActions(){const content=root.querySelector('#order-dialog-content');if(!content)return;const order=adminData.orders.find(item=>String(item.id)===content.dataset.orderId);if(!order?.edit_pending_approval)return;const next=content.querySelector('[data-next-status]'),payment=content.querySelector('[data-send-payment-email]');if(next){next.disabled=true;next.title='Hay cambios pendientes de revisión'}if(payment)payment.hidden=true}
+root.addEventListener('click',event=>{const button=event.target.closest('[data-next-status],[data-resend-email],[data-send-payment-email]');if(!button)return;const content=button.closest('#order-dialog-content'),id=button.dataset.orderId||button.dataset.resendEmail||button.dataset.sendPaymentEmail||content?.dataset.orderId,order=id&&adminData.orders.find(item=>String(item.id)===String(id));if(order?.edit_pending_approval){event.preventDefault();event.stopImmediatePropagation();button.disabled=true;if(!button.matches('[data-next-status]'))button.hidden=true;toast('Primero debes comparar y aprobar o rechazar los cambios pendientes.')}});
+async function approveOrderEditWithoutEmail(order,button){if(!await confirmOrderAction(root,{orderId:order.id,title:'Aprobar sin enviar email',message:'Los cambios quedarán aprobados. Podrás enviar el correo después desde Herramientas.',action:'Aprobar cambios'}))return;button.disabled=true;button.textContent='Aprobando…';const nextVersion=Number(order.order_edit_version||0)+1;const {error}=await supabase.from('orders').update({edit_pending_approval:false,edit_pending_at:null,edit_pending_by:null,edit_pending_snapshot:null,order_edit_version:nextVersion,order_edit_email_sent_at:null,order_edit_email_sent_by:null,updated_at:new Date().toISOString()}).eq('id',order.id).eq('edit_pending_approval',true);if(error){button.disabled=false;button.textContent='Aprobar cambios';toast(error.message);return}await supabase.from('order_status_history').insert({order_id:order.id,status:order.status,note:`Edición #${nextVersion} aprobada por administración; email pendiente de envío.`});await refreshData('Cambios aprobados. El email queda pendiente de envío.')}
+function addTransferNoticeToPaymentDialog(){const content=root.querySelector('#order-dialog-content'),section=content?.querySelector('[data-order-charge]');if(!content||!section||section.querySelector('[data-transfer-notice]'))return;const match=content.dataset.orderId,order=match&&adminData.orders.find(item=>String(item.id)===match);if(!order?.payment_transfer_notice_at)return;const notice=document.createElement('p');notice.className='admin-payment-transfer-notice';notice.dataset.transferNotice='true';notice.textContent=`Cliente avisó que realizó la transferencia · ${date(order.payment_transfer_notice_at)}`;section.append(notice)}
 async function confirmPayment(toggle){
  const order=adminData.orders.find(item=>String(item.id)===String(toggle.dataset.confirmPayment));
  if(!order)return;
  const revoking=!toggle.checked;
  if(revoking){
   toggle.checked=true;
-  if(!window.confirm(`¿Desmarcar el pago del pedido #${order.id}? Volverá a Pedido ingresado. Esto no devuelve dinero al cliente.`))return;
+  if(!await confirmOrderAction(root,{orderId:order.id,title:'Desmarcar pago',message:'El pedido volverá a Pedido ingresado. Esta acción no genera un reembolso.',action:'Desmarcar pago',danger:true}))return;
  }
  toggle.disabled=true;
  const {data,error}=await supabase.functions.invoke('update-order-status',{body:{orderId:order.id,...(revoking?{revokePayment:true}:{confirmPayment:true})}});
  if(error||data?.error){toggle.checked=revoking;toggle.disabled=false;normalizePaymentToggleCopy();toast(data?.error||error?.message||'No pudimos actualizar el pago.');return}
  await refreshData(revoking?'Pago desmarcado. El pedido volvió a Pedido ingresado.':data.email?.sent?'Pago confirmado. Email enviado al cliente.':'Pago confirmado. Email al cliente pendiente; revisa la configuración.');
 }
-function installPaymentGate(){const content=root.querySelector('#order-dialog-content');if(!content||content.dataset.paymentGateInstalled)return;const match=content.textContent.match(/PEDIDO #([^\s·]+)/),order=match&&adminData.orders.find(item=>String(item.id)===match[1]),actions=content.querySelector('.admin-order-dialog-actions'),progress=actions?.querySelector('.admin-order-progress-actions'),next=progress?.querySelector('[data-next-status]');if(!order||order.archived_at||!actions||!progress||!next||next.dataset.nextStatus!=='in_production')return;content.dataset.paymentGateInstalled='true';const payment=(order.payments||[]).find(item=>item.provider==='mercado_pago'&&item.status==='approved')||(order.payments||[]).find(item=>item.provider==='transferencia_bancaria')||(order.payments||[]).find(item=>item.provider==='mercado_pago')||(order.payments||[])[0],paymentConfirmed=orderPaymentState(order)==='paid',paymentIssue=(order.payments||[]).find(item=>paymentIssueStatuses.has(item.status)),canConfirmTransfer=Boolean((order.payments||[]).find(item=>item.provider==='transferencia_bancaria')||order.payment_instructions?.transfer),onlineWaiting=payment?.provider==='mercado_pago'&&payment.status!=='approved'&&!canConfirmTransfer&&!paymentConfirmed;if(paymentIssue){content.dataset.paymentGateMode='payment-issue';const notice=document.createElement('p');notice.className='admin-payment-transfer-notice';notice.textContent=`Mercado Pago: ${paymentStatusLabel(paymentIssue.status)}. Resuelve la incidencia antes de iniciar producción.`;progress.prepend(notice);next.disabled=true;next.title='El pago tiene una incidencia activa.';return}if(onlineWaiting){content.dataset.paymentGateMode='automatic-pending';const notice=document.createElement('p');notice.className='admin-payment-transfer-notice';notice.textContent=payment.status==='rejected'||payment.status==='cancelled'?`Mercado Pago ${paymentStatusLabel(payment.status).toLowerCase()}. El cliente debe reintentar antes de iniciar producción.`:'Esperando la aprobación de Mercado Pago.';progress.prepend(notice);next.disabled=true;next.title='Espera la confirmación automática de Mercado Pago.';return}content.dataset.paymentGateMode='manual-confirmation';const toggleLabel=document.createElement('label');toggleLabel.className='admin-payment-toggle';toggleLabel.innerHTML=`<input type="checkbox" role="switch" aria-label="Pago confirmado del pedido #${safe(order.id)}" data-confirm-payment="${safe(order.id)}" ${paymentConfirmed?'checked':''} ${order.request_type==='creative'&&paymentConfirmed?'disabled title="La reversión de una solicitud creativa requiere revisión de administración"':''}><span><strong>${paymentConfirmed?'Pago confirmado':'Confirmar pago'}</strong><small>${paymentConfirmed?'Pago confirmado':'Confirma la transferencia antes de continuar'}</small></span>`;const toggle=toggleLabel.querySelector('input');toggle.addEventListener('change',()=>confirmPayment(toggle));progress.querySelector('div').prepend(toggleLabel);next.disabled=!paymentConfirmed;next.title=paymentConfirmed?'':'Confirma primero que recibiste la transferencia.';next.addEventListener('click',event=>{if(!toggle.checked){event.preventDefault();event.stopImmediatePropagation();toast('Confirma el pago antes de tomar el pedido.')}},true)}
-const paymentGateObserver=new MutationObserver(installPaymentGate);paymentGateObserver.observe(root,{childList:true,subtree:true});
+function installPaymentGate(){const content=root.querySelector('#order-dialog-content');if(!content||content.dataset.paymentGateInstalled)return;const match=content.dataset.orderId,order=match&&adminData.orders.find(item=>String(item.id)===match),actions=content.querySelector('.admin-order-dialog-actions'),progress=actions?.querySelector('.admin-order-progress-actions'),next=progress?.querySelector('[data-next-status]');if(!order||order.archived_at||!actions||!progress||!next||next.dataset.nextStatus!=='in_production')return;content.dataset.paymentGateInstalled='true';const payment=(order.payments||[]).find(item=>item.provider==='mercado_pago'&&item.status==='approved')||(order.payments||[]).find(item=>item.provider==='transferencia_bancaria')||(order.payments||[]).find(item=>item.provider==='mercado_pago')||(order.payments||[])[0],paymentConfirmed=orderPaymentState(order)==='paid',paymentIssue=(order.payments||[]).find(item=>paymentIssueStatuses.has(item.status)),canConfirmTransfer=Boolean((order.payments||[]).find(item=>item.provider==='transferencia_bancaria')||order.payment_instructions?.transfer),onlineWaiting=payment?.provider==='mercado_pago'&&payment.status!=='approved'&&!canConfirmTransfer&&!paymentConfirmed;if(paymentIssue){content.dataset.paymentGateMode='payment-issue';const notice=document.createElement('p');notice.className='admin-payment-transfer-notice';notice.textContent=`Mercado Pago: ${paymentStatusLabel(paymentIssue.status)}. Resuelve la incidencia antes de iniciar producción.`;progress.prepend(notice);next.disabled=true;next.title='El pago tiene una incidencia activa.';return}if(onlineWaiting){content.dataset.paymentGateMode='automatic-pending';const notice=document.createElement('p');notice.className='admin-payment-transfer-notice';notice.textContent=payment.status==='rejected'||payment.status==='cancelled'?`Mercado Pago ${paymentStatusLabel(payment.status).toLowerCase()}. El cliente debe reintentar antes de iniciar producción.`:'Esperando la aprobación de Mercado Pago.';progress.prepend(notice);next.disabled=true;next.title='Espera la confirmación automática de Mercado Pago.';return}content.dataset.paymentGateMode='manual-confirmation';const toggleLabel=document.createElement('label');toggleLabel.className='admin-payment-toggle';toggleLabel.innerHTML=`<input type="checkbox" role="switch" aria-label="Pago confirmado del pedido #${safe(order.id)}" data-confirm-payment="${safe(order.id)}" ${paymentConfirmed?'checked':''} ${order.request_type==='creative'&&paymentConfirmed?'disabled title="La reversión de una solicitud creativa requiere revisión de administración"':''}><span><strong>${paymentConfirmed?'Pago confirmado':'Confirmar pago'}</strong><small>${paymentConfirmed?'Pago confirmado':'Confirma la transferencia antes de continuar'}</small></span>`;const toggle=toggleLabel.querySelector('input');toggle.addEventListener('change',()=>confirmPayment(toggle));progress.querySelector('div').prepend(toggleLabel);next.disabled=!paymentConfirmed;next.title=paymentConfirmed?'':'Confirma primero que recibiste la transferencia.';next.addEventListener('click',event=>{if(!toggle.checked){event.preventDefault();event.stopImmediatePropagation();toast('Confirma el pago antes de tomar el pedido.')}},true)}
 function printOrderLabel(order){const customer=orderCustomer(order),units=(order.order_items||[]).reduce((sum,item)=>sum+Number(item.quantity||0),0),created=order.created_at||order.submitted_at||new Date().toISOString(),popup=window.open('','_blank','width=760,height=720');if(!popup)return toast('Permite ventanas emergentes para imprimir.');popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Etiqueta pedido ${safe(order.id)}</title><style>*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#171914;font-family:Arial,Helvetica,sans-serif}body{padding:24px}.label{width:100mm;min-height:58mm;margin:0 auto;padding:5mm;border:1.5px solid #171914;background:#fff}.label-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8mm;align-items:start;padding-bottom:3mm;border-bottom:1px solid #777}.eyebrow{margin:0 0 1mm;font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555}.sender-name{font-size:13px;font-weight:800;line-height:1.15}.sender-location{margin-top:1mm;font-size:8px;color:#444}.label-date{text-align:right;font-size:8px;line-height:1.35;white-space:nowrap}.label-date strong{display:block;font-size:10px}.recipient{padding:3.5mm 0 3mm}.recipient-name{margin:0 0 2.5mm;font-size:17px;line-height:1.05;font-weight:800;overflow-wrap:anywhere}.destination{margin:0;font-size:10px;line-height:1.3;font-weight:700;overflow-wrap:anywhere}.contact{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:2.5mm;font-size:8px;line-height:1.25;overflow-wrap:anywhere}.label-footer{display:flex;justify-content:space-between;gap:5mm;padding-top:3mm;border-top:1px solid #777;font-size:8px;font-weight:700;text-transform:uppercase}.label-footer span:last-child{text-align:right}@media print{@page{size:100mm 58mm;margin:0}body{padding:0}.label{width:100mm;min-height:58mm;margin:0;border:1px solid #171914}}</style></head><body><main class="label"><header class="label-header"><div><p class="eyebrow">Remitente</p><div class="sender-name">${safe(SHIPPING_SENDER.name)}</div><div class="sender-location">${safe(SHIPPING_SENDER.location)}</div></div><div class="label-date"><span>Pedido #${safe(order.id)}</span><strong>${safe(date(created))}</strong></div></header><section class="recipient"><p class="eyebrow">Destinatario</p><h1 class="recipient-name">${safe(orderCustomerName(order))}</h1><p class="destination">${safe(orderDestination(order))}</p><div class="contact"><span>${safe(customer.phone||'Sin teléfono')}</span><span>${safe(customer.email||'Sin email')}</span></div></section><footer class="label-footer"><span>${order.shipping_address?.fulfillment==='pickup'?'Retiro en tienda':'Despacho'}</span><span>${units} ${units===1?'unidad':'unidades'}</span></footer></main><script>window.print()<\/script></body></html>`);popup.document.close()}
 function manualPaymentInstructions(form){const transfer=form.elements.payment_transfer_enabled.checked?{holder:String(form.elements.transfer_holder.value||'').trim(),bank:String(form.elements.transfer_bank.value||'').trim(),account_type:String(form.elements.transfer_account_type.value||'').trim(),account_number:String(form.elements.transfer_account_number.value||'').trim(),rut:String(form.elements.transfer_rut.value||'').trim(),email:String(form.elements.transfer_email.value||'').trim()}:null;const mercado=form.elements.payment_mercado_pago_enabled.checked?String(form.elements.mercado_pago_url.value||'').trim():'';return {transfer,mercado_pago_url:mercado||null}}
 async function handleManualOrderWithPayment(event){event.preventDefault();event.stopImmediatePropagation();const form=event.target;const button=event.submitter||form.querySelector('[type="submit"]'),rows=[...form.querySelectorAll('.admin-manual-item')],paymentInstructions=manualPaymentInstructions(form),sendPaymentEmail=form.elements.send_payment_email.checked,transferValues=paymentInstructions.transfer?Object.values(paymentInstructions.transfer).filter(Boolean):[],hasPayment=transferValues.length>0||Boolean(paymentInstructions.mercado_pago_url);const status=form.querySelector('.admin-form-status');if(sendPaymentEmail&&!hasPayment){status.textContent='Agrega datos de transferencia o activa un link de Mercado Pago antes de enviar.';return}const items=rows.map(row=>{const product=manualProductOptions.find(item=>item.id===row.querySelector('[name="item_product_type"]').value),size=String(row.querySelector('[name="item_size"]').value),color=String(row.querySelector('input[type="radio"]:checked')?.value||''),placement=String(row.querySelector('[name="item_print_placement"]').value),quantity=Number(row.querySelector('[name="item_quantity"]').value),unitPrice=Number(row.querySelector('[name="item_unit_price"]').value),detail=String(row.querySelector('[name="item_name"]').value).trim(),designDetails=String(row.querySelector('[name="item_design_details"]').value||'').trim();return {product,size,color,placement,quantity,unitPrice,detail,designDetails}});if(!items.length||items.some(item=>!item.detail||item.quantity<1||item.unitPrice<0)){status.textContent='Completa cada producto antes de ingresar el pedido.';return}button.disabled=true;button.textContent='Ingresando…';const fulfillment=String(form.elements.fulfillment.value),notes=manualOrderNotes(form),deliveryNotes=String(form.elements.delivery_notes.value||'').trim(),total=items.reduce((sum,item)=>sum+item.quantity*item.unitPrice,0),shippingAddress={fulfillment,customer:{first_name:String(form.elements.first_name.value).trim(),last_name:String(form.elements.last_name.value).trim(),email:String(form.elements.email.value).trim(),phone:String(form.elements.phone.value).trim()},region:String(form.elements.region.value).trim(),commune:String(form.elements.commune.value).trim(),address:String(form.elements.address.value).trim(),address_extra:String(form.elements.address_extra.value).trim(),delivery_notes:deliveryNotes,notes};const now=new Date().toISOString(),priceSnapshot={manual:true,on_hold:true,order_type:String(form.elements.order_type.value),items:items.map(item=>({substrate:item.product?.label||'Otro',size:item.size,color:item.color,print_placement:item.placement,design_details:item.designDetails}))};const {data:order,error}=await supabase.from('orders').insert({user_id:null,source:'manual',status:'submitted',subtotal_clp:total,shipping_clp:0,discount_clp:0,total_clp:total,shipping_address:shippingAddress,price_snapshot:priceSnapshot,payment_instructions:hasPayment?paymentInstructions:null,submitted_at:now}).select('id').single();if(error){button.disabled=false;button.textContent='Ingresar a revisión';status.textContent=error.message;return}const orderItems=items.map(item=>({order_id:order.id,name_snapshot:`${item.product?.label||'Producto manual'} · ${item.size} · ${item.color} · ${item.detail}`,sku_snapshot:`MANUAL-${slugify(item.product?.id||'otro')}-${slugify(item.size)}`,print_sides:item.placement==='none'?'front':item.placement,quantity:item.quantity,unit_price_clp:item.unitPrice,line_total_clp:item.quantity*item.unitPrice})),{error:itemError}=await supabase.from('order_items').insert(orderItems);if(itemError){await supabase.from('orders').delete().eq('id',order.id);button.disabled=false;button.textContent='Ingresar a revisión';status.textContent=itemError.message;return}await supabase.from('order_status_history').insert({order_id:order.id,status:'submitted',note:'Pedido manual ingresado y dejado en revisión del panel.'});const {data:emailData,error:emailError}=await supabase.functions.invoke('send-order-email',{body:{orderId:order.id,paymentEmail:sendPaymentEmail,paymentInstructions:hasPayment?paymentInstructions:null}});form.closest('dialog').close();await refreshData(emailError||emailData?.error?'Pedido manual ingresado en revisión. Email pendiente de configuración.':sendPaymentEmail?'Pedido ingresado y datos de pago enviados.':'Pedido manual ingresado en revisión y email enviado.')}
@@ -1211,19 +1723,52 @@ function openManualTypeEditor(order){
   const updated=[...adminData.orders,...adminData.archivedRecent].find(item=>String(item.id)===String(order.id));
   if(updated)openOrderDetails(updated);
  };
- dialog.showModal();
- dialog.querySelector('select').focus();
+ showOrderDialog(dialog);
 }
-function openOrderDetails(order){const index=adminData.orders.findIndex(item=>String(item.id)===String(order.id));if(index<0)adminData.orders.push(order);else adminData.orders[index]=order;const dialog=root.querySelector('#order-dialog'),content=root.querySelector('#order-dialog-content');content.innerHTML=orderDetailMarkup(order);const actions=content.querySelector('.admin-order-dialog-actions');if(!order.archived_at&&(order.edit_pending_approval||order.order_edit_email_sent_at)){const status=document.createElement('section');status.className=`admin-order-edit-status${order.edit_pending_approval?' is-pending':' is-sent'}`;status.innerHTML=order.edit_pending_approval?`<strong>Edición pendiente</strong><span>Los cambios todavía no se han comunicado al cliente.</span>`:`<strong>Edición enviada al cliente</strong><span>Versión #${order.order_edit_version||1} · ${date(order.order_edit_email_sent_at)}</span>`;actions?.before(status)}const tools=content.querySelector('.admin-order-tools .admin-actions-popover');if(tools&&!order.archived_at){const edit=document.createElement('button');edit.type='button';edit.className='admin-secondary';edit.dataset.editOrder=order.id;edit.textContent=order.edit_pending_approval?'Comparar cambios':'Editar pedido';tools.prepend(edit);edit.onclick=()=>order.edit_pending_approval?openEditApproval(order):openOrderEditor(order)}dialog.showModal();installPaymentGate();content.querySelector('.dialog-close').onclick=()=>dialog.close();content.querySelector('[data-next-status]')?.addEventListener('click',event=>advanceOrder(event.currentTarget));content.querySelector('[data-print-order]')?.addEventListener('click',()=>printOrderLabel(order));content.querySelector('[data-resend-email]')?.addEventListener('click',event=>resendOrderEmail(event.currentTarget));content.querySelector('[data-archive-order]')?.addEventListener('click',event=>archiveOrder(event.currentTarget));content.querySelector('[data-restore-archived-order]')?.addEventListener('click',event=>restoreArchivedOrder(event.currentTarget));content.querySelector('[data-classify-manual-order]')?.addEventListener('click',()=>openManualTypeEditor(order))}
+function openOrderDetails(order){
+ const index=adminData.orders.findIndex(item=>String(item.id)===String(order.id));
+ if(index<0)adminData.orders.push(order);else adminData.orders[index]=order;
+ const dialog=root.querySelector('#order-dialog'),content=root.querySelector('#order-dialog-content');
+ content.dataset.orderId=order.id;
+ delete content.dataset.paymentEnhanced;
+ delete content.dataset.paymentGateInstalled;
+ delete content.dataset.paymentGateMode;
+ content.innerHTML=orderDetailMarkup(order);
+ installPaymentGate();
+ if(!order.archived_at)enhancePaymentDialog();
+ addTransferNoticeToPaymentDialog();
+ lockPendingOrderActions();
+ const actions={
+  '[data-next-status]':button=>advanceOrder(button),
+  '[data-edit-order]':()=>openOrderEditor(order),
+  '[data-review-order]':()=>openEditApproval(order),
+  '[data-quote-order]':()=>openQuoteEditor(order),
+  '[data-print-order]':()=>printOrderLabel(order),
+  '[data-resend-email]':resendOrderEmail,
+  '[data-approved-edit-email]':button=>openOrderEmailPreview(order,'edit',button),
+  '[data-rollback-order]':rollbackOrder,
+  '[data-archive-order]':archiveOrder,
+  '[data-restore-archived-order]':restoreArchivedOrder,
+  '[data-classify-manual-order]':()=>openManualTypeEditor(order)
+ };
+ for(const [selector,action] of Object.entries(actions)){
+   content.querySelector(selector)?.addEventListener('click',event=>{
+   const button=event.currentTarget;
+   if(!button.closest('[popover]'))button.focus({preventScroll:true});
+   action(button);
+  });
+ }
+ showOrderDialog(dialog);
+}
+
 function archiveHistoryRow(order){return `<article class="admin-archive-history-row"><div><strong>#${safe(order.id)} · ${safe(orderCustomerName(order))}</strong><span>Tipo: ${safe(orderTypeLabel(order))} · ${safe(orderStatusLabel(archivedOrderStatus(order),order))} · Archivado ${dateTime(order.archived_at)} · ${money(order.total_clp)}</span><span class="admin-payment-badge is-${orderPaymentState(order)}">${paymentStateLabels[orderPaymentState(order)]}</span></div><button type="button" class="admin-secondary" data-archive-order-id="${safe(order.id)}" aria-label="Ver pedido #${safe(order.id)}">Ver pedido</button></article>`}
 function wireArchiveHistory(){
  const dialog=root.querySelector('#archive-history-dialog');
  const list=dialog.querySelector('#archive-history-list');
  const filters=dialog.querySelector('#archive-history-filters');
  let requestId=0;
- root.querySelector('#open-archive-history')?.addEventListener('click',async()=>{
+ async function loadHistory(){
   const currentRequest=++requestId;
-  dialog.showModal();
   filters.hidden=true;
   list.innerHTML='<p class="admin-archive-history-message" role="status">Cargando historial…</p>';
   try{
@@ -1243,26 +1788,31 @@ function wireArchiveHistory(){
    filters.querySelectorAll('input,select').forEach(input=>input.value='');
    filters.hidden=false;
    const render=()=>{
-    const activeFilters=Array.from(filters.querySelectorAll('select, input[type=date]')).filter(field=>field.value).length;
-    updateAdminFilterCount(dialog,'archive-filter-options',activeFilters);
     const found=filterArchivedOrders(all,{query:filters.querySelector('#archive-search').value,status:statusSelect.value,payment:filters.querySelector('#archive-payment').value,from:filters.querySelector('#archive-from').value,to:filters.querySelector('#archive-to').value});
     list.innerHTML=`<p class="admin-archive-history-count" role="status">${found.length} de ${all.length} ${all.length===1?'pedido archivado':'pedidos archivados'}</p>${found.map(archiveHistoryRow).join('')||'<p class="admin-archive-history-message">No hay pedidos que coincidan con los filtros.</p>'}`;
    };
    filters.oninput=render;
-   filters.onchange=render;
    filters.querySelector('#archive-clear-filters').onclick=()=>{filters.querySelectorAll('input,select').forEach(input=>input.value='');render();filters.querySelector('#archive-search').focus()};
    render();
-   list.onclick=event=>{const button=event.target.closest('[data-archive-order-id]');if(!button)return;const order=all.find(item=>String(item.id)===button.dataset.archiveOrderId);if(!order)return;dialog.close();openOrderDetails(order)};
+   list.onclick=event=>{const button=event.target.closest('[data-archive-order-id]');if(!button)return;const order=all.find(item=>String(item.id)===button.dataset.archiveOrderId);if(!order)return;button.focus({preventScroll:true});openOrderDetails(order)};
   }catch(error){
    if(!dialog.isConnected||!dialog.open||requestId!==currentRequest)return;
    console.error('No pudimos cargar los pedidos archivados',error);
-   list.innerHTML='<p class="admin-archive-history-message" role="alert">No pudimos cargar el historial. Cierra y vuelve a abrir para reintentar.</p>';
+   list.innerHTML='<div class="admin-archive-history-message"><p role="alert">No pudimos cargar el historial.</p><button type="button" class="admin-secondary">Reintentar</button></div>';
+   list.querySelector('button').onclick=()=>{
+    dialog.querySelector('h2').focus({preventScroll:true});
+    loadHistory();
+   };
   }
+ }
+ root.querySelector('#open-archive-history')?.addEventListener('click',()=>{
+  showOrderDialog(dialog);
+  loadHistory();
  });
  dialog.querySelector('.dialog-close').onclick=()=>dialog.close();
  dialog.addEventListener('close',()=>requestId++);
 }
-function wireOrders(){root.querySelector('#export-orders').onclick=event=>exportAllOrders(event.currentTarget);root.querySelectorAll('[data-open-order]').forEach(button=>button.onclick=()=>{const order=[...adminData.orders,...adminData.archivedRecent].find(item=>String(item.id)===button.dataset.openOrder);if(order)openOrderDetails(order)});wireArchiveHistory();const manual=root.querySelector('#manual-order-dialog'),form=manual.querySelector('form'),items=root.querySelector('#manual-items');let nextManualItem=items.children.length;const setupItem=row=>{const productInput=row.querySelector('[name="item_product_type"]'),sizeInput=row.querySelector('[name="item_size"]');productInput.onchange=()=>{const product=manualProductOptions.find(item=>item.id===productInput.value);sizeInput.innerHTML=(product?.sizes||[]).map(size=>`<option value="${size}">${size}</option>`).join('')};row.querySelector('[data-remove-item]')?.addEventListener('click',()=>{row.remove();const remaining=[...items.children];remaining.forEach((item,index)=>{item.querySelector('strong').textContent=`Producto ${index+1}`;item.querySelector('[data-remove-item]').hidden=remaining.length===1})})};setupAdminRegionFilter(manual.querySelector('#manual-order-region'));setupItem(items.firstElementChild);root.querySelector('#new-manual-order').onclick=()=>{installManualChannelField();manual.showModal();mountAdminOrderDisclosure(form,'manual')};manual.querySelector('.dialog-close').onclick=()=>manual.close();manual.querySelector('.dialog-cancel').onclick=()=>manual.close();root.querySelector('#add-manual-item').onclick=()=>{const row=document.createElement('div');row.innerHTML=manualItemMarkup(nextManualItem++);const item=row.firstElementChild;items.append(item);setupItem(item)};form.onsubmit=submitManualOrder}
+function wireOrders(){root.querySelector('#export-orders').onclick=event=>exportAllOrders(event.currentTarget);root.querySelectorAll('[data-open-order]').forEach(button=>button.onclick=()=>{const order=[...adminData.orders,...adminData.archivedRecent].find(item=>String(item.id)===button.dataset.openOrder);if(order){button.focus({preventScroll:true});openOrderDetails(order)}});wireArchiveHistory();const manual=root.querySelector('#manual-order-dialog'),form=manual.querySelector('form'),items=root.querySelector('#manual-items');let nextManualItem=items.children.length;const setupItem=row=>{const productInput=row.querySelector('[name="item_product_type"]'),sizeInput=row.querySelector('[name="item_size"]');productInput.onchange=()=>{const product=manualProductOptions.find(item=>item.id===productInput.value);sizeInput.innerHTML=(product?.sizes||[]).map(size=>`<option value="${size}">${size}</option>`).join('')};row.querySelector('[data-remove-item]')?.addEventListener('click',()=>{row.remove();const remaining=[...items.children];remaining.forEach((item,index)=>{item.querySelector('strong').textContent=`Producto ${index+1}`;item.querySelector('[data-remove-item]').hidden=remaining.length===1})})};setupAdminRegionFilter(manual.querySelector('#manual-order-region'));setupItem(items.firstElementChild);root.querySelector('#new-manual-order').onclick=()=>{installManualChannelField();mountAdminOrderDisclosure(form,'manual');showOrderDialog(manual)};manual.querySelector('.dialog-close').onclick=()=>manual.close();manual.querySelector('.dialog-cancel').onclick=()=>manual.close();root.querySelector('#add-manual-item').onclick=()=>{const row=document.createElement('div');row.innerHTML=manualItemMarkup(nextManualItem++);const item=row.firstElementChild;items.append(item);setupItem(item)};form.onsubmit=submitManualOrder}
 
 function supplierModels(){const models=new Map([['basic',{code:'basic',name:'Polera básica'}],['woman',{code:'woman',name:'Polera mujer'}],['over',{code:'over',name:'Polera oversize'}],['kid',{code:'kid',name:'Polera niño'}],['body',{code:'body',name:'Body bebé'}]]);for(const variant of adminData.variants){const model=Array.isArray(variant.product_models)?variant.product_models[0]:variant.product_models;if(model?.code)models.set(model.code,model)}return [...models.values()]}
 function supplierNumber(form,name,fallback=0){const value=Number(form.elements[name]?.value);return Number.isFinite(value)?Math.max(0,value):fallback}
@@ -1461,13 +2011,31 @@ function settingsView(){
 function wireStoreSettings(){return bindStoreSettings({root,adminData,supabase,catalogMockupPhoto,collectionName})}
 function wireAdminNotifications(){return bindAdminNotifications({root,supabase})}
 
-function plannedView(route){const label=routes.find(([id])=>id===route)?.[2]||'Sección';const service=route==='servicio-cliente',description=service?'Aquí se centralizarán los incidentes posteriores a un pedido terminado, su detalle, compensación y el envío de encuesta de satisfacción.':'La estructura ya está preparada. Activaremos esta vista en una siguiente etapa sin mezclarla con el trabajo actual.',body=service?'Los pedidos que requieran atención después del cierre operativo aparecerán aquí. Por ahora, el seguimiento de pedidos se mantiene en Pedidos.':'Por ahora puedes trabajar en Resumen, Catálogo y Pedidos.';const content=`${pageHeading('PRÓXIMA ETAPA',`${label}.`,description)}<section class="admin-panel admin-empty"><strong>${label} todavía no está habilitado.</strong><p>${body}</p><a class="admin-secondary" href="#${service?'pedidos':'resumen'}">${service?'Ir a pedidos':'Volver al resumen'}</a></section>`;shell(content,route)}
+function plannedView(route){const label=routes.find(([id])=>id===route)?.[2]||'Sección';const content=`${pageHeading('PRÓXIMA ETAPA',`${label}.`,'La estructura ya está preparada. Activaremos esta vista en una siguiente etapa sin mezclarla con el trabajo actual.')}<section class="admin-panel admin-empty"><strong>${label} todavía no está habilitada.</strong><p>Por ahora puedes trabajar en Resumen, Catálogo y Pedidos.</p><a class="admin-secondary" href="#resumen">Volver al resumen</a></section>`;shell(content,route)}
+function customerServiceView(){
+ renderCustomerService({
+  root,shell,pageHeading,supabase,toast,
+  localOrders:import.meta.env.DEV?readLocalOrders():[],
+  async openOrder(id){
+   if(id.startsWith('LOCAL-')){
+    const order=readLocalOrders().find(item=>String(item.id)===id);
+    if(order&&root.querySelector('#service-panel'))openOrderDetails(order);
+    return;
+   }
+   const {data,error}=await supabase.from('orders').select(ADMIN_ORDER_SELECT).eq('id',id).maybeSingle();
+   if(!root.querySelector('#service-panel'))return;
+   if(error||!data){toast('No pudimos abrir el pedido. Intenta nuevamente.');return}
+   openOrderDetails(data);
+  },
+  previewEmail:order=>openOrderEmailPreview(order,'survey'),
+ });
+}
 let customerAccounts=[];
 async function loadCustomerAccounts(){const {data,error}=await supabase.functions.invoke('admin-customer-accounts',{body:{action:'list'}});if(error||data?.error)throw new Error(data?.error||error?.message||'No pudimos cargar las cuentas.');customerAccounts=data.accounts||[]}
 function customersView(){const rows=customerAccounts.filter(account=>account.id!==sessionUser.id).map(account=>`<tr data-admin-searchable="${safe(`${account.email} ${account.full_name} ${account.phone}`.toLowerCase())}"><td><strong>${safe(account.full_name||'Sin nombre')}</strong><small>${safe(account.email)}</small></td><td>${safe(account.phone||'Sin teléfono')}</td><td>${date(account.created_at)}</td><td>${account.last_sign_in_at?date(account.last_sign_in_at):'Nunca'}</td><td><button type="button" class="admin-secondary admin-danger-link" data-delete-account="${safe(account.id)}">Eliminar cuenta</button></td></tr>`).join('');const content=`${pageHeading('CUENTAS','Clientes.','Elimina una cuenta y todos sus datos, incluyendo pedidos, diseños guardados y perfil.')}${rows?`<section class="admin-panel admin-list-panel" aria-label="Clientes">${listSearch('Buscar cliente','Nombre, correo o teléfono')}<div class="admin-table-wrap"><table class="admin-table admin-customers-table"><thead><tr><th>Cliente</th><th>Teléfono</th><th>Registro</th><th>Último acceso</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>${searchEmpty}</section>`:'<section class="admin-panel admin-empty"><strong>No hay cuentas de clientes.</strong><p>Las cuentas nuevas aparecerán aquí.</p></section>'}<dialog class="admin-dialog admin-confirm-dialog" id="delete-account-dialog"><form method="dialog"><div class="dialog-title"><div><span class="admin-eyebrow">ACCIÓN PERMANENTE</span><h2>Eliminar cuenta</h2></div><button type="button" class="dialog-close" data-delete-account-cancel aria-label="Cerrar">×</button></div><p>Eliminarás <strong data-delete-account-email></strong> y todos sus datos: perfil, pedidos, pagos, carro y archivos guardados. Esta acción no se puede deshacer.</p><input type="hidden" name="user_id"><div class="dialog-actions"><button type="button" class="admin-secondary" data-delete-account-cancel>Cancelar</button><button type="submit" class="admin-danger">Eliminar todo</button></div><p class="admin-form-status" role="alert"></p></form></dialog>`;shell(content,'clientes');wireCustomers();filterCurrentView('')}
 function wireCustomers(){const dialog=root.querySelector('#delete-account-dialog'),form=dialog.querySelector('form');root.querySelectorAll('[data-delete-account]').forEach(button=>button.onclick=()=>{const account=customerAccounts.find(item=>item.id===button.dataset.deleteAccount);if(!account)return;form.elements.user_id.value=account.id;dialog.querySelector('[data-delete-account-email]').textContent=account.email;dialog.showModal();dialog.querySelector('[data-delete-account-cancel]').focus()});dialog.querySelectorAll('[data-delete-account-cancel]').forEach(button=>button.onclick=()=>dialog.close());form.onsubmit=async event=>{event.preventDefault();const button=event.submitter,status=form.querySelector('.admin-form-status'),userId=form.elements.user_id.value;button.disabled=true;button.textContent='Eliminando…';const {data,error}=await supabase.functions.invoke('admin-customer-accounts',{body:{action:'delete',userId}});if(error||data?.error){button.disabled=false;button.textContent='Eliminar todo';status.textContent=data?.error||error?.message||'No pudimos eliminar la cuenta.';return}dialog.close();await refreshCustomers(`Cuenta eliminada · ${data.orders} pedidos y ${data.files} archivos borrados.`)}}
 async function refreshCustomers(message=''){try{await loadCustomerAccounts();customersView();if(message)toast(message)}catch(error){toast(error.message)}}
-function render(){const route=currentRoute();if(route==='resumen')summaryView();else if(route==='productos')productsView();else if(route==='categorias')categoriesView();else if(route==='colecciones')collectionsView();else if(route==='tallas')sizesView();else if(route==='disenos')designsView();else if(route==='pedidos')ordersView();else if(route==='inventario')inventoryView();else if(route==='insumos')renderSupplierProducts({root,adminData,supabase,icon,refreshData,toast,models:supplierModels(),shell});else if(route==='precios')pricesView();else if(route==='cupones')couponsView();else if(route==='clientes')customersView();else if(route==='configuracion')settingsView();else plannedView(route)}
+function render(){const route=currentRoute();if(route==='resumen')summaryView();else if(route==='productos')productsView();else if(route==='categorias')categoriesView();else if(route==='colecciones')collectionsView();else if(route==='tallas')sizesView();else if(route==='disenos')designsView();else if(route==='pedidos')ordersView();else if(route==='inventario')inventoryView();else if(route==='insumos')renderSupplierProducts({root,adminData,supabase,icon,refreshData,toast,models:supplierModels(),shell});else if(route==='precios')pricesView();else if(route==='cupones')couponsView();else if(route==='servicio-cliente')customerServiceView();else if(route==='clientes')customersView();else if(route==='configuracion')settingsView();else plannedView(route)}
 async function requestCatalogRebuild(){
  if(import.meta.env.DEV)return {queued:false,local:true};
  const {data:{session}}=await supabase.auth.getSession();
@@ -1505,7 +2073,7 @@ async function refreshData(message,catalogChanged=false){
  try{const rebuild=await requestCatalogRebuild();if(rebuild.queued)toast('Cambio guardado · actualizando páginas SEO.');}
  catch(error){console.error(error);toast('Cambio guardado · publicación SEO pendiente.');}
 }
-function watchNewOrders(){if(adminOrdersChannel)supabase.removeChannel(adminOrdersChannel);let refreshing=false;const refreshFromPayment=async message=>{if(refreshing)return;refreshing=true;try{await refreshData(message)}finally{refreshing=false}};adminOrdersChannel=supabase.channel('admin-orders-and-payments').on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'},()=>refreshFromPayment('Llegó un nuevo pedido.')).on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'},()=>refreshFromPayment('El estado de un pedido se actualizó.')).on('postgres_changes',{event:'INSERT',schema:'public',table:'payments'},()=>refreshFromPayment('Se registró un pago.')).on('postgres_changes',{event:'UPDATE',schema:'public',table:'payments'},()=>refreshFromPayment('El estado de un pago se actualizó.')).subscribe()}
+function watchNewOrders(){if(adminOrdersChannel)supabase.removeChannel(adminOrdersChannel);let refreshing=false;const refreshFromPayment=async message=>{if(refreshing||(currentRoute()==='servicio-cliente'&&root.querySelector('dialog[open]')))return;refreshing=true;try{await refreshData(message)}finally{refreshing=false}};adminOrdersChannel=supabase.channel('admin-orders-and-payments').on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'},()=>refreshFromPayment('Llegó un nuevo pedido.')).on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'},()=>refreshFromPayment('El estado de un pedido se actualizó.')).on('postgres_changes',{event:'INSERT',schema:'public',table:'payments'},()=>refreshFromPayment('Se registró un pago.')).on('postgres_changes',{event:'UPDATE',schema:'public',table:'payments'},()=>refreshFromPayment('El estado de un pago se actualizó.')).subscribe()}
 function scrollToConfigurationSection(){
  const anchor=location.hash.slice(1);
  if(!configurationAnchors.has(anchor))return false;
@@ -1528,49 +2096,23 @@ window.addEventListener('hashchange',async()=>{
  if(!scrollToConfigurationSection())focusPageHeading();
 });
 boot();
-root.addEventListener('click',event=>{const button=event.target.closest('[data-reject-edit]');if(!button||button.dataset.rejectEdit)return;button.dataset.rejectEdit=button.closest('dialog')?.textContent.match(/PEDIDO #([^\s·]+)/)?.[1]||''},true);
-root.addEventListener('click',event=>{const button=event.target.closest('[data-edit-order]');if(!button)return;const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.editOrder));button.closest('#order-dialog')?.close();event.preventDefault();event.stopImmediatePropagation();setTimeout(()=>{if(order){if(order.edit_pending_approval)openEditApproval(order);else openOrderEditor(order)}},0)},true);
-function compactOrderHistory(){}
-const orderHistoryObserver=new MutationObserver(compactOrderHistory);orderHistoryObserver.observe(root,{childList:true,subtree:true});
-async function rollbackOrder(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.rollbackOrder));if(!order||order.edit_pending_approval)return;if(!window.confirm(`¿Devolver el pedido #${order.id} a “Pedido ingresado”?`))return;button.disabled=true;button.textContent='Devolviendo…';if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){const now=new Date().toISOString();local.status='paid';local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status:'paid',note:'Pedido devuelto a Pedido ingresado.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData('Pedido devuelto a Pedido ingresado.');return}}const {data,error}=await supabase.functions.invoke('update-order-status',{body:{orderId:order.id,status:'paid',rollback:true}});if(error||data?.error){button.disabled=false;button.textContent='Volver a ingresado';toast(data?.error||error?.message||'No pudimos devolver el pedido.');return}await refreshData('Pedido devuelto a Pedido ingresado.')}
-async function archiveOrder(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.archiveOrder));if(!order||order.archived_at)return;if(!window.confirm(`¿Archivar el pedido #${order.id}? El cliente no recibirá ninguna notificación.`))return;button.disabled=true;button.setAttribute('aria-busy','true');const now=new Date().toISOString();if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){local.archived_at=now;local.archived_by=sessionUser?.id||null;local.archived_from_status=local.status;local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status:local.status,note:'Pedido archivado por administración. No se notificó al cliente.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData('Pedido archivado sin notificar al cliente.');return}}const {data:archived,error}=await supabase.from('orders').update({archived_at:now,archived_by:sessionUser?.id||null,archived_from_status:order.status,updated_at:now}).eq('id',order.id).is('archived_at',null).select('id,archived_at').maybeSingle();if(error){button.disabled=false;button.removeAttribute('aria-busy');toast(`No pudimos archivar el pedido: ${error.message}`);return}if(!archived){button.disabled=false;button.removeAttribute('aria-busy');toast('El pedido ya fue archivado o cambió en otra sesión. Actualiza el panel e inténtalo nuevamente.');return}const {error:historyError}=await supabase.from('order_status_history').insert({order_id:order.id,status:order.status,note:'Pedido archivado por administración. No se notificó al cliente.'});if(historyError){console.error('No se pudo registrar el historial del archivado',historyError);toast('Pedido archivado. No se pudo registrar el detalle en el historial.')}await refreshData('Pedido archivado sin notificar al cliente.')}
-async function restoreArchivedOrder(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.restoreArchivedOrder));if(!order?.archived_at)return;const previous=order.archived_from_status||'paid';if(!window.confirm(`¿Restaurar el pedido #${order.id} a “${orderStatusLabel(previous,order)}”?`))return;button.disabled=true;button.textContent='Restaurando…';const now=new Date().toISOString();if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){local.status=previous;local.archived_at=null;local.archived_by=null;local.archived_from_status=null;local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status:previous,note:'Pedido restaurado desde Archivado por administración.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData('Pedido restaurado a su estado anterior.');return}}const {error}=await supabase.from('orders').update({status:previous,archived_at:null,archived_by:null,archived_from_status:null,updated_at:now}).eq('id',order.id).not('archived_at','is',null);if(error){button.disabled=false;button.textContent='Restaurar pedido';toast(error.message);return}await supabase.from('order_status_history').insert({order_id:order.id,status:previous,note:'Pedido restaurado desde Archivado por administración.'});await refreshData('Pedido restaurado a su estado anterior.')}
-function addRollbackOrderAction(){const content=root.querySelector('#order-dialog-content');if(!content||content.querySelector('[data-rollback-order]'))return;const match=content.textContent.match(/PEDIDO #([^\s·]+)/),order=match&&adminData.orders.find(item=>String(item.id)===match[1]),progress=content.querySelector('.admin-order-progress-actions>div');if(!order||!progress||order.edit_pending_approval||['paid','submitted','draft','delivered','cancelled'].includes(order.status))return;const button=document.createElement('button');button.type='button';button.className='admin-secondary';button.dataset.rollbackOrder=order.id;button.textContent='Volver a ingresado';button.title='Regresar el pedido a Pedido ingresado';button.addEventListener('click',event=>rollbackOrder(event.currentTarget));progress.prepend(button)}
-const rollbackOrderObserver=new MutationObserver(addRollbackOrderAction);rollbackOrderObserver.observe(root,{childList:true,subtree:true});
+async function rollbackOrder(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.rollbackOrder));if(!order||order.edit_pending_approval)return;if(!await confirmOrderAction(root,{orderId:order.id,title:'Volver a Pedido ingresado',message:'El pedido regresará a la columna Pedido ingresado del tablero.',action:'Devolver pedido'}))return;button.disabled=true;button.textContent='Devolviendo…';if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){const now=new Date().toISOString();local.status='paid';local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status:'paid',note:'Pedido devuelto a Pedido ingresado.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData('Pedido devuelto a Pedido ingresado.');return}}const {data,error}=await supabase.functions.invoke('update-order-status',{body:{orderId:order.id,status:'paid',rollback:true}});if(error||data?.error){button.disabled=false;button.textContent='Volver a ingresado';toast(data?.error||error?.message||'No pudimos devolver el pedido.');return}await refreshData('Pedido devuelto a Pedido ingresado.')}
+async function archiveOrder(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.archiveOrder));if(!order||order.archived_at)return;if(!await confirmOrderAction(root,{orderId:order.id,title:'Archivar pedido',message:'El pedido pasará al historial de archivados. El cliente no recibirá una notificación.',action:'Archivar pedido'}))return;button.disabled=true;button.setAttribute('aria-busy','true');const now=new Date().toISOString();if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){local.archived_at=now;local.archived_by=sessionUser?.id||null;local.archived_from_status=local.status;local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status:local.status,note:'Pedido archivado por administración. No se notificó al cliente.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData('Pedido archivado sin notificar al cliente.');return}}const {data:archived,error}=await supabase.from('orders').update({archived_at:now,archived_by:sessionUser?.id||null,archived_from_status:order.status,updated_at:now}).eq('id',order.id).is('archived_at',null).select('id,archived_at').maybeSingle();if(error){button.disabled=false;button.removeAttribute('aria-busy');toast(`No pudimos archivar el pedido: ${error.message}`);return}if(!archived){button.disabled=false;button.removeAttribute('aria-busy');toast('El pedido ya fue archivado o cambió en otra sesión. Actualiza el panel e inténtalo nuevamente.');return}const {error:historyError}=await supabase.from('order_status_history').insert({order_id:order.id,status:order.status,note:'Pedido archivado por administración. No se notificó al cliente.'});if(historyError){console.error('No se pudo registrar el historial del archivado',historyError);toast('Pedido archivado. No se pudo registrar el detalle en el historial.')}await refreshData('Pedido archivado sin notificar al cliente.')}
+async function restoreArchivedOrder(button){const order=adminData.orders.find(item=>String(item.id)===String(button.dataset.restoreArchivedOrder));if(!order?.archived_at)return;const previous=order.archived_from_status||'paid';if(!await confirmOrderAction(root,{orderId:order.id,title:'Restaurar pedido',message:`El pedido volverá a «${orderStatusLabel(previous,order)}».`,action:'Restaurar pedido'}))return;button.disabled=true;button.textContent='Restaurando…';const now=new Date().toISOString();if(import.meta.env.DEV&&String(order.id).startsWith('LOCAL-')){const orders=readLocalOrders(),local=orders.find(item=>item.id===order.id);if(local){local.status=previous;local.archived_at=null;local.archived_by=null;local.archived_from_status=null;local.order_status_history=[...(local.order_status_history||[]),{id:`${order.id}-${now}`,status:previous,note:'Pedido restaurado desde Archivado por administración.',created_at:now}];localStorage.setItem(LOCAL_DEMO_ORDERS_KEY,JSON.stringify(orders));await refreshData('Pedido restaurado a su estado anterior.');return}}const {error}=await supabase.from('orders').update({status:previous,archived_at:null,archived_by:null,archived_from_status:null,updated_at:now}).eq('id',order.id).not('archived_at','is',null);if(error){button.disabled=false;button.textContent='Restaurar pedido';toast(error.message);return}await supabase.from('order_status_history').insert({order_id:order.id,status:previous,note:'Pedido restaurado desde Archivado por administración.'});await refreshData('Pedido restaurado a su estado anterior.')}
 function normalizePaymentToggleCopy(){root.querySelectorAll('.admin-payment-toggle').forEach(toggle=>{const input=toggle.querySelector('input[data-confirm-payment]'),strong=toggle.querySelector('strong');if(!input||!strong)return;const label=input.checked?'Pago confirmado':'Confirmar pago';if(strong.textContent!==label)strong.textContent=label})}
 root.addEventListener('change',event=>{if(event.target.matches('.admin-payment-toggle input[data-confirm-payment]'))normalizePaymentToggleCopy()});
 const paymentToggleCopyObserver=new MutationObserver(normalizePaymentToggleCopy);paymentToggleCopyObserver.observe(root,{childList:true,subtree:true});
-const rejectEditIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-function organizeEditApprovalActions(){const dialog=root.querySelector('#edit-approval-dialog'),actions=dialog?.querySelector('.admin-edit-approval-actions');if(!actions)return;let tools=actions.querySelector('.admin-edit-approval-tools'),notification=actions.querySelector('.admin-edit-approval-notification'),main=actions.querySelector('.admin-edit-approval-main-actions'),edit=actions.querySelector('[data-edit-again]'),reject=actions.querySelector('[data-reject-edit]'),approve=actions.querySelector('[data-approve-edit]');if(!tools){tools=document.createElement('div');tools.className='admin-order-action-group admin-order-tools admin-edit-approval-tools';tools.innerHTML='<span class="admin-order-action-label">Herramientas</span><div></div>';actions.prepend(tools)}if(!notification){notification=document.createElement('div');notification.className='admin-order-action-group admin-edit-approval-notification';notification.innerHTML='<span class="admin-order-action-label">Notificación</span><div></div>';tools.after(notification)}if(!main){main=document.createElement('div');main.className='admin-order-action-group admin-order-progress-actions admin-edit-approval-main-actions';main.innerHTML='<span class="admin-order-action-label">Siguiente paso</span><div></div>';actions.append(main)}const toolButtons=tools.querySelector('div'),notificationControl=notification.querySelector('div'),mainButtons=main.querySelector('div');if(edit&&edit.parentElement!==toolButtons){edit.classList.add('admin-icon-action');edit.title='Volver a editar';edit.setAttribute('aria-label','Volver a editar');edit.innerHTML=`${orderToolIcons.edit}<span>Volver a editar</span>`;toolButtons.append(edit)}if(reject&&reject.parentElement!==toolButtons){reject.classList.remove('admin-danger');reject.classList.add('admin-secondary','admin-icon-action','admin-reject-icon-action');reject.title='Rechazar cambios';reject.setAttribute('aria-label','Rechazar cambios');reject.innerHTML=`${rejectEditIcon}<span>Rechazar cambios</span>`;toolButtons.append(reject)}if(approve&&approve.parentElement!==mainButtons)mainButtons.append(approve);const toggle=actions.querySelector('[data-send-edit-email-toggle]')?.closest('.admin-edit-email-toggle');if(toggle&&toggle.parentElement!==notificationControl)notificationControl.append(toggle)}
-function normalizeEditApprovalToggle(){const label=root.querySelector('#edit-approval-dialog .admin-edit-email-toggle strong');if(label&&label.textContent!=='Enviar email')label.textContent='Enviar email'}
-const editApprovalActionsObserver=new MutationObserver(()=>{organizeEditApprovalActions();normalizeEditApprovalToggle()});editApprovalActionsObserver.observe(root,{childList:true,subtree:true});
-function repairPaymentGate(){const content=root.querySelector('#order-dialog-content');if(!shouldRepairPaymentGate(content))return;delete content.dataset.paymentGateInstalled;installPaymentGate();lockPendingOrderActions();normalizePaymentToggleCopy()}
-const paymentGateRepairObserver=new MutationObserver(repairPaymentGate);paymentGateRepairObserver.observe(root,{childList:true,subtree:true});
-function organizeEditOrderActions(){const dialog=root.querySelector('#edit-order-dialog'),actions=dialog?.querySelector('.dialog-actions'),cancel=actions?.querySelector('.dialog-cancel'),save=actions?.querySelector('button[type="submit"]'),status=dialog?.querySelector('.admin-form-status');if(!actions||!cancel||!save)return;if(status&&status.nextElementSibling!==actions)actions.before(status);actions.classList.add('admin-edit-order-actions');if(actions.dataset.simpleActions)return;actions.dataset.simpleActions='true';cancel.className='admin-secondary dialog-cancel';cancel.textContent='Cancelar';cancel.removeAttribute('title');cancel.removeAttribute('aria-label');delete cancel.dataset.tooltip;actions.replaceChildren(cancel,save)}
-const editOrderActionsObserver=new MutationObserver(organizeEditOrderActions);editOrderActionsObserver.observe(root,{childList:true,subtree:true});
-const orderSubdialogIds=new Set(['edit-order-dialog','edit-approval-dialog','order-email-preview-dialog','order-status-email-preview-dialog','payment-instructions-dialog','payment-auth-dialog']);
-const backToOrderIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
-function reopenOrderFromBoard(orderId){const trigger=[...root.querySelectorAll('[data-open-order]')].find(button=>String(button.dataset.openOrder)===String(orderId));trigger?.click()}
-function addOrderSubdialogBackButtons(){orderSubdialogIds.forEach(id=>{const dialog=root.querySelector(`#${id}`),header=dialog?.querySelector('.dialog-title');if(!dialog||!header||header.querySelector('.admin-dialog-back'))return;const orderId=dialog.dataset.orderId||header.textContent.match(/PEDIDO #([^\s·]+)/)?.[1]||root.querySelector('#order-dialog-content')?.textContent.match(/PEDIDO #([^\s·]+)/)?.[1];if(orderId)dialog.dataset.orderId=orderId;const button=document.createElement('button');button.type='button';button.className='admin-dialog-back';button.title='Volver al pedido';button.setAttribute('aria-label','Volver al pedido');button.innerHTML=`${backToOrderIcon}<span>Volver</span>`;button.addEventListener('click',()=>{const hasOpenParent=[...root.querySelectorAll('dialog[open]')].some(candidate=>candidate!==dialog);dialog.close();if(!hasOpenParent&&dialog.dataset.orderId)setTimeout(()=>reopenOrderFromBoard(dialog.dataset.orderId),0)});header.prepend(button)})}
-const orderSubdialogBackObserver=new MutationObserver(addOrderSubdialogBackButtons);orderSubdialogBackObserver.observe(root,{childList:true,subtree:true});
 function installAdminIconTooltips(){root.querySelectorAll('.admin-icon-action[aria-label]').forEach(control=>{control.dataset.tooltip=control.getAttribute('aria-label')})}
 const adminIconTooltipObserver=new MutationObserver(installAdminIconTooltips);adminIconTooltipObserver.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-label']});installAdminIconTooltips();
 root.addEventListener('click',event=>{const button=event.target.closest('[data-open-order]');if(button)rememberOpenedOrder(button.dataset.openOrder)},true);
 
-root.addEventListener('click',event=>{
- const trigger=event.target.closest('[data-open-order]');if(!trigger)return;
- setTimeout(()=>{
-  const order=adminData?.orders.find(item=>String(item.id)===String(trigger.dataset.openOrder)),content=root.querySelector('#order-dialog-content');
-  if(!order||!content||content.querySelector('.admin-order-traceability'))return;
-  const markup=orderTraceabilityMarkup(order);if(!markup)return;
-  content.querySelector('.admin-order-progress')?.insertAdjacentHTML('afterend',markup);
- },0);
-},true);
-
 function technicalReviewMarkup(order){
  const items=order.order_items||[],required=items.filter(item=>item.quality_review).length,archived=Boolean(order.archived_at);
- const summary=required?`${required} ${required===1?'producto requiere':'productos requieren'} revisión antes de producir.`:'No hay productos marcados para revisión técnica.';
- return `<section class="admin-technical-review" data-technical-review aria-labelledby="technical-review-${safe(order.id)}"><div><span class="admin-eyebrow">ANTES DE PRODUCIR</span><h3 id="technical-review-${safe(order.id)}">Revisión técnica</h3><p>${safe(summary)}</p></div><div class="admin-technical-review-status"><strong>${required?`${required} pendiente${required===1?'':'s'}`:'Sin revisión pendiente'}</strong>${archived?'<small>Pedido archivado</small>':`<button type="button" class="admin-secondary" data-edit-technical-review="${safe(order.id)}">Editar revisión</button>`}</div></section>`;
+ const summary=required?`${required} ${required===1?'producto pendiente':'productos pendientes'} antes de producir`:'Sin revisión pendiente';
+ return `<section class="admin-technical-review" data-technical-review>
+  <div><h3>Revisión técnica</h3><p>${safe(summary)}</p></div>
+  ${!archived&&items.length?`<button type="button" class="admin-secondary" data-edit-technical-review="${safe(order.id)}">Editar revisión</button>`:''}
+ </section>`;
 }
 function technicalReviewDialogMarkup(order){
  const items=order.order_items||[];
@@ -1602,22 +2144,13 @@ function openTechnicalReviewEditor(order){
   await refreshData('Revisión técnica guardada antes de producción.');
  };
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
- dialog.showModal();
+ showOrderDialog(dialog);
 }
-root.addEventListener('click',event=>{
- const trigger=event.target.closest('[data-open-order]');
- if(!trigger)return;
- setTimeout(()=>{
-  const order=adminData?.orders.find(item=>String(item.id)===String(trigger.dataset.openOrder)),content=root.querySelector('#order-dialog-content');
-  if(!order||!content||content.querySelector('[data-technical-review]'))return;
-  content.querySelector('.admin-order-progress')?.insertAdjacentHTML('afterend',technicalReviewMarkup(order));
- },0);
-},true);
 root.addEventListener('click',event=>{
  const trigger=event.target.closest('[data-edit-technical-review]');
  if(!trigger)return;
  const order=adminData?.orders.find(item=>String(item.id)===String(trigger.dataset.editTechnicalReview));
- if(order)openTechnicalReviewEditor(order);
+ if(order){trigger.focus({preventScroll:true});openTechnicalReviewEditor(order)}
 });
 
 function orderPrintAssetUrl(path){
@@ -1645,13 +2178,13 @@ root.addEventListener('click',async event=>{
 function openQuoteEditor(order){
  root.querySelector('#quote-editor-dialog')?.remove();
  const dialog=document.createElement('dialog');dialog.id='quote-editor-dialog';dialog.className='admin-dialog';
- dialog.innerHTML=`<form><div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · COTIZACIÓN</span><h2>Responder cotización</h2><p>Guarda el detalle y valor de la propuesta para el cliente.</p></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><fieldset class="admin-form-section"><legend>Respuesta al cliente</legend><label>Detalle de la propuesta<textarea name="quote_message" rows="7" required placeholder="Ej. Incluye diseño de una tinta al frente, dos rondas de cambios y preparación para impresión.">${safe(order.quote_message||'')}</textarea></label><label>Valor total de la propuesta<input name="quoted_total_clp" type="number" min="1" step="1" required value="${Number(order.quoted_total_clp||order.total_clp||0)||''}"><small>Valor en pesos chilenos. Incluye el despacho acordado, si corresponde. Explica la entrega en el detalle.</small></label></fieldset><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Guardar cotización</button></div><p class="admin-form-status" role="alert"></p></form>`;
+ dialog.innerHTML=`<form><div class="dialog-title"><div><span class="admin-eyebrow">PEDIDO #${safe(order.id)} · COTIZACIÓN</span><h2>${order.status==='quoted'?'Editar cotización':'Responder cotización'}</h2></div><button type="button" class="dialog-close" aria-label="Cerrar">×</button></div><fieldset class="admin-form-section"><legend>Propuesta para el cliente</legend><label>Detalle de la propuesta<textarea name="quote_message" rows="7" required placeholder="Ej. Incluye diseño de una tinta al frente, dos rondas de cambios y preparación para impresión.">${safe(order.quote_message||'')}</textarea></label><label>Valor total de la propuesta<input name="quoted_total_clp" type="number" min="1" step="1" required value="${Number(order.quoted_total_clp||order.total_clp||0)||''}"><small>Valor en pesos chilenos. Incluye el despacho acordado, si corresponde. Explica la entrega en el detalle.</small></label></fieldset><div class="dialog-actions"><button type="button" class="admin-secondary dialog-cancel">Cancelar</button><button type="submit" class="admin-primary">Guardar cotización</button></div><p class="admin-form-status" role="alert"></p></form>`;
  root.append(dialog);const form=dialog.querySelector('form'),close=()=>{dialog.close();dialog.remove()};dialog.querySelector('.dialog-close').onclick=close;dialog.querySelector('.dialog-cancel').onclick=close;
  form.onsubmit=async event=>{event.preventDefault();const button=event.submitter,status=form.querySelector('.admin-form-status'),message=String(form.elements.quote_message.value||'').trim(),total=Math.round(Number(form.elements.quoted_total_clp.value));if(!message||!Number.isFinite(total)||total<=0){status.textContent='Completa el detalle y un valor válido.';return}button.disabled=true;button.textContent='Guardando…';const now=new Date().toISOString();const {data:{user}}=await supabase.auth.getUser();const {data:updatedQuote,error}=await supabase.from('orders').update({status:'quoted',quote_message:message,quoted_total_clp:total,quoted_at:now,quoted_by:user?.id||null,subtotal_clp:total,shipping_clp:0,discount_clp:0,total_clp:total,updated_at:now,price_snapshot:{...(order.price_snapshot||{}),quote_message:message,quoted_total_clp:total,quote_pending:false}}).eq('id',order.id).eq('request_type','creative').in('status',['submitted','quoted']).select('id').maybeSingle();if(error||!updatedQuote){button.disabled=false;button.textContent='Guardar cotización';status.textContent=error?.message||'La solicitud cambió. Actualiza el panel antes de cotizar.';return}const item=order.order_items?.[0];if(item){const updated=await supabase.from('order_items').update({name_snapshot:'Diseño personalizado cotizado',unit_price_clp:total,line_total_clp:total}).eq('id',item.id);if(updated.error){button.disabled=false;button.textContent='Guardar cotización';status.textContent='La cotización se guardó, pero el detalle falló. Vuelve a guardar para reintentar.';return}}if(order.status==='quoted')await supabase.from('order_status_history').insert({order_id:order.id,status:'quoted',note:`Cotización actualizada a ${money(total)}.`});const {data:emailData,error:emailError}=await supabase.functions.invoke('send-order-email',{body:{orderId:order.id,resend:true}});close();await refreshData(emailError||emailData?.error||!emailData?.email?.sent?'Cotización guardada. El correo no salió; abre el pedido para reenviarlo.':'Cotización guardada y enviada al cliente.')};
- dialog.showModal();form.elements.quote_message.focus();
+ dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ showOrderDialog(dialog);
 }
 
-root.addEventListener('click',event=>{const trigger=event.target.closest('[data-open-order]');if(!trigger)return;setTimeout(()=>{const order=adminData?.orders.find(item=>String(item.id)===String(trigger.dataset.openOrder));if(order?.request_type!=='creative')return;const content=root.querySelector('#order-dialog-content');if(!content||content.querySelector('[data-creative-request]'))return;const detail=content.querySelector('.admin-order-detail-grid>section');detail?.insertAdjacentHTML('afterbegin',`<section class="admin-creative-request" data-creative-request><span class="admin-eyebrow">IDEA DEL CLIENTE</span><p>${safe(order.request_details||'Sin detalle')}</p>${order.request_references?.length?`<div class="admin-creative-references"><strong>Referencias</strong>${order.request_references.map((item,index)=>`<button type="button" class="admin-secondary" data-creative-reference="${index}" data-order-id="${safe(order.id)}">Abrir ${safe(item.name)}</button>`).join('')}</div>`:''}${order.quote_message?`<div class="admin-quote-saved"><strong>Cotización guardada · ${money(order.quoted_total_clp)}</strong><p>${safe(order.quote_message)}</p></div>`:''}</section>`);const tools=content.querySelector('.admin-order-tools .admin-actions-popover');if(tools&&['submitted','quoted'].includes(order.status)&&!tools.querySelector('[data-quote-order]')){const quote=document.createElement('button');quote.type='button';quote.className='admin-primary';quote.dataset.quoteOrder=order.id;quote.textContent=order.status==='quoted'?'Editar cotización':'Responder con cotización';quote.onclick=()=>openQuoteEditor(order);tools.prepend(quote)}},0)},true);
 root.addEventListener('click',async event=>{
  const button=event.target.closest('[data-creative-reference]');if(!button)return;
  const order=adminData?.orders.find(item=>String(item.id)===button.dataset.orderId),reference=order?.request_references?.[Number(button.dataset.creativeReference)];
@@ -1666,10 +2199,21 @@ root.addEventListener('click',async event=>{
 
 function installManualChannelField(){const form=document.querySelector('#manual-order-form'),grid=form?.querySelector('.admin-form-section .admin-form-grid');if(!form||!grid||form.elements.channel)return;grid.insertAdjacentHTML('beforeend','<label>Canal de origen<select name="channel"><option value="whatsapp">WhatsApp</option><option value="web">Web</option><option value="instagram">Instagram</option><option value="other">Otro</option></select></label>')}
 function manualChannelName(value){return {whatsapp:'WhatsApp',web:'Web',instagram:'Instagram',other:'Otro'}[value]||'Otro'}
-document.addEventListener('click',event=>{if(event.target.closest('#new-manual-order'))installManualChannelField();if(event.target.closest('[data-open-order]'))setTimeout(()=>{const button=event.target.closest('[data-open-order]'),order=adminData.orders.find(item=>String(item.id)===String(button?.dataset.openOrder)),dl=document.querySelector('#order-dialog-content .admin-order-detail-grid section dl');if(order?.source==='manual'&&dl&&!dl.querySelector('[data-order-channel]'))dl.insertAdjacentHTML('afterbegin',`<div data-order-channel><dt>Canal</dt><dd>${safe(orderChannelLabel(order))}</dd></div>`)},0)},true)
 function manualOrderNotes(form){const channel=manualChannelName(form.elements.channel?.value),notes=String(form.elements.notes?.value||'').replace(/^Canal de origen:.*(?:\n\n|\n|$)/,'').trim();return [`Canal de origen: ${channel}`,notes].filter(Boolean).join('\n\n')}
 
 
 function colorNameForHex(value){const normalized=String(value||'').toLowerCase();return manualColorOptions.find(([hex])=>hex.toLowerCase()===normalized)?.[1]||'Color personalizado'}
-function readableOrderItem(item){const variant=adminData.variants.find(candidate=>candidate.sku===item.sku_snapshot),modelRecord=Array.isArray(variant?.product_models)?variant.product_models[0]:variant?.product_models,parts=String(item.name_snapshot||'').split(' · '),model=modelRecord?.name||parts[0]||'Producto',size=variant?.size||parts[1]||'A definir',color=item.color_hex?colorNameForHex(item.color_hex):variant?.color_name||parts[2]||'A definir',design=variant?parts.slice(1).join(' · '):parts.slice(3).join(' · '),designLabel=design&&design!=='personalizada'?design:'Diseño cargado por cliente',placement=printConfigurationLabel(item.print_configuration,item.print_sides);return {name:design&&design!=='personalizada'?`${model} · ${design}`:model,details:[`Talla ${size}`,`Color ${color}`,`Diseño: ${designLabel}`,placement].join(' · ')}}
-document.addEventListener('click',event=>{if(!event.target.closest('[data-open-order]'))return;setTimeout(()=>{const button=event.target.closest('[data-open-order]'),order=adminData.orders.find(item=>String(item.id)===String(button?.dataset.openOrder)),rows=document.querySelectorAll('#order-dialog-content .admin-order-products>div');if(!order)return;(order.order_items||[]).forEach((item,index)=>{const row=rows[index];if(!row)return;const readable=readableOrderItem(item),name=row.querySelector('strong'),details=row.querySelector('small');if(name)name.textContent=readable.name;if(details)details.textContent=`${readable.details} · ${item.quantity} ${item.quantity===1?'unidad':'unidades'}`})},0)},true)
+function readableOrderItem(item){
+ const variant=adminData.variants.find(candidate=>candidate.sku===item.sku_snapshot);
+ const model=Array.isArray(variant?.product_models)?variant.product_models[0]:variant?.product_models;
+ const parts=String(item.name_snapshot||'').split(' · ');
+ const [product,size,color]=parts.length>=3?parts:[parts[0]];
+ const design=variant?parts.slice(1).join(' · '):parts.slice(3).join(' · ');
+ const name=variant?[model?.name||product,design==='personalizada'?'':design].filter(Boolean).join(' · '):item.name_snapshot;
+ const placement=item.print_configuration||item.print_sides?printConfigurationLabel(item.print_configuration,item.print_sides):'';
+ const colorName=item.color_hex?colorNameForHex(item.color_hex):variant?.color_name||color;
+ return {
+  name:name||'Producto',
+  details:[variant?.size||size?`Talla ${variant?.size||size}`:'',colorName?`Color ${colorName}`:'',placement].filter(Boolean).join(' · ')
+ };
+}

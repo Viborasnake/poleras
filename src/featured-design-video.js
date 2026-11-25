@@ -55,8 +55,9 @@ export function createFeaturedDesignVideo() {
    let attempt = 0, ratio = 0;
    const entry = {dialog:video.closest('dialog'),automatic:false,stop};
    const label = control.dataset.videoLabel || '';
+   const controlLabel = control.querySelector('[data-featured-video-label]') ?? control;
    function controlText(text) {
-    control.textContent = text;
+    controlLabel.textContent = text;
     if (label) control.setAttribute('aria-label',`${text} · ${label}`);
    }
    function stop() {

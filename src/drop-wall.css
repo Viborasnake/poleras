@@ -1172,18 +1172,49 @@ body.drop-wall-enabled.theme-dark #app>header .account-trigger:hover .account-in
 }
 .drop-featured-video.is-playing{opacity:1}
 
-.drop-featured-video-control.ds-secondary-button:not([hidden]) {
+.drop-featured-video-control {
  position:absolute;
  top:56px;
  right:16px;
  z-index:5;
  min-height:44px;
- padding:8px 13px;
  border-radius:var(--ds-radius-pill);
- font-size:12px;
  cursor:pointer;
 }
+.drop-featured-video-control.ds-secondary-button:not([hidden]){
+ padding:8px 13px;
+ font-size:12px;
+}
 .drop-featured-video-control.ds-secondary-button:not(:hover){background:var(--ds-surface-raised)}
+
+.catalog-card-video-control{
+ display:grid;
+ align-items:center;
+ padding:0;
+ background:transparent;
+ color:var(--ds-text-inverse);
+}
+.catalog-card-video-control-content{
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ gap:6px;
+ min-height:32px;
+ padding:4px 10px;
+ border:1px solid currentColor;
+ border-radius:inherit;
+ background:var(--ds-brand-primary);
+ font:700 12px/16px var(--ds-font-body);
+ white-space:nowrap;
+}
+.catalog-card-video-control svg{width:14px;height:14px;fill:currentColor}
+.catalog-card-video-stop,
+[data-video-active] .catalog-card-video-play{display:none}
+[data-video-active] .catalog-card-video-stop{display:block}
+.catalog-card-video-control:hover{filter:none}
+.catalog-card-video-control:is(:hover,:focus-visible) [data-featured-video-label]{text-decoration:underline;text-underline-offset:2px}
+.catalog-card-video-control:active .catalog-card-video-control-content{background:var(--ds-action-primary-active)}
+.catalog-card-video-control:focus-visible{outline:3px solid var(--ds-focus-ring);outline-offset:var(--ds-focus-offset-control)}
 
 .drop-collection-section-grid .drop-card-media{border-radius:inherit}
 .studio-stage-video.is-playing{z-index:3}

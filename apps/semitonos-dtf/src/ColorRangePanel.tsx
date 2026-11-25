@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState,type CSSProperties,type KeyboardEvent,type PointerEvent,type UIEvent} from 'react'
 import {Check,Minus,Plus,Trash2,Undo2} from 'lucide-react'
 import EditorDialog from './EditorDialog'
-import {colorRangeRetention,selectionBrushMask,selectionCoverage,type ColorRange} from './color-range'
+import {colorRangeRetention,maxSelectionBrushSize,selectionBrushMask,selectionCoverage,type ColorRange} from './color-range'
+import {canvasPoint,type CanvasPoint} from './brush-geometry'
 import {removeBackground} from './background-stage'
 import {processImage} from './process-image'
 import type {Settings} from './App'
@@ -23,7 +24,8 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
   const sampleButtons=useRef<HTMLUListElement>(null)
   const cleanPreview=useRef<Uint8ClampedArray>(null)
   const keyboardPoint=useRef({x:.5,y:.5})
-  const point=useRef<{x:number;y:number;id:number}|null>(null)
+  const pointer=useRef<CanvasPoint|null>(null)
+  const activeStroke=useRef<{id:number;point:CanvasPoint|null}|null>(null)
   const history=useRef<ColorRange[]>([])
   const baseImage=processedSource?.width?processedSource:image
   const region=processedSource?.width?{x:0,y:0,width:processedSource.width,height:processedSource.height}:crop??{x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}
@@ -33,7 +35,7 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
   const renderScale=Math.min(1200/region.width,900/region.height,1)
   const width=Math.max(1,Math.round(region.width*renderScale)),height=Math.max(1,Math.round(region.height*renderScale))
   const displayWidth=Math.max(1,Math.round(region.width*displayScale))
-  const [cursor,setCursor]=useState<{x:number;y:number}|null>(null)
+  const [cursor,setCursor]=useState<CanvasPoint|null>(null)
   useEffect(()=>{
     const frame=requestAnimationFrame(()=>{
       const canvas=left.current!,ctx=canvas.getContext('2d')!
@@ -129,32 +131,48 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
     left.current?.focus()
   }
 
-  function canvasPoint(canvas: HTMLCanvasElement, clientX: number, clientY: number) {
-    const box=canvas.getBoundingClientRect()
-    return {
-      x:Math.max(0,Math.min(1,(clientX-box.left)/box.width)),
-      y:Math.max(0,Math.min(1,(clientY-box.top)/box.height)),
-    }
+  function clearCursor() {
+    pointer.current=null
+    setCursor(null)
   }
 
-  function stroke(from: {x:number;y:number}, to: {x:number;y:number}, canvas: HTMLCanvasElement) {
-    const radius=Math.min(1,size/(2*canvas.getBoundingClientRect().width))
+  function trackPointer(rect: DOMRect, clientX: number, clientY: number) {
+    pointer.current={x:clientX,y:clientY}
+    const next=canvasPoint(rect,clientX,clientY)
+    setCursor(next)
+    return next
+  }
+
+  function stroke(from: CanvasPoint, to: CanvasPoint, displayWidth: number) {
+    if(!displayWidth)return
+    const radius=size/(2*displayWidth)
     setRange(r=>(r.strokes?.length??0)>=20000?r:{...r,strokes:[...(r.strokes??[]),{...from,toX:to.x,toY:to.y,radius,erase:tool==='erase'}]})
   }
 
   function paint(e: PointerEvent<HTMLCanvasElement>, start=false) {
-    const next=canvasPoint(e.currentTarget,e.clientX,e.clientY)
     if(tool==='sample')return
-    setCursor(next)
-    if((start&&e.button!==0)||(!start&&point.current?.id!==e.pointerId))return
-    e.preventDefault()
+    const active=activeStroke.current
+    if(active&&active.id!==e.pointerId)return
+    const rect=e.currentTarget.getBoundingClientRect()
+    const next=trackPointer(rect,e.clientX,e.clientY)
     if(start){
+      if(!next||e.button!==0||active)return
       saveHistory()
       setMessage('')
       e.currentTarget.setPointerCapture(e.pointerId)
+      activeStroke.current={id:e.pointerId,point:next}
+      stroke(next,next,rect.width)
+      e.preventDefault()
+    }else if(active){
+      if(next)stroke(active.point??next,next,rect.width)
+      active.point=next
+      e.preventDefault()
     }
-    stroke(start?next:{x:point.current!.x,y:point.current!.y},next,e.currentTarget)
-    point.current={...next,id:e.pointerId}
+  }
+
+  function stopPaint(e: PointerEvent<HTMLCanvasElement>) {
+    if(activeStroke.current?.id===e.pointerId)activeStroke.current=null
+    if(e.type==='pointercancel'||(e.type==='pointerup'&&e.pointerType!=='mouse'))clearCursor()
   }
 
   function useCanvasWithKeyboard(event: KeyboardEvent<HTMLCanvasElement>) {
@@ -162,11 +180,13 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
     if(event.key===' '||event.key==='Enter'){
       event.preventDefault()
       if(event.repeat)return
+      pointer.current=null
+      setCursor({x,y})
       if(tool==='sample'){
         sample(x,y)
       }else{
         saveHistory()
-        stroke({x,y},{x,y},event.currentTarget)
+        stroke({x,y},{x,y},event.currentTarget.getBoundingClientRect().width)
         setMessage(tool==='erase'?'Zona excluida.':'Zona pintada.')
       }
       return
@@ -180,6 +200,7 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
     const step=event.shiftKey ? .05 : .01
     const next={x:Math.max(0,Math.min(1,x+dx*step)),y:Math.max(0,Math.min(1,y+dy*step))}
     keyboardPoint.current=next
+    pointer.current=null
     setCursor(next)
     const viewport=leftViewport.current!
     const canvas=event.currentTarget
@@ -223,11 +244,11 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
     }>
       <div className="range-toolbar">
         {screening&&<div className="segmented range-segments" role="group" aria-label="Herramienta de selección">
-          {tools.map(([value,label])=><button key={value} className={tool===value?'active':''} aria-pressed={tool===value} onClick={()=>{setTool(value);setCursor(null)}}>{tool===value&&<Check size={14} aria-hidden="true" />}{label}</button>)}
+          {tools.map(([value,label])=><button key={value} className={tool===value?'active':''} aria-pressed={tool===value} onClick={()=>{setTool(value);clearCursor()}}>{tool===value&&<Check size={14} aria-hidden="true" />}{label}</button>)}
         </div>}
         {tool==='sample'
           ?<label className="range-replace"><input type="checkbox" checked={replace} onChange={e=>setReplace(e.target.checked)}/> Reemplazar muestras</label>
-          :<label className="range-control range-brush-size"><span><b>Tamaño del pincel</b><output>{size} px</output></span><input type="range" min="2" max="120" value={size} style={{'--progress':`${(size-2)/118*100}%`} as CSSProperties} onChange={e=>setSize(Number(e.target.value))}/></label>}
+          :<label className="range-control range-brush-size" htmlFor="range-brush-size"><span><b>Tamaño del pincel</b><output>{size} px</output></span><input id="range-brush-size" type="range" min="2" max={maxSelectionBrushSize} value={size} style={{'--progress':`${(size-2)/(maxSelectionBrushSize-2)*100}%`} as CSSProperties} onChange={e=>setSize(Number(e.target.value))}/></label>}
         <div className="range-history">
           <button className="btn" disabled={!history.current.length} onClick={undo}><Undo2 size={16} aria-hidden="true"/> Deshacer</button>
           {screening&&<button className="btn" disabled={!colors.length&&!range.strokes?.length} onClick={clearSelection}>Vaciar selección</button>}
@@ -272,23 +293,31 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
       <div className="range-preview-grid" style={artworkStyle}>
         <figure>
           <figcaption>{screening?'Diseño sin fondo':'Original'}</figcaption>
-          <div ref={leftViewport} className="range-canvas-wrap range-source-wrap" onScroll={e=>syncPreviewScroll(e,rightViewport.current)}>
+          <div ref={leftViewport} className="range-canvas-wrap range-source-wrap" onScroll={e=>{
+            syncPreviewScroll(e,rightViewport.current)
+            if(pointer.current&&left.current)trackPointer(left.current.getBoundingClientRect(),pointer.current.x,pointer.current.y)
+          }}>
             <div className="range-canvas-art">
               <canvas
                 ref={left} tabIndex={0} aria-label="Lienzo de selección" aria-describedby="range-canvas-help"
                 style={{touchAction:tool==='sample'?'auto':'none',cursor:tool==='sample'?'crosshair':'none'}}
-                onClick={e=>{if(tool==='sample'){const {x,y}=canvasPoint(e.currentTarget,e.clientX,e.clientY);sample(x,y)}}}
+                onClick={e=>{
+                  if(tool!=='sample')return
+                  const next=canvasPoint(e.currentTarget.getBoundingClientRect(),e.clientX,e.clientY)
+                  if(next)sample(next.x,next.y)
+                }}
+                onPointerEnter={e=>{if(tool!=='sample')trackPointer(e.currentTarget.getBoundingClientRect(),e.clientX,e.clientY)}}
                 onPointerDown={e=>paint(e,true)}
                 onPointerMove={e=>paint(e)}
-                onPointerLeave={()=>setCursor(null)}
-                onPointerUp={()=>{point.current=null}}
-                onPointerCancel={()=>{point.current=null;setCursor(null)}}
-                onLostPointerCapture={()=>{point.current=null}}
+                onPointerLeave={clearCursor}
+                onPointerUp={stopPaint}
+                onPointerCancel={stopPaint}
+                onLostPointerCapture={stopPaint}
                 onFocus={e=>{if(e.currentTarget.matches(':focus-visible'))setCursor(keyboardPoint.current)}}
-                onBlur={()=>setCursor(null)}
+                onBlur={clearCursor}
                 onKeyDown={useCanvasWithKeyboard}
               />
-              {cursor&&<span className={`brush-cursor ${tool==='erase'?'erase':''}`} style={{width:tool==='sample'?12:size,height:tool==='sample'?12:size,left:`${cursor.x*100}%`,top:`${cursor.y*100}%`}} aria-hidden="true"/>}
+              {cursor&&<span className={`brush-cursor ${tool==='erase'?'brush-cursor-erase':''}`} style={{width:tool==='sample'?12:size,height:tool==='sample'?12:size,left:`${cursor.x*100}%`,top:`${cursor.y*100}%`}} aria-hidden="true"/>}
             </div>
           </div>
         </figure>

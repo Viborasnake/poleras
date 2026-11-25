@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { orderEmailLabels, sendOrderEmail } from '../_shared/order-email.ts'
+import { markServiceSurveySent, serviceSurveyLink } from '../_shared/service-survey-email.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -145,7 +146,19 @@ Deno.serve(async request => {
   const name = String(customer.first_name || authUser?.data?.user?.user_metadata?.full_name || '').trim()
   let emailResult: Record<string, unknown> = { sent: false, reason: 'missing_customer_email' }
   if (email) {
-    try { emailResult = await sendOrderEmail(email, name, orderId, status, pickup, { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, discount_clp: order.discount_clp, coupon_code: order.coupon_code, total_clp: order.total_clp, shipping_address: shippingAddress, price_snapshot: order.price_snapshot }) }
+    const survey = status === 'delivered' ? await serviceSurveyLink(admin, orderId).catch(error => {
+      console.error('No pudimos preparar la encuesta de servicio', error)
+      return null
+    }) : null
+    try {
+      emailResult = await sendOrderEmail(email, name, orderId, status, pickup, {
+        items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp,
+        discount_clp: order.discount_clp, coupon_code: order.coupon_code, total_clp: order.total_clp,
+        shipping_address: shippingAddress, price_snapshot: order.price_snapshot,
+        surveyToken: survey?.token, surveyIdempotency: Boolean(survey && !survey.sent),
+      })
+      if (survey && emailResult.sent) await markServiceSurveySent(admin, orderId)
+    }
     catch (error) {
       console.error(error)
       emailResult = { sent: false, reason: 'provider_error' }

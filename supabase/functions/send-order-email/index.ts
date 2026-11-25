@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { buildOrderEmail, orderEmailLabels, sendOrderEmail } from '../_shared/order-email.ts'
+import { markServiceSurveySent, serviceSurveyLink } from '../_shared/service-survey-email.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,11 +28,15 @@ Deno.serve(async request => {
   const resend = body.resend === true
   const paymentEmail = body.paymentEmail === true
   const orderEditEmail = body.orderEditEmail === true
+  const surveyEmail = body.surveyEmail === true
   const preview = body.preview === true
   const requestedStatus = String(body.status || '').trim()
   if (!orderId) return json({ error: 'Falta el pedido.' }, 400)
   const { data: order, error } = await admin.from('orders').select('id,status,source,request_type,request_details,quote_message,user_id,shipping_address,subtotal_clp,shipping_clp,discount_clp,coupon_code,total_clp,price_snapshot,payment_instructions,payment_confirmed_at,payment_confirmed_by,edit_pending_approval,order_edit_version,order_edit_email_sent_at,order_items(name_snapshot,quantity,unit_price_clp,line_total_clp,print_sides,print_configuration)').eq('id', orderId).single()
   if (error || !order) return json({ error: 'No encontramos el pedido.' }, 404)
+  if (surveyEmail && (order.status !== 'delivered' || paymentEmail || orderEditEmail)) {
+    return json({ error: 'La encuesta solo se puede enviar para un pedido terminado.' }, 409)
+  }
   const supportedStatuses = ['submitted', 'paid', 'in_production', 'ready', 'ready_for_pickup', 'shipped', 'delivered', ...(order.request_type === 'creative' ? ['quoted', 'awaiting_deposit'] : [])]
   const previewStatus = preview && supportedStatuses.includes(requestedStatus) ? requestedStatus : order.status
   const isStatusTransitionPreview = preview && previewStatus !== order.status
@@ -39,24 +44,35 @@ Deno.serve(async request => {
   const approvedEditAwaitingEmail = Number(order.order_edit_version || 0) > 0 && !order.order_edit_email_sent_at && !order.edit_pending_approval
   if (orderEditEmail && !order.edit_pending_approval && !approvedEditAwaitingEmail) return json({ error: 'No hay una edición aprobada pendiente de envío.' }, 409)
   if ((order.edit_pending_approval || approvedEditAwaitingEmail) && !orderEditEmail) return json({ error: 'Este pedido tiene cambios pendientes de revisión o envío. Usa la acción correspondiente antes de enviar otro email.' }, 409)
-  if (!supportedStatuses.includes(order.status) || (!resend && !paymentEmail && !isStatusTransitionPreview && (order.source !== 'manual' || !['submitted', 'paid'].includes(order.status)))) return json({ error: 'El pedido no tiene una plantilla de email disponible para reenviar.' }, 409)
+  if (!supportedStatuses.includes(order.status) || (!resend && !surveyEmail && !paymentEmail && !isStatusTransitionPreview && (order.source !== 'manual' || !['submitted', 'paid'].includes(order.status)))) return json({ error: 'El pedido no tiene una plantilla de email disponible para reenviar.' }, 409)
   if (isStatusTransitionPreview && previewStatus === 'in_production' && !(order.payment_confirmed_at && order.payment_confirmed_by)) return json({ error: 'Confirma primero que recibiste el pago antes de preparar el pedido.' }, 409)
   const customer = order.shipping_address?.customer || {}
-  const email = String(customer.email || '').trim()
+  const customerEmail = String(customer.email || '').trim()
+  const account = !customerEmail && order.user_id ? await admin.auth.admin.getUserById(order.user_id) : null
+  const email = customerEmail || String(account?.data?.user?.email || '').trim()
   if (!email) return json({ error: 'El cliente no tiene email.' }, 422)
-  const name = String(customer.first_name || '').trim()
+  const name = String(customer.first_name || account?.data?.user?.user_metadata?.full_name || '').trim()
   try {
     const paymentInstructions = body.paymentInstructions || order.payment_instructions || null
     if (paymentEmail && !paymentInstructions?.transfer && !paymentInstructions?.mercado_pago_url) return json({ error: 'Agrega datos de transferencia o un link de Mercado Pago.' }, 422)
     const shippingAddress = { ...(order.shipping_address || {}), delivery_notes: order.shipping_address?.delivery_notes || (order.source === 'online' ? order.shipping_address?.notes : '') }
     delete shippingAddress.notes
-    const details = { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, discount_clp: order.discount_clp, coupon_code: order.coupon_code, total_clp: order.total_clp, shipping_address: shippingAddress, price_snapshot: order.price_snapshot, payment_instructions: paymentEmail ? paymentInstructions : undefined, orderEdited: orderEditEmail, creative: order.request_type === 'creative', request_details: order.request_details, quote_message: order.quote_message }
+    const includeSurvey = (preview ? previewStatus : order.status) === 'delivered' && !paymentEmail && !orderEditEmail
+    const survey = includeSurvey ? await serviceSurveyLink(admin, String(order.id), preview).catch(error => {
+      console.error('No pudimos preparar la encuesta de servicio', error)
+      if (surveyEmail) throw error
+      return null
+    }) : null
+    if (surveyEmail && !survey) return json({ error: 'Activa una encuesta antes de enviarla.' }, 409)
+    if (surveyEmail && survey?.sent && !preview) return json({ orderId: order.id, email: { sent: true } })
+    const details = { items: order.order_items, subtotal_clp: order.subtotal_clp, shipping_clp: order.shipping_clp, discount_clp: order.discount_clp, coupon_code: order.coupon_code, total_clp: order.total_clp, shipping_address: shippingAddress, price_snapshot: order.price_snapshot, payment_instructions: paymentEmail ? paymentInstructions : undefined, orderEdited: orderEditEmail, creative: order.request_type === 'creative', request_details: order.request_details, quote_message: order.quote_message, surveyToken: survey?.token, surveyIdempotency: Boolean(survey && !survey.sent) }
     if (preview) {
       const siteUrl = (Deno.env.get('SITE_URL') || 'https://droska.frontbook.cl').replace(/\/$/, '')
       const emailPreview = buildOrderEmail(name, order.id, previewStatus, siteUrl, order.shipping_address?.fulfillment === 'pickup', details)
       return json({ orderId: order.id, status: previewStatus, label: orderEmailLabels[previewStatus], preview: true, recipient: email, email: emailPreview, paymentEmail, orderEditEmail })
     }
     const result = await sendOrderEmail(email, name, order.id, order.status, order.shipping_address?.fulfillment === 'pickup', details)
+    if (survey && result.sent) await markServiceSurveySent(admin, String(order.id))
     if (paymentEmail && result.sent) {
       const { error: trackingError } = await admin.from('orders').update({ payment_instructions: paymentInstructions, payment_email_sent_at: new Date().toISOString(), payment_email_sent_by: userData.user.id, updated_at: new Date().toISOString() }).eq('id', order.id)
       if (trackingError) throw trackingError
@@ -71,6 +87,6 @@ Deno.serve(async request => {
     return json({ orderId: order.id, status: order.status, label: orderEmailLabels[order.status], email: result, paymentEmail: paymentEmail, orderEditEmail: orderEditEmail })
   } catch (sendError) {
     console.error(sendError)
-    return json({ error: 'No pudimos enviar el correo inicial.' }, 503)
+    return json({ error: surveyEmail ? 'No pudimos enviar la encuesta. Intenta nuevamente.' : 'No pudimos enviar el correo inicial.' }, 503)
   }
 })

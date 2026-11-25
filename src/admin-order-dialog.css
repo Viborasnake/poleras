@@ -1,0 +1,555 @@
+/* Pedidos shares one dialog frame across the detail, forms and confirmations. */
+.admin-dialog.admin-order-modal {
+  --order-dialog-inset: clamp(16px, 3vw, 28px);
+  --order-dialog-header: 116px;
+  --order-dialog-footer: 76px;
+  max-height: calc(100dvh - 32px);
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--order-dialog-header) var(--order-dialog-footer);
+  overflow-wrap: anywhere;
+}
+
+html:has(.admin-order-modal[open]) {
+  overflow: hidden;
+}
+
+.admin-dialog.admin-order-modal :is(.dialog-title, .dialog-actions) {
+  position: sticky;
+  z-index: 2;
+  min-width: 0;
+  background: var(--ds-surface-raised);
+}
+
+.admin-dialog.admin-order-modal .dialog-title {
+  inset-block-start: 0;
+  min-height: 0;
+  padding: 16px var(--order-dialog-inset);
+}
+
+.admin-dialog.admin-order-modal .dialog-title h2 {
+  margin: 0;
+}
+
+.admin-dialog.admin-order-modal .dialog-title p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.admin-dialog.admin-order-modal .dialog-title .admin-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.admin-dialog.admin-order-modal .dialog-title .dialog-close {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.admin-dialog.admin-order-modal .dialog-actions {
+  inset-block-end: 0;
+  margin: 0;
+  padding: 12px var(--order-dialog-inset) max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.admin-dialog.admin-order-modal .dialog-actions :is(button, .admin-payment-toggle) {
+  min-height: 44px;
+}
+
+.admin-dialog.admin-order-modal > form:not([method="dialog"]) {
+  min-width: 0;
+  gap: 16px;
+  padding: 0 var(--order-dialog-inset);
+}
+
+.admin-dialog.admin-order-modal > form > :is(.dialog-title, .dialog-actions),
+.admin-order-modal .admin-archive-history-content > .dialog-title {
+  margin-inline: calc(-1 * var(--order-dialog-inset));
+}
+
+.admin-order-modal .admin-form-status:empty {
+  display: none;
+}
+
+.admin-order-modal .admin-form-status:not(:empty) {
+  margin: 0;
+  padding: 6px 0;
+}
+
+.admin-order-modal .admin-payment-auth-body {
+  padding: 0;
+}
+
+.admin-order-modal .admin-technical-review-item {
+  min-height: 52px;
+}
+
+.admin-order-modal .admin-technical-review-item input {
+  flex: 0 0 18px;
+}
+
+.admin-order-confirm-message {
+  margin: 0;
+  padding: 20px var(--order-dialog-inset);
+  color: var(--ds-text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.admin-dialog.admin-order-dialog.admin-order-modal {
+  width: min(1040px, calc(100vw - 32px));
+  max-width: none;
+}
+
+.admin-order-dialog.admin-order-modal > #order-dialog-content {
+  display: block;
+  padding: 0;
+}
+
+.admin-order-dialog.admin-order-modal > #order-dialog-content > .dialog-title {
+  margin: 0;
+  padding: 16px var(--order-dialog-inset);
+}
+
+.admin-order-body {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px var(--order-dialog-inset) 24px;
+  background: var(--ds-surface-page);
+}
+
+.admin-order-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 12px;
+  background: var(--ds-surface-raised);
+}
+
+.admin-order-overview > div {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.admin-order-overview > div + div {
+  border-inline-start: 1px solid var(--ds-border-subtle);
+}
+
+.admin-order-overview dt,
+.admin-order-facts dt,
+.admin-order-trace-content dt {
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-order-overview dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.admin-order-overview .admin-order-overview-total {
+  font: 700 20px/1.2 var(--ds-font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-order-body .admin-order-journey {
+  margin-top: -8px;
+}
+
+.admin-order-body :is(.admin-order-journey, .admin-order-traceability, .admin-order-history-details, .admin-creative-brief) > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--ds-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-order-body summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-order-body :is(.admin-order-journey, .admin-order-traceability, .admin-order-history-details, .admin-creative-brief) > summary::after {
+  content: '';
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  margin-inline-start: auto;
+  margin-inline-end: 3px;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.admin-order-body :is(.admin-order-journey, .admin-order-traceability, .admin-order-history-details, .admin-creative-brief)[open] > summary::after {
+  transform: rotate(225deg);
+}
+
+.admin-order-body summary:focus-visible,
+.admin-order-semitone-link:focus-visible {
+  outline: 3px solid var(--ds-focus-ring);
+  outline-offset: 3px;
+}
+
+.admin-order-dialog .admin-order-body .admin-order-progress {
+  grid-template-columns: repeat(var(--order-step-count, 4), minmax(100px, 1fr));
+  margin: 8px 0 0;
+  padding-bottom: 10px;
+  overflow-x: auto;
+}
+
+.admin-order-body .admin-technical-review {
+  flex-flow: row wrap;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 12px;
+  background: var(--ds-surface-raised);
+}
+
+.admin-order-body .admin-technical-review :is(h3,p) {
+  margin: 0;
+}
+
+.admin-order-body .admin-technical-review button {
+  min-height: 44px;
+}
+
+.admin-order-body .admin-order-edit-blocker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.admin-order-body .admin-order-edit-blocker button {
+  min-height: 44px;
+}
+
+.admin-order-body .admin-order-detail-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.admin-order-column {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.admin-order-body .admin-order-section {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 12px;
+  background: var(--ds-surface-raised);
+}
+
+.admin-order-section h3,
+.admin-order-body .admin-technical-review h3 {
+  margin: 0;
+  font: 700 17px/1.3 var(--ds-font-display);
+}
+
+.admin-order-section h3 > span {
+  margin-inline-start: 4px;
+  color: var(--ds-text-secondary);
+  font: 700 12px var(--ds-font-body);
+}
+
+.admin-order-section h4,
+.admin-order-trace-content h4 {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 14px;
+}
+
+.admin-creative-request:has(.admin-creative-brief[open]) > .admin-creative-brief-preview {
+  display: none;
+}
+
+.admin-creative-brief[open] > summary {
+  margin-bottom: 4px;
+}
+
+.admin-order-body .admin-order-products > div {
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+}
+
+.admin-order-body .admin-order-products :is(strong,b) {
+  font-size: 14px;
+}
+
+.admin-order-body .admin-order-products small {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-order-section .admin-secondary {
+  min-height: 44px;
+  text-align: start;
+}
+
+.admin-order-semitone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  min-height: 44px;
+  padding-top: 4px;
+  color: var(--ds-color-link);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-order-facts {
+  display: grid;
+  margin: 8px 0 0;
+}
+
+.admin-order-facts > div {
+  display: grid;
+  grid-template-columns: minmax(88px, .8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.admin-order-facts > div + div {
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.admin-order-facts dd,
+.admin-order-edit-receipt {
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-line;
+}
+
+.admin-order-body .admin-order-traceability,
+.admin-order-body .admin-order-history-wrap {
+  display: block;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 12px;
+  background: var(--ds-surface-raised);
+}
+
+.admin-order-body .admin-order-history-details {
+  margin: 0;
+  border: 0;
+}
+
+.admin-order-trace-content {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0 14px;
+}
+
+.admin-order-trace-content p {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}
+
+.admin-order-body .admin-order-trace-content dl {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 175px), 1fr));
+}
+
+.admin-order-body .admin-order-trace-content dl > div {
+  border: 0;
+  padding: 4px 0;
+}
+
+.admin-order-body .admin-order-trace-content :is(dd, code),
+.admin-order-body .admin-order-history-details :is(small, strong, time) {
+  font-size: 13px;
+}
+
+.admin-order-body .admin-order-history-details li {
+  flex-wrap: wrap;
+}
+
+.admin-order-dialog.admin-order-modal .admin-order-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-order-dialog .admin-order-dialog-actions > :is(.admin-order-tools,.admin-order-progress-actions) {
+  width: auto;
+  margin: 0;
+}
+
+.admin-order-dialog .admin-order-dialog-actions .admin-order-progress-actions {
+  margin-inline-start: auto;
+}
+
+.admin-order-dialog .admin-order-progress-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-order-dialog .admin-order-progress-actions :is([data-next-status],.admin-payment-toggle) {
+  width: auto;
+  min-width: 0;
+  height: auto;
+}
+
+.admin-order-dialog .admin-order-progress-actions .admin-payment-transfer-notice {
+  max-width: 480px;
+  margin-top: 0;
+}
+
+.admin-order-modal .admin-archive-history-content {
+  padding: 0 var(--order-dialog-inset) 20px;
+}
+
+.admin-order-modal .admin-archive-history-filters :is(input,select,button) {
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.admin-order-modal .admin-archive-history-message button {
+  margin: 10px auto 0;
+}
+
+.admin-order-modal .admin-edit-approval-body,
+.admin-order-modal .admin-edit-approval-options {
+  padding: 16px var(--order-dialog-inset);
+}
+
+.admin-order-modal .admin-edit-approval-options {
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.admin-order-modal .admin-edit-approval-options label {
+  min-height: 44px;
+}
+
+.admin-order-modal .admin-edit-approval-options p {
+  margin: 2px 0 0;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}
+
+.admin-order-modal .admin-edit-approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-order-modal.admin-email-preview-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  height: min(780px, calc(100dvh - 32px));
+}
+
+.admin-order-modal .admin-email-preview-meta {
+  padding: 12px var(--order-dialog-inset);
+}
+
+.admin-order-modal .admin-email-preview-meta strong {
+  white-space: normal;
+}
+
+.admin-order-modal .admin-email-preview-live-frame {
+  flex: 1 0 160px;
+  height: auto;
+  min-height: 0;
+}
+
+.admin-order-modal .admin-email-preview-actions {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.admin-order-modal .admin-email-preview-actions button {
+  width: auto;
+}
+
+@media (max-width: 760px) {
+  .admin-order-column {
+    display: contents;
+  }
+
+  .admin-order-body .admin-order-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-dialog.admin-order-dialog.admin-order-modal .admin-order-dialog-actions {
+    position: static;
+  }
+
+  .admin-order-dialog .admin-order-dialog-actions .admin-order-progress-actions {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 540px) {
+  .admin-dialog.admin-order-modal,
+  .admin-dialog.admin-order-dialog.admin-order-modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    scroll-padding-block-end: 16px;
+  }
+
+  .admin-dialog.admin-order-modal .dialog-title,
+  .admin-order-dialog.admin-order-modal > #order-dialog-content > .dialog-title {
+    padding-block: 12px;
+  }
+
+  .admin-dialog.admin-order-modal .dialog-actions {
+    position: static;
+  }
+
+  .admin-order-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-order-overview > div {
+    padding: 10px 12px;
+  }
+
+  .admin-order-overview > div:last-child {
+    grid-column: 1 / -1;
+    grid-template: auto / 1fr auto;
+    border-inline-start: 0;
+    border-top: 1px solid var(--ds-border-subtle);
+  }
+
+  .admin-order-modal.admin-email-preview-dialog[open] {
+    height: calc(100dvh - 16px);
+  }
+
+  .admin-order-modal .admin-edit-approval-actions > button {
+    flex-basis: 100%;
+  }
+}

@@ -1,6 +1,6 @@
 import { CUSTOMER_IMAGE_POLICY, imageFileError, optimizeImage } from './image-optimization.js';
 import {requestCaptchaToken,signInAnonymouslyWithCaptcha} from './auth-captcha.js';
-import {receiptEmailFeedback} from './commerce-feedback.js';
+import {quoteEmailFollowUp,receiptEmailFeedback} from './commerce-feedback.js';
 
 export function petPhotoError(file,subject='pets') {
   if(Array.isArray(file)){
@@ -39,10 +39,10 @@ export function petStepHtml({step,draft,selection,designName,subject='pets',purc
   if(draft.orderId){
     const {model,size,sizeLabel,color,preliminaryPrice}=draft.submittedSelection||selection;
     const contents=[[designName,model,sizeLabel||size,color].filter(Boolean).join(' · '),...petRequestIdentity(draft,subject),
-      draft.email?.trim()&&`Correo de contacto · ${draft.email.trim()}`,...petFiles(draft).map(file=>`Foto adjunta · ${file.name}`),
+      draft.email?.trim()&&`Correo de contacto · ${draft.email.trim()}`,draft.phone?.trim()&&`Teléfono · ${draft.phone.trim()}`,...petFiles(draft).map(file=>`Foto adjunta · ${file.name}`),
       draft.notes?.trim()&&'Tus indicaciones para el diseño'].filter(Boolean);
     const emailNote=receiptEmailFeedback(draft.receipt,draft.email?.trim(),'Los datos de la solicitud');
-    return `<span class="eyebrow">SOLICITUD RECIBIDA</span><h2 data-request-receipt tabindex="-1">Recibimos tu personalización.</h2><p><strong>Solicitud #${e(String(draft.orderId))}</strong></p><ul>${contents.map(item=>`<li>${e(item)}</li>`).join('')}</ul><p><strong>Precio preliminar · ${e(preliminaryPrice||'Por confirmar')}</strong></p><p>${draft.recovered?'Tu solicitud quedó guardada para revisión. ':''}Te contactaremos para confirmar el diseño, precio final y plazo. No necesitas volver a enviar la solicitud.</p>${emailNote?`<p>${e(emailNote)}</p>`:''}<button type="button" class="button dark ds-cta" data-pet-done>Entendido</button>`;
+    return `<span class="eyebrow">COMPROBANTE DE SOLICITUD</span><h2 data-request-receipt tabindex="-1">Recibimos tu personalización.</h2><p><strong>Solicitud #${e(String(draft.orderId))}</strong></p><ul>${contents.map(item=>`<li>${e(item)}</li>`).join('')}</ul><p><strong>Precio preliminar · ${e(preliminaryPrice||'Por confirmar')}</strong></p><p>${draft.recovered?'Tu solicitud quedó guardada para revisión. No necesitas volver a enviar la solicitud. ':''}${e(quoteEmailFollowUp(draft.email?.trim()))} Puedes seguir la solicitud en «Mis pedidos» con ese mismo correo.</p>${emailNote?`<p>${e(emailNote)}</p>`:''}<button type="button" class="button dark ds-cta" data-pet-done>Entendido</button>`;
   }
   if(step===2){const files=petFiles(draft),limit=petPhotoLimit(subject);const photoInstruction=purchaseMethod==='whatsapp'?`<div class="pet-whatsapp-photo" role="note"><strong>Las fotos se envían por WhatsApp</strong><span>No subas archivos aquí. Al continuar abriremos WhatsApp para que adjuntes las fotos directamente en el chat.</span></div>`:petReferencesMarkup({files,limit,subject});return `<span class="eyebrow">PASO 2 · ${people?'TUS FOTOS':'TU MASCOTA'}</span><h2>${people?'Ahora, presenta a tus protagonistas.':'Ahora, presenta a tu protagonista.'}</h2><p>Adaptaremos ${e(designName)} con ${people?'sus fotos':'tus fotos'}.</p><section class="detail-block" data-pet-photo-block>${photoInstruction}</section><section class="detail-block" data-pet-notes-block><label class="field">${people?'Nombre de la persona (opcional)':'Nombre de tu mascota (opcional)'}<input data-pet-value="petName" maxlength="100" value="${e(draft.petName||'')}"></label><label class="field">Algo que debamos cuidar (opcional)<textarea data-pet-value="notes" maxlength="2000" placeholder="${people?'Ej. Mantener el fondo de la foto.':'Ej. Mantener la mancha sobre su ojo izquierdo.'}">${e(draft.notes||'')}</textarea></label></section>`;}
   const photoSummary=purchaseMethod==='whatsapp'?'Las adjuntarás en WhatsApp':e(petFiles(draft).map(file=>file.name).join(', '));
@@ -104,5 +104,5 @@ export async function sendPetRequest({draft,design,selection,supabase,uploadPhot
   onStatus('Guardando tus datos para que podamos contactarte…');
   const recovery=await supabase.functions.invoke('create-design-request',{body:{...payload,recovery:true,recoveryReason:String(primaryMessage).slice(0,300),captchaToken:await requestCaptchaToken()}});
   if(!recovery.error&&recovery.data?.orderId){draft.orderId=recovery.data.orderId;draft.recovered=true;draft.receipt=recovery.data.receipt;draft.submittedSelection=selection;return}
-  throw new Error('No pudimos confirmar el envío todavía. Tu selección y fotos siguen aquí; vuelve a intentarlo o escríbenos por WhatsApp.');
+  throw new Error('El envío de tu personalización quedó sin confirmar.');
 }

@@ -70,3 +70,22 @@ test('las notas internas no se filtran al correo del cliente',()=>{
   assert.doesNotMatch(email.text,/NOTA INTERNA SECRETA/);
   assert.match(email.html,/Tocar el timbre rojo/);
 });
+
+test('el correo de cierre enlaza la invitación individual en HTML y texto', () => {
+  const surveyToken = '48ac78c1-001d-498c-8e83-5461503569ee';
+  const url = 'https://droska.frontbook.cl/encuesta.html#' + surveyToken;
+  for (const pickup of [false, true]) {
+    const email = buildOrderEmail('Ana', '51', 'delivered', 'https://droska.frontbook.cl', pickup, { ...deliveryDetails, creative: true, surveyToken });
+    assert.ok(email.html.includes(`href="${url}"`));
+    assert.ok(email.html.includes('Responder encuesta'));
+    assert.ok(email.text.includes(url));
+    assert.doesNotMatch(email.html, /\?encuesta=51/);
+  }
+});
+
+test('los correos sin invitación válida mantienen un acceso a la cuenta', () => {
+  const email = buildOrderEmail('Ana', '51', 'delivered', 'https://droska.frontbook.cl', false, { surveyToken: '51' });
+  assert.match(email.html, /\?panel=account/);
+  assert.doesNotMatch(email.html, /encuesta\.html|Responder encuesta/);
+  assert.doesNotMatch(email.text, /encuesta/);
+});

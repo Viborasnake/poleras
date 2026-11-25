@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+.service-survey-page {
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  min-height: 100dvh;
+  margin: 0;
+  padding: clamp(16px, 6vw, 64px);
+  background: var(--ds-surface-page);
+  color: var(--ds-text-primary);
+  font: 400 16px/1.5 var(--ds-font-body);
+}
+
+.service-survey-card {
+  box-sizing: border-box;
+  width: min(100%, 620px);
+  padding: clamp(20px, 5vw, 48px);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 20px;
+  background: var(--ds-surface-raised);
+  overflow-wrap: anywhere;
+}
+
+.service-survey-card img { display: block; width: 128px; max-width: 100%; height: auto; margin-bottom: 28px; }
+.service-survey-card h1 { margin: 0 0 8px; font: 700 clamp(28px, 5vw, 42px)/1.1 var(--ds-font-display); }
+.service-survey-card p { margin: 0 0 18px; color: var(--ds-text-secondary); white-space: pre-wrap; }
+.service-survey-card form { display: grid; gap: 24px; margin-top: 26px; }
+.survey-question { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.survey-question legend, .survey-question > label { padding: 0; font-weight: 700; }
+.survey-question legend { margin-bottom: 8px; }
+.survey-question small { color: var(--ds-text-secondary); font-size: .875rem; font-weight: 400; }
+.survey-question textarea { resize: vertical; }
+.survey-rating { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(4px, 1.3vw, 10px); }
+.survey-rating label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  border: 1px solid var(--ds-border-control);
+  border-radius: var(--ds-radius-control);
+  background: var(--ds-surface-raised);
+  cursor: pointer;
+}
+.survey-rating input { margin: 0; accent-color: var(--ds-brand-primary); }
+.survey-rating label:hover { background: var(--ds-surface-subtle); }
+.survey-rating label:has(:checked) { background: var(--ds-color-lime); color: var(--ds-brand-primary); box-shadow: inset 0 0 0 1px var(--ds-brand-primary); font-weight: 700; }
+.survey-rating label:has(:focus-visible) { outline: 3px solid var(--ds-focus-ring); outline-offset: 2px; }
+.survey-rating-scale { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; color: var(--ds-text-secondary); font-size: .875rem; }
+.survey-submit button, .service-survey-card button { cursor: pointer; }
+.survey-submit button:disabled { cursor: wait; }
+.survey-submit [role="alert"] { margin: 12px 0 0; color: var(--ds-feedback-danger); }
+.survey-submit [role="alert"]:empty { margin: 0; }
+.service-survey-home { display: inline-flex; align-items: center; min-height: 44px; color: var(--ds-color-link); font-weight: 700; }

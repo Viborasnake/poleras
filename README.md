@@ -28,6 +28,8 @@ En local, puedes copiar [`.env.example`](.env.example) a `.env` para sobrescribi
 
 El seguimiento operativo usa la migración `order_status_workflow` y la Edge Function autenticada `update-order-status`. Para activarlo en un proyecto vinculado ejecuta `npx supabase db push` y `npx supabase functions deploy update-order-status`; configura como secretos `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (remitente de un dominio verificado) y `SITE_URL`. Ninguno debe llevar prefijo `VITE_`. Sin esos secretos el estado igualmente se actualiza y queda auditado, pero el panel avisa que el email no fue enviado.
 
+Administración → Servicio al cliente reúne pedidos terminados y encuestas. Para habilitarlo se aplica la migración `customer_service_surveys` y se despliegan `service-survey`, `update-order-status` y `send-order-email`. Las invitaciones usan la configuración de Resend de los correos de pedidos. Cada invitación conserva su cuestionario y admite una respuesta.
+
 La confirmación de cuentas y recuperación de contraseña usan Supabase Auth. Para que lleguen a clientes reales, configura Resend como SMTP personalizado y pega la plantilla de marca siguiendo [`docs/auth-email-setup.md`](docs/auth-email-setup.md). Es una configuración del Dashboard de Supabase: la API key no se expone en el frontend.
 
 El panel de Administración incluye `Clientes`, que elimina una cuenta de Auth junto con perfil, carro, pedidos, pagos y archivos privados. Para habilitarlo en un proyecto vinculado despliega `npx supabase functions deploy admin-customer-accounts`; la función usa el secreto de servidor de Supabase y nunca expone `service_role` al navegador.

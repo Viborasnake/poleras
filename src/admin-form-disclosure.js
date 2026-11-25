@@ -16,7 +16,7 @@ export function adminFormData(form){
 function labelFor(field){
  const label=field.closest('label');
  if(!label)return field.name;
- const copy=label.cloneNode(true);copy.querySelectorAll('input,select,textarea,small,output,svg').forEach(node=>node.remove());return copy.textContent.trim().replace(/\s+/g,' ');
+ const copy=label.cloneNode(true);copy.querySelectorAll('input,select,textarea,small,output,svg,[data-catalog-file-action]').forEach(node=>node.remove());return copy.textContent.trim().replace(/\s+/g,' ');
 }
 export function adminFieldSummary(node,{limit=180}={}){
  const result=controls(node).filter(field=>!field.disabled&&field.type!=='hidden'&&field.type!=='file'&&(field.type!=='radio'||field.checked)&&(!['design_products','allowed_colors','polera_additional_print'].includes(field.name)&&!field.name.startsWith('design_colors_')||field.checked)&&(!/^clear_(?:polera_)?mockup_/.test(field.name)||field.checked)).map(field=>{
@@ -76,7 +76,8 @@ export function unmountAdminFormDisclosure(form){controllers.get(form)?.destroy(
 export function mountAdminFormDisclosure(form,kind,{validateFile=()=>null,specs:providedSpecs,editableSections=false,onDestroy=()=>{}}={}){
  unmountAdminFormDisclosure(form);
  const specs=providedSpecs||adminFlowSchema(form,kind),submit=form.querySelector('[type="submit"]'),actions=submit.closest('.dialog-actions,.admin-settings-actions'),dialog=form.closest('dialog'),originalSubmit=form.onsubmit;
- const markers=[],group=document.createElement('div');group.className='admin-form-disclosure';group.dataset.adminDisclosure='';actions.before(group);
+ const content=form.querySelector('.admin-catalog-dialog-body'),progress=form.querySelector('[data-catalog-workflow-status]');
+ const markers=[],group=document.createElement('div');group.className='admin-form-disclosure';group.dataset.adminDisclosure='';if(content)content.append(group);else actions.before(group);
  const steps=specs.map(spec=>{
   const node=document.createElement('section');
   for(const field of spec.nodes.filter(Boolean)){const marker=document.createComment('admin-field');field.before(marker);markers.push([field,marker]);node.append(field)}
@@ -84,14 +85,14 @@ export function mountAdminFormDisclosure(form,kind,{validateFile=()=>null,specs:
   if(spec.advanced?.length){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Opciones avanzadas';details.append(summary);for(const name of spec.advanced){const field=form.elements.namedItem(name);if(field)details.append(field.closest('label'))}node.append(details)}
   return {...spec,node,valid:()=> (!spec.valid||spec.valid())&&controls(node).filter(field=>field.type==='file'&&!field.disabled).every(field=>[...field.files].every(file=>!validateFile(file,field))),value:()=>spec.value?String(spec.value()):adminStepSnapshot(node),summary:()=>spec.summary?spec.summary():adminFieldSummary(node)};
  });
- const review=document.createElement('section');review.className='admin-disclosure-review';const heading=document.createElement('h3'),list=document.createElement('dl');heading.textContent='Revisa antes de guardar';review.append(heading,list);actions.before(review);
+ const review=document.createElement('section');review.className='admin-disclosure-review';const heading=document.createElement('h3'),list=document.createElement('dl');heading.textContent='Revisa antes de guardar';review.append(heading,list);if(content)content.append(review);else actions.before(review);
  const state=createDisclosureState(),initialValues=steps.map(step=>step.value());
  if(editableSections)steps.forEach((step,index)=>{state.confirmed[step.id]=initialValues[index]});
  const initial=adminStepSnapshot(form),before=steps.map(step=>step.summary?step.summary():adminFieldSummary(step.node,{limit:Infinity}));let pending=false,destroyed=false;
  let expandToggle=null;
  if(editableSections){const tools=document.createElement('div');tools.className='admin-disclosure-tools';expandToggle=document.createElement('button');expandToggle.type='button';expandToggle.className='admin-secondary';expandToggle.textContent='Expandir todo';expandToggle.setAttribute('aria-expanded','false');tools.append(expandToggle);group.prepend(tools)}
  const abort=new AbortController(),signal=abort.signal;
- const controller=mountFormDisclosure({container:group,state,steps,finalButton:submit,review,prefix:`admin-${kind}`,busy:()=>pending,multiple:editableSections,onChange:()=>{
+ const controller=mountFormDisclosure({container:group,state,steps,finalButton:submit,review,prefix:`admin-${kind}`,busy:()=>pending,multiple:editableSections,onChange:({complete})=>{
   if(expandToggle){const allExpanded=steps.every(step=>Boolean(state.expanded?.[step.id]));expandToggle.textContent=allExpanded?'Cerrar todo':'Expandir todo';expandToggle.setAttribute('aria-expanded',String(allExpanded));expandToggle.disabled=pending}
   list.replaceChildren();
   steps.forEach((step,index)=>{
@@ -99,16 +100,25 @@ export function mountAdminFormDisclosure(form,kind,{validateFile=()=>null,specs:
    if(button){
     const unsaved=step.value()!==initialValues[index];
     button.toggleAttribute('data-unsaved',unsaved);
-    const label=unsaved?'Cambios sin guardar':step.continueLabel||'Continuar';
+    const label=content?(editableSections?'Confirmar sección':'Continuar'):unsaved?'Cambios sin guardar':step.continueLabel||'Continuar';
     if(button.textContent!==label)button.textContent=label;
-    if(unsaved)button.setAttribute('aria-label','Cambios sin guardar. Continuar');else button.removeAttribute('aria-label');
+    if(unsaved&&!content)button.setAttribute('aria-label','Cambios sin guardar. Continuar');else button.removeAttribute('aria-label');
    }
+   const after=step.summary();
+   if(content&&editableSections&&step.value()===initialValues[index])return;
    const row=document.createElement('div'),label=document.createElement('dt'),value=document.createElement('dd');
-   label.textContent=step.title;const after=step.summary();
+   label.textContent=step.title;
    value.textContent=editableSections&&before[index]!==after?`Antes: ${before[index]}\nDespués: ${after}`:after;
    row.append(label,value);list.append(row);
   });
-  if(editableSections&&adminStepSnapshot(form)===initial){submit.disabled=true;const status=group.querySelector('.ds-disclosure-status');status.textContent='Edita la sección que necesitas cambiar y revisa las diferencias antes de guardar.';status.dataset.tone='hint'}
+  if(content&&editableSections){heading.textContent='Cambios para guardar';if(!list.children.length)review.hidden=true}
+  const unchanged=editableSections&&adminStepSnapshot(form)===initial;
+  if(progress){
+   const confirmed=Object.keys(state.confirmed).length;
+   const label=pending?'Guardando…':editableSections?(unchanged?'Sin cambios pendientes':complete?'Cambios listos para guardar':'Confirma las secciones pendientes'):`${confirmed} de ${steps.length} secciones confirmadas`;
+   if(progress.textContent!==label)progress.textContent=label;
+  }
+  if(unchanged){submit.disabled=true;const status=group.querySelector('.ds-disclosure-status');status.textContent=content?'Abre la sección que quieras editar.':'Edita la sección que necesitas cambiar y revisa las diferencias antes de guardar.';status.dataset.tone='hint'}
  }});
  if(expandToggle)expandToggle.onclick=()=>{const allExpanded=steps.every(step=>Boolean(state.expanded?.[step.id]));controller.setExpanded(allExpanded?[]:steps.map(step=>step.id));if(!allExpanded)focusDisclosure(group.querySelector('.ds-disclosure-panel:not([hidden]) input, .ds-disclosure-panel:not([hidden]) select, .ds-disclosure-panel:not([hidden]) textarea')||group.querySelector('.ds-disclosure-head h3'))};
  const closeButtons=[...form.querySelectorAll('.dialog-close,.dialog-cancel')];
@@ -123,9 +133,9 @@ export function mountAdminFormDisclosure(form,kind,{validateFile=()=>null,specs:
  dialog?.addEventListener('cancel',event=>{if(pending)event.preventDefault()},{signal});
  const submitAction=async(event,handler=originalSubmit)=>{
   event.preventDefault();if(editableSections&&adminStepSnapshot(form)===initial)return;if(!controller.guardFinal(event)||pending)return;
-  pending=true;const submitLabel=submit.textContent;const disabled=closeButtons.map(button=>button.disabled);closeButtons.forEach(button=>button.disabled=true);form.setAttribute('aria-busy','true');refresh();
+  pending=true;const submitLabel=submit.textContent;const disabled=closeButtons.map(button=>button.disabled);closeButtons.forEach(button=>button.disabled=true);form.setAttribute('aria-busy','true');if(content)dialog?.setAttribute('aria-busy','true');refresh();
   try{await handler?.call(form,event)}catch(error){const status=form.querySelector('.admin-form-status');if(status)status.textContent=`No pudimos guardar: ${error.message}`}
-  finally{pending=false;submit.textContent=submitLabel;closeButtons.forEach((button,index)=>button.disabled=disabled[index]);form.removeAttribute('aria-busy');refresh()}
+  finally{pending=false;submit.textContent=submitLabel;closeButtons.forEach((button,index)=>button.disabled=disabled[index]);form.removeAttribute('aria-busy');if(content)dialog?.removeAttribute('aria-busy');refresh()}
  };
  form.onsubmit=submitAction;
  const result={...controller,state,refresh,submit:submitAction,destroy:()=>{

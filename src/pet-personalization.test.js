@@ -31,17 +31,20 @@ test('si fallan confirmación y respaldo conserva el intento y la foto para rein
  const draft={file:{name:'pet.jpg',size:100,type:'image/jpeg',lastModified:1},firstName:'Test',email:'test@example.com',phone:'123'};
  let uploads=0;
  const supabase={auth:{getSession:async()=>({data:{session:{user:{id:'user'}}}})},functions:{invoke:async()=>({error:new Error('offline')})}};
- await assert.rejects(sendPetRequest({draft,design:{id:'kaiju',name:'Kaiju'},selection:{variantId:42,model:'Body',size:'M',color:'Blanco',side:'front'},supabase,uploadPhoto:async()=>{uploads++;return 'private/photo.jpg'},onStatus:()=>{}}),/WhatsApp/);
+ await assert.rejects(sendPetRequest({draft,design:{id:'kaiju',name:'Kaiju'},selection:{variantId:42,model:'Body',size:'M',color:'Blanco',side:'front'},supabase,uploadPhoto:async()=>{uploads++;return 'private/photo.jpg'},onStatus:()=>{}}),/sin confirmar/);
  assert.equal(uploads,1);
  assert.ok(draft.attempt?.id);
  assert.equal(draft.uploaded[0].path,'private/photo.jpg');
 });
 test('la recepción recuperada explica que el equipo conserva los datos',()=>{
- const html=petStepHtml({step:3,draft:{orderId:123,recovered:true,firstName:'Ana Pérez',file:{name:'luna.webp'}},selection:{},designName:'Kaiju',escapeText:String});
+ const html=petStepHtml({step:3,draft:{orderId:123,recovered:true,firstName:'Ana Pérez',email:'ana@example.test',file:{name:'luna.webp'},receipt:{sent:false}},selection:{},designName:'Kaiju',escapeText:String});
  assert.match(html,/Tu solicitud quedó guardada para revisión/);
  assert.match(html,/A nombre de Ana Pérez/);
  assert.match(html,/Foto adjunta · luna.webp/);
  assert.match(html,/No necesitas volver a enviar la solicitud/);
+ assert.match(html,/COMPROBANTE DE SOLICITUD/);
+ assert.match(html,/Te responderemos a ana@example.test/);
+ assert.match(html,/No pudimos enviar el correo a ana@example.test/);
 });
 test('la solicitud web exige una acción explícita y confirma la entrega de la foto',()=>{
  const review=petStepHtml({step:3,draft:{file:{name:'familia.jpg'}},selection:{model:'Polera',size:'M',color:'Blanco',side:'front'},designName:'Navidad',subject:'people',escapeText:String});

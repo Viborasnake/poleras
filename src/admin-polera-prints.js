@@ -1,5 +1,6 @@
 import {POLERA_PRINT_LOCATIONS,normalizePoleraPrints,poleraPrintsOverlap} from '../supabase/functions/_shared/catalog-polera-prints.js';
 import {catalogAssetUrl} from './catalog.js';
+import {catalogFileField,setCatalogFileStatus} from './admin-catalog-dialog.js';
 
 const locations=Object.entries(POLERA_PRINT_LOCATIONS);
 
@@ -18,12 +19,16 @@ export function poleraPrintFields(mainUpload){
    <p data-print-selection-status role="status"></p>
   ${locations.map(([key,location])=>`<section data-polera-print="${key}">
    <label class="admin-check" data-print-toggle><input type="checkbox" name="polera_additional_print" value="${key}" disabled><span>Agregar ${location.label.toLowerCase()}</span></label>
-   <label class="admin-file" data-print-upload hidden><span>Archivo para ${location.label.toLowerCase()}</span><input type="file" name="polera_print_${key}" accept="image/png,image/jpeg,image/webp" disabled><output>Ningún archivo seleccionado.</output></label>
-   <div class="design-file-preview" data-art-preview hidden><img alt="Archivo para ${location.label.toLowerCase()}"></div>
+   <div class="admin-catalog-upload" data-print-upload hidden>
+    ${catalogFileField({name:`polera_print_${key}`,label:`Arte para ${location.label.toLowerCase()}`,disabled:true})}
+    <div class="design-file-preview" data-art-preview hidden><img alt="Arte para ${location.label.toLowerCase()}"></div>
+   </div>
    <div data-print-mockup="${key}" hidden>
-    <label class="admin-file"><span>Mockup de ${location.label.toLowerCase()} (opcional)</span><input type="file" name="polera_mockup_${key}" accept="image/png,image/jpeg,image/webp" disabled><output>Ningún archivo seleccionado.</output></label>
+    <div class="admin-catalog-upload">
+     ${catalogFileField({name:`polera_mockup_${key}`,label:`Mockup de ${location.label.toLowerCase()} (opcional)`,disabled:true})}
+     <div class="design-file-preview" hidden><img alt="Mockup de ${location.label.toLowerCase()}"></div>
+    </div>
     <label class="admin-check" hidden><input type="checkbox" name="clear_polera_mockup_${key}" disabled><span>Quitar mockup guardado</span></label>
-    <div class="design-file-preview" hidden><img alt="Mockup de ${location.label.toLowerCase()}"></div>
    </div>
   </section>`).join('')}
   </fieldset>
@@ -32,9 +37,9 @@ export function poleraPrintFields(mainUpload){
 
 function updateFilePreview(input,preview,cleared=false){
  const file=input.files[0],path=input.dataset.currentArtwork;
- const output=input.closest('label').querySelector('output'),image=preview.querySelector('img');
+ const image=preview.querySelector('img');
  if(image.getAttribute('src')?.startsWith('blob:'))URL.revokeObjectURL(image.src);
- output.textContent=cleared?'Se quitará este mockup.':file?file.name:path?'Archivo actual conservado. Puedes reemplazarlo.':'Ningún archivo seleccionado.';
+ setCatalogFileStatus(input,cleared?'Se quitará al guardar':file?file.name:path?'Archivo actual':'Sin archivo',Boolean(file||path&&!cleared));
  const url=cleared?'':file?URL.createObjectURL(file):catalogAssetUrl(path);
  if(url)image.src=url;else image.removeAttribute('src');
  preview.hidden=input.disabled||!url;
@@ -58,7 +63,7 @@ export function syncPoleraPrintFields(form,changed){
   check.disabled=!enabled||conflictsPrimary;
   file.disabled=check.disabled||!check.checked;
   file.required=!file.disabled&&!file.dataset.currentArtwork;
-  file.closest('label').hidden=file.disabled;
+  section.querySelector('[data-print-upload]').hidden=file.disabled;
   const art=section.querySelector('[data-art-preview]');art.hidden=file.disabled||!art.querySelector('img').getAttribute('src');
   const mockup=container.querySelector(`[data-print-mockup="${location}"]`),photo=mockup.querySelector('[type="file"]'),clear=mockup.querySelector('[type="checkbox"]');
   const destination=isPrimary?primaryMockup:section;

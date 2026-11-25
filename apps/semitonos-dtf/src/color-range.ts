@@ -1,6 +1,7 @@
 export type SelectionStroke={x:number;y:number;toX:number;toY:number;radius:number;erase:boolean}
 export type ColorRange = {colors:string[]; tolerance:number; softness:number;useColors?:boolean;strokes?:SelectionStroke[]}
 export const defaultColorRange:ColorRange = {colors:['#ffffff'],tolerance:8,softness:4}
+export const maxSelectionBrushSize = 120
 
 export function validColorRange(value:unknown):value is ColorRange {
   if(!value||typeof value!=='object')return false
@@ -9,7 +10,7 @@ export function validColorRange(value:unknown):value is ColorRange {
     &&v.colors.every(c=>typeof c==='string'&&/^#[\da-f]{6}$/i.test(c))
     &&[v.tolerance,v.softness].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=100)
     &&(v.useColors===undefined||typeof v.useColors==='boolean')
-    &&(v.strokes===undefined||(Array.isArray(v.strokes)&&v.strokes.length<=20000&&v.strokes.every(s=>s&&typeof s.erase==='boolean'&&[s.x,s.y,s.toX,s.toY,s.radius].every(n=>Number.isFinite(n)&&n>=0&&n<=1)&&s.radius>0)))
+    &&(v.strokes===undefined||(Array.isArray(v.strokes)&&v.strokes.length<=20000&&v.strokes.every(s=>s&&typeof s.erase==='boolean'&&[s.x,s.y,s.toX,s.toY].every(n=>Number.isFinite(n)&&n>=0&&n<=1)&&Number.isFinite(s.radius)&&s.radius>0&&s.radius<=maxSelectionBrushSize/2)))
 }
 
 // Rasterize normalized brush segments once per render, independent of output
