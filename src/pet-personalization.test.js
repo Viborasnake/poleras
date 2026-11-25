@@ -37,18 +37,19 @@ test('si fallan confirmación y respaldo conserva el intento y la foto para rein
  assert.equal(draft.uploaded[0].path,'private/photo.jpg');
 });
 test('la recepción recuperada explica que el equipo conserva los datos',()=>{
- const html=petStepHtml({step:3,draft:{orderId:123,recovered:true},selection:{},designName:'Kaiju',escapeText:String});
- assert.match(html,/guardamos tu contacto, selección, fotos e indicaciones/);
- assert.match(html,/No necesitas enviarlas otra vez/);
+ const html=petStepHtml({step:3,draft:{orderId:123,recovered:true,firstName:'Ana Pérez',file:{name:'luna.webp'}},selection:{},designName:'Kaiju',escapeText:String});
+ assert.match(html,/Tu solicitud quedó guardada para revisión/);
+ assert.match(html,/A nombre de Ana Pérez/);
+ assert.match(html,/Foto adjunta · luna.webp/);
+ assert.match(html,/No necesitas volver a enviar la solicitud/);
 });
 test('la solicitud web exige una acción explícita y confirma la entrega de la foto',()=>{
  const review=petStepHtml({step:3,draft:{file:{name:'familia.jpg'}},selection:{model:'Polera',size:'M',color:'Blanco',side:'front'},designName:'Navidad',subject:'people',escapeText:String});
  assert.match(review,/Nada se envía automáticamente/);
  assert.match(review,/Enviar solicitud/);
  assert.equal(petSubmitLabel(3,'cart'),'Enviar solicitud');
- const success=petStepHtml({step:3,draft:{orderId:123},selection:{},designName:'Navidad',subject:'people',escapeText:String});
- assert.match(success,/ya fueron enviadas al equipo/);
- assert.match(success,/No necesitas enviarlas otra vez/);
+ const success=petStepHtml({step:3,draft:{orderId:123,firstName:'Ana Pérez',petName:'Luna',file:{name:'luna.webp'}},selection:{model:'Polera',size:'M',color:'Blanco',preliminaryPrice:'$17.980'},designName:'Mascota Navidad',subject:'pets',escapeText:String});
+ for(const text of ['Recibimos tu personalización','Solicitud #123','A nombre de Ana Pérez','Nombre de la mascota · Luna','Mascota Navidad · Polera · M · Blanco','Foto adjunta · luna.webp','Precio preliminar · $17.980','precio final'])assert.ok(success.includes(text),text);
 });
 test('WhatsApp aclara que abrir el chat no envía la solicitud',()=>{
  const html=petStepHtml({step:3,purchaseMethod:'whatsapp',draft:{},selection:{model:'Polera',size:'M',color:'Blanco',side:'front'},designName:'Navidad',subject:'people',escapeText:String});

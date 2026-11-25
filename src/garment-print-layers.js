@@ -28,7 +28,7 @@ export function createPrintLayerCollection({build,attach,dispose,onError=()=>{}}
       if(previous)dispose(previous);
       entry.resource=resource;attach(resource,layer);
      }catch(error){
-      if(!closed&&entries.get(layer.id)===entry){entry.key=null;onError(error);}
+      if(!closed&&entries.get(layer.id)===entry){entry.key=null;onError(error,layer,context);}
      }
     })();
     return entry.pending;

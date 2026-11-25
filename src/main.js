@@ -1,4 +1,4 @@
-import {catalogPrintPriceRows,catalogPrintViews} from './catalog-print-presentation.js';
+import {catalogPrintLabel,catalogPrintPriceRows,catalogPrintViews} from './catalog-print-presentation.js';
 import {catalogPoleraComposition,catalogChargeablePrints,normalizePoleraPrints,POLERA_PRINT_LOCATIONS} from '../supabase/functions/_shared/catalog-polera-prints.js';
 import {printPrice} from '../supabase/functions/_shared/print-pricing.js';
 import {studioPreviewState} from './studio-preview.js';
@@ -37,6 +37,7 @@ import {mountIdeaFlow,mountPetFlow,mountWhatsAppFlow,mountCheckoutFlow} from './
 import { previewKey, needsGeneratedPreview } from './catalog-preview-cache.js';
 import {catalogDesignAllowsBasePurchase,catalogDesignForVariantSelection,isCatalogPrintIncluded,normalizeCatalogDesignPurchaseMode} from '../supabase/functions/_shared/catalog-personalization.js';
 import {stableRequestId} from './request-attempt.js';
+import {mercadoPagoFeedback,receiptEmailFeedback,whatsappFeedback} from './commerce-feedback.js';
 import {effectiveQualityReview} from './quality-review.js';
 import {cartPriceBreakdown,cartVariantBasePrice} from './cart-pricing.js';
 import {accountFromUser,accountNavigationState} from './account-navigation.js';
@@ -52,7 +53,7 @@ import { orderTypeLabel } from './order-type.js';
 import { communes, provinces } from '@clregions/data/array';
 import { uploadPrivateDesign, sharePrivateDesign } from './design-storage.js';
 import {buildWhatsAppPurchaseMessage,effectivePurchaseMethod,hasCartPurchase,purchaseMethodLabel,purchaseTypeFor,whatsappPurchaseUrl} from './purchase-methods.js';
-import { petPhotoError, petStepHtml, petSubmitLabel, bindPetStep, sendPetRequest } from './pet-personalization.js';
+import { petPhotoError, petRequestIdentity, petStepHtml, petSubmitLabel, bindPetStep, sendPetRequest } from './pet-personalization.js';
 import { CUSTOMER_IMAGE_POLICY, imageFileError, optimizeImage } from './image-optimization.js';
 import { productFamilyIcon } from './product-family-icons.js';
 const icons={arrow:'↗',spark:'✳',close:'×'};
@@ -406,8 +407,34 @@ async function createWhatsAppOrder({requestType='purchase',customer,idea='',prod
  const requestId=stableRequestId(localStorage,'droska-whatsapp-attempt',signature);
  const captchaToken=await requestCaptchaToken();
  const {data,error}=await supabase.functions.invoke('create-whatsapp-order',{body:{requestId,requestType,customer,idea,product,details,captchaToken}});
- if(error||data?.error){const detail=error?.context?.json?await error.context.json().catch(()=>null):null;throw new Error(data?.error||detail?.error||error?.message||'No pudimos registrar la solicitud de WhatsApp.');}
+ if(error||!data?.orderId){const detail=error?.context?.json?await error.context.json().catch(()=>null):null;throw new Error(data?.error||detail?.error||error?.message||'No pudimos registrar la solicitud de WhatsApp.');}
  return data;
+}
+function showCommerceReceipt({title,message,tone='success',reference,contents=[],contentsLabel='Qué recibimos',details='',link}){
+ const target=document.querySelector('#payment-content');
+ const summary=contents.length?`<div class="mp-success-details"><strong>${safe(contentsLabel)}</strong><ul>${contents.map(item=>`<li>${safe(item)}</li>`).join('')}</ul></div>`:'';
+ target.innerHTML=`<section class="mp-success commerce-receipt" data-tone="${tone}"><div class="mp-success-icon" aria-hidden="true">${{success:'✓',info:'↗',warning:'!',error:'!'}[tone]}</div><h2 id="payment-title" tabindex="-1">${safe(title)}</h2>${reference?`<p><strong>${safe(reference)}</strong></p>`:''}<p>${safe(message)}</p>${summary}${details}${link?`<a class="button dark ds-cta" href="${safe(link.url)}" target="_blank" rel="noopener noreferrer">${safe(link.label)}</a>`:''}<button type="button" class="button dark ds-cta" data-receipt-close>Entendido</button></section>`;
+ target.querySelector('[data-receipt-close]').onclick=()=>paymentModal.close();
+ openDialog(paymentModal);
+ target.querySelector('#payment-title').focus();
+}
+function newPetRequest(designId){
+ return {designId,firstName:state.name||[state.firstName,state.lastName].filter(Boolean).join(' '),email:state.email,phone:state.phone};
+}
+function showWhatsAppReceipt({url,popup,orderId,contents,pendingAttachments,preliminaryPrice}){
+ try{if(popup&&!popup.closed)popup.location.replace(url)}catch{}
+ showCommerceReceipt({
+  ...whatsappFeedback({orderId,contents,pendingAttachments,preliminaryPrice}),
+  link:{url,label:'Abrir WhatsApp'}
+ });
+}
+function whatsappSelectionContents(variant,name){
+ const product=cartProductLabel({modelCode:state.kind,kind:products[state.kind].name});
+ return [[product,state.catalogDesignName,sizeLabel(state.kind,state.size),variant.colorName||state.color].filter(Boolean).join(' · '),name&&`A nombre de ${name}`,'Tus datos de contacto'].filter(Boolean);
+}
+function preliminarySelectionPrice(variant,{personalized=currentPurchaseType()==='personalized',review=0}={}){
+ const price=variantPriceForPurchase(variant,personalized);
+ return Number.isInteger(price)?money(currentPrintPricing(price,review).total):'';
 }
 function updateCommerceNav(){const itemCount=cart.reduce((sum,item)=>sum+item.quantity,0),cartAvailable=hasCartPurchase(catalogProducts,storefrontSettings),navigation=accountNavigationState(account);accountButton.innerHTML=navigation.authenticated?`<span class="account-initial" aria-hidden="true">${safe(navigation.label).slice(0,1).toUpperCase()}</span><span class="account-label">${safe(navigation.label)}</span>`:`<span class="account-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span><span class="account-label">${safe(navigation.label)}</span>`;accountButton.setAttribute('aria-label',navigation.ariaLabel);headerLogoutButton.hidden=!navigation.authenticated;headerLogoutButton.setAttribute('aria-label',navigation.authenticated?`Cerrar sesión de ${navigation.label}`:'Cerrar sesión');cartButton.innerHTML=`<svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>${itemCount}</b>`;cartButton.hidden=!cartAvailable;cartButton.classList.toggle('has-items',itemCount>0)}
 document.addEventListener('click',event=>{
@@ -419,7 +446,7 @@ document.addEventListener('click',event=>{
  const fields=['custom-idea','custom-name','custom-email','custom-phone'].map(id=>document.querySelector(`#${id}`));
  for(const field of fields)if(!field?.checkValidity()){field?.reportValidity();return}
  const popup=window.open('about:blank','droska-whatsapp'),release=lockStudioRequest();button.disabled=true;button.textContent='Abriendo WhatsApp…';
- (async()=>{try{state.customIdea=fields[0].value.trim();state.customName=fields[1].value.trim();state.customEmail=fields[2].value.trim();state.customPhone=fields[3].value.trim();const order=await createWhatsAppOrder({requestType:'creative',idea:state.customIdea,details:'El cliente adjuntará sus referencias directamente en WhatsApp.',customer:{name:state.customName,email:state.customEmail,phone:state.customPhone}});const message=buildWhatsAppPurchaseMessage({purchaseType:'personalized',productName:'Diseño personalizado',designName:state.catalogDesignName,personalization:[state.customIdea,'Adjuntaré mis imágenes de referencia en este chat.',`Solicitud #${order.orderId}`].filter(Boolean).join(' · '),customer:{name:state.customName,email:state.customEmail,phone:state.customPhone}}),url=whatsappPurchaseUrl(storefrontSettings.whatsapp_number,message);if(popup)popup.location.replace(url);else window.location.assign(url)}catch(error){popup?.close();toast(error.message||'No pudimos registrar la solicitud. Intenta nuevamente.','error')}finally{button.innerHTML='Solicitar por WhatsApp <span aria-hidden="true">→</span>';release()}})()
+ (async()=>{try{state.customIdea=fields[0].value.trim();state.customName=fields[1].value.trim();state.customEmail=fields[2].value.trim();state.customPhone=fields[3].value.trim();const order=await createWhatsAppOrder({requestType:'creative',idea:state.customIdea,details:'El cliente adjuntará sus referencias directamente en WhatsApp.',customer:{name:state.customName,email:state.customEmail,phone:state.customPhone}});const message=buildWhatsAppPurchaseMessage({purchaseType:'personalized',productName:'Diseño personalizado',designName:state.catalogDesignName,personalization:[state.customIdea,'Adjuntaré mis imágenes de referencia en este chat.',`Solicitud #${order.orderId}`].filter(Boolean).join(' · '),customer:{name:state.customName,email:state.customEmail,phone:state.customPhone}}),url=whatsappPurchaseUrl(storefrontSettings.whatsapp_number,message);showWhatsAppReceipt({url,popup,orderId:order.orderId,contents:['Tu idea de diseño',`A nombre de ${state.customName}`,'Tus datos de contacto'],pendingAttachments:'tus imágenes de referencia si tienes'});}catch(error){popup?.close();showCommerceReceipt({title:'No pudimos confirmar el registro',message:error.message||'Tus datos siguen aquí. Puedes reintentar el envío.',tone:'error'})}finally{button.innerHTML='Solicitar por WhatsApp <span aria-hidden="true">→</span>';release()}})()
 },true);
 const accountDate=value=>new Intl.DateTimeFormat('es-CL',{day:'numeric',month:'short',year:'numeric'}).format(new Date(value));
 function accountDashboardShell(active){return `<div class="account-welcome"><span class="account-initial large">${safe(account.name).slice(0,1).toUpperCase()}</span><div><strong>${safe(account.name)}</strong><small>${safe(account.email)}</small></div></div><nav class="account-sections" aria-label="Secciones de mi cuenta"><button type="button" class="${active==='orders'?'active':''}" data-account-section="orders" ${active==='orders'?'aria-current="page"':''}>Mis pedidos</button><button type="button" class="${active==='data'?'active':''}" data-account-section="data" ${active==='data'?'aria-current="page"':''}>Mis datos</button></nav><div class="account-panel" id="account-panel" aria-live="polite"><div class="account-loading"><span></span>Cargando…</div></div><button type="button" class="account-logout" id="logout-account" aria-label="Cerrar sesión de ${safe(account.email)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></svg><span><strong>Cerrar sesión</strong><small>Salir de esta cuenta en este dispositivo</small></span></button>`}
@@ -435,9 +462,41 @@ async function accountOrders(){
 }
 async function claimOrdersToAccount(){if(!account)return;try{const {data,error}=await supabase.functions.invoke('claim-orders');if(error||data?.error)throw error||new Error(data.error)}catch(error){console.error('No pudimos asociar los pedidos existentes',error);toast('No pudimos asociar tus solicitudes anteriores. Reintenta al abrir tu cuenta.','error')}}
 function orderDestination(order){const address=order.shipping_address||{};if(address.fulfillment==='pickup')return 'Retiro coordinado';return [address.address,address.commune,address.region].filter(Boolean).join(', ')||'Dirección por confirmar'}
-function accountOrderPaymentMarkup(order){if(order.archived_at)return '';const transfer=order.payment_instructions?.transfer||{},hasTransfer=Object.values(transfer).some(Boolean),paymentLink=order.payment_instructions?.mercado_pago_url,notice=order.payment_transfer_notice_at,noticeSupported=order.payment_transfer_notice_supported===true,paymentState=orderPaymentState(order),paymentConfirmed=paymentState==='paid';if(!hasTransfer&&!paymentLink)return '';return `<section class="account-order-payment" data-account-order-payment="${safe(order.id)}" aria-label="Datos de pago"><div class="account-order-payment-head"><span>Datos de pago</span><strong>${money(order.total_clp)}</strong></div><p>${paymentConfirmed?'Tu pago fue confirmado. Ya podemos preparar tu pedido.':paymentState==='issue'?'El pago presenta una reversa o mediación. Te contactaremos para resolverla antes de continuar.':paymentState==='review'?'Recibimos información de tu pago. Administración lo está revisando.':'Debes pagar este monto para que podamos preparar tu pedido.'}</p>${hasTransfer?`<dl>${transfer.holder?`<div><dt>Titular</dt><dd>${safe(transfer.holder)}</dd></div>`:''}${transfer.bank?`<div><dt>Banco</dt><dd>${safe(transfer.bank)}</dd></div>`:''}${transfer.account_type||transfer.account_number?`<div><dt>Cuenta</dt><dd>${safe(`${transfer.account_type||''} ${transfer.account_number||''}`.trim())}</dd></div>`:''}${transfer.rut?`<div><dt>RUT</dt><dd>${safe(transfer.rut)}</dd></div>`:''}${transfer.email?`<div><dt>Email</dt><dd>${safe(transfer.email)}</dd></div>`:''}</dl>${noticeSupported&&paymentState==='unpaid'?`<div class="account-order-payment-action">${notice?`<span class="account-order-payment-notice">Aviso enviado. Estamos verificando tu transferencia.</span>`:`<button type="button" class="account-order-payment-link" data-notify-payment-transfer="${safe(order.id)}">Avisar que ya pagué</button>`}</div>`:''}`:''}${paymentLink&&paymentState==='unpaid'?`<a class="account-order-payment-link" href="${safe(paymentLink)}" target="_blank" rel="noreferrer">Pagar online</a>`:''}</section>`}
-document.addEventListener('click',async event=>{const button=event.target.closest('[data-notify-payment-transfer]');if(!button)return;event.preventDefault();const orderId=button.dataset.notifyPaymentTransfer;button.disabled=true;button.textContent='Enviando aviso…';const {data,error}=await supabase.functions.invoke('notify-payment-transfer',{body:{orderId}});if(error||data?.error){button.disabled=false;button.textContent='Avisar que ya pagué';toast(data?.error||error?.message||'No pudimos enviar el aviso.','error');return}toast('Avisamos a la tienda que ya realizaste la transferencia.');renderAccountOrders()});
-document.addEventListener('click',async event=>{const button=event.target.closest('[data-pay-creative]');if(!button)return;const method=button.dataset.paymentMethod||'mercado_pago';button.disabled=true;button.textContent=method==='transfer'?'Preparando transferencia…':'Preparando pago…';const {data,error}=await supabase.functions.invoke('create-creative-payment',{body:{orderId:Number(button.dataset.payCreative),paymentMethod:method}});if(error||data?.error){button.disabled=false;button.textContent=method==='transfer'?'Transferencia bancaria':'Mercado Pago';toast(data?.error||error?.message||'No pudimos iniciar el pago. Intenta nuevamente.','error');return}if(method==='transfer'){toast('Datos de transferencia disponibles en Mis pedidos.');await renderAccountOrders();return}if(!data?.initPoint){button.disabled=false;toast('No recibimos el enlace de Mercado Pago. Intenta nuevamente.','error');return}window.location.assign(data.initPoint)});
+function accountOrderPaymentMarkup(order){if(order.archived_at)return '';const transfer=order.payment_instructions?.transfer||{},hasTransfer=Object.values(transfer).some(Boolean),paymentLink=order.payment_instructions?.mercado_pago_url,notice=order.payment_transfer_notice_at,noticeSupported=order.payment_transfer_notice_supported===true,paymentState=orderPaymentState(order),paymentConfirmed=paymentState==='paid';if(!hasTransfer&&!paymentLink)return '';return `<section class="account-order-payment" data-account-order-payment="${safe(order.id)}" aria-label="Datos de pago"><div class="account-order-payment-head"><span>Datos de pago</span><strong>${money(order.total_clp)}</strong></div><p>${paymentConfirmed?'Tu pago fue confirmado. Ya podemos preparar tu pedido.':paymentState==='issue'?'El pago presenta una reversa o mediación. Te contactaremos para resolverla antes de continuar.':paymentState==='review'?'Recibimos información de tu pago. Administración lo está revisando.':'Debes pagar este monto para que podamos preparar tu pedido.'}</p>${hasTransfer?`<dl>${transfer.holder?`<div><dt>Titular</dt><dd>${safe(transfer.holder)}</dd></div>`:''}${transfer.bank?`<div><dt>Banco</dt><dd>${safe(transfer.bank)}</dd></div>`:''}${transfer.account_type||transfer.account_number?`<div><dt>Cuenta</dt><dd>${safe(`${transfer.account_type||''} ${transfer.account_number||''}`.trim())}</dd></div>`:''}${transfer.rut?`<div><dt>RUT</dt><dd>${safe(transfer.rut)}</dd></div>`:''}${transfer.email?`<div><dt>Email</dt><dd>${safe(transfer.email)}</dd></div>`:''}</dl>${noticeSupported&&notice&&paymentState==='review'?'<p class="account-order-payment-notice">Recibimos tu aviso de transferencia. Estamos verificando el abono.</p>':noticeSupported&&paymentState==='unpaid'?`<div class="account-order-payment-action"><button type="button" class="account-order-payment-link" data-notify-payment-transfer="${safe(order.id)}">Avisar que ya pagué</button></div>`:''}`:''}${paymentLink&&paymentState==='unpaid'?`<a class="account-order-payment-link" href="${safe(paymentLink)}" target="_blank" rel="noreferrer">Pagar online</a>`:''}</section>`}
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-notify-payment-transfer]');
+ if(!button||button.disabled)return;
+ event.preventDefault();
+ const orderId=button.dataset.notifyPaymentTransfer;
+ button.disabled=true;button.textContent='Enviando aviso…';
+ try{
+  const {data,error}=await supabase.functions.invoke('notify-payment-transfer',{body:{orderId}});
+  if(error||!data?.noticedAt)throw new Error(data?.error||await paymentFunctionError(error,'No pudimos enviar el aviso de transferencia.'));
+  showCommerceReceipt({
+   title:'Aviso de transferencia recibido',reference:`Pedido #${orderId}`,
+   message:'Recibimos tu aviso de que hiciste la transferencia. Droska verificará el abono antes de continuar.'
+  });
+  void renderAccountOrders();
+ }catch(error){button.disabled=false;button.textContent='Avisar que ya pagué';toast(error.message,'error')}
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-pay-creative]');
+ if(!button||button.disabled)return;
+ const method=button.dataset.paymentMethod||'mercado_pago';
+ button.disabled=true;
+ button.textContent=method==='transfer'?'Preparando transferencia…':'Preparando pago…';
+ try{
+  const {data,error}=await supabase.functions.invoke('create-creative-payment',{body:{orderId:Number(button.dataset.payCreative),paymentMethod:method}});
+  if(error||!data?.orderId)throw new Error(data?.error||await paymentFunctionError(error,'No pudimos iniciar el pago de la cotización. Intenta nuevamente.'));
+  if(method==='transfer'){
+   showTransferReceipt(data,{creative:true,contents:['Tu elección de pagar la cotización por transferencia bancaria']});
+   await renderAccountOrders();
+   return;
+  }
+  if(!data.initPoint)throw new Error('No recibimos el enlace de Mercado Pago. Intenta nuevamente.');
+  window.location.assign(data.initPoint);
+ }catch(error){button.disabled=false;button.textContent=method==='transfer'?'Transferencia bancaria':'Mercado Pago';toast(error.message,'error')}
+});
 function orderStepper(order){if(order.archived_at)return '<div class="account-order-archived-note">Pedido archivado · solo lectura</div>';const steps=orderSteps(order),current=orderProgressIndex(order.status,order);return `<ol class="order-progress${order.status==='cancelled'?' is-cancelled':''}" style="--order-step-count:${steps.length}" aria-label="Avance del pedido">${steps.map((step,index)=>`<li class="${index<current?'complete':index===current?'current':''}"><span aria-hidden="true">${index<current?'✓':String(index+1).padStart(2,'0')}</span><strong>${safe(step.label)}</strong></li>`).join('')}</ol>${accountOrderPaymentMarkup(order)}`}
 function stopAccountOrdersWatch(){if(accountOrdersChannel){supabase.removeChannel(accountOrdersChannel);accountOrdersChannel=null}}
 function watchAccountOrders(){stopAccountOrdersWatch();if(!account)return;accountOrdersChannel=supabase.channel(`account-orders-${account.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders',filter:`user_id=eq.${account.id}`},()=>{if(accountModal.open&&document.querySelector('[data-account-section="orders"].active'))renderAccountOrders()}).subscribe()}
@@ -828,12 +887,15 @@ function renderStudioGallery(){
   if(src)items.unshift({src,label:'Vista del diseño',productSlug:selectedProduct,focusX:50,focusY:50,artworkFallback:true});
  }
  const key=JSON.stringify([design?.id,design?.name,items]);
- studioGallery.hidden=state.mode!=='browse'||!items.length;
- if(!stagePhoto.hidden&&(studioGallery.hidden||stagePhoto.dataset.kind!==state.kind||stagePhoto.dataset.step!==String(state.step)||key!==galleryKey))closeStagePhoto({restoreFocus:false});
+ const browsingPhotos=state.mode==='browse'&&items.length>0;
+ const singleProduct=browsingPhotos&&items.every(item=>item.productSlug===items[0].productSlug);
+ studio.classList.toggle('has-single-gallery-product',singleProduct);
+ studioGallery.hidden=!browsingPhotos||items.length===1;
+ if(!stagePhoto.hidden&&(!browsingPhotos||stagePhoto.dataset.kind!==state.kind||stagePhoto.dataset.step!==String(state.step)||key!==galleryKey))closeStagePhoto({restoreFocus:false});
  if(key===galleryKey)return;
  galleryKey=key;galleryItems=items;
- stagePhoto.querySelector('.studio-stage-photo-dots').innerHTML=items.map(()=>'<span></span>').join('');
- stagePhoto.querySelectorAll('.studio-stage-photo-nav').forEach(button=>button.hidden=items.length<2);
+ stagePhoto.querySelector('.studio-stage-photo-dots').innerHTML=items.length>1?items.map(()=>'<span></span>').join(''):'';
+ stagePhoto.querySelectorAll('.studio-stage-photo-nav,.studio-stage-photo-pause,.studio-stage-photo-dots').forEach(control=>control.hidden=items.length<2);
  const grid=studioGallery.querySelector('.studio-gallery-grid');
  grid.replaceChildren(...items.map((item,index)=>{
   const button=document.createElement('button');button.type='button';button.className='studio-gallery-card';button.dataset.galleryIndex=String(index);button.setAttribute('aria-label',`Ver fotografía ${index+1} en el visor: ${item.label}`);button.setAttribute('aria-pressed','false');
@@ -926,7 +988,15 @@ function showPreviewFallback(preview){
  container.replaceChildren(shell);
  setPreviewLoading(false);
 }
-document.querySelector('#viewer').addEventListener('preview-error',()=>toast('No pudimos mostrar ese estampado. Prueba reemplazando el archivo.'));
+document.querySelector('#viewer').addEventListener('preview-error',event=>{
+ if(!studio.open||state.mode!=='ready')return;
+ const {layer,catalogDesign}=event.detail||{};
+ if(catalogDesign||state.catalogDesignSlug){
+  const print=layer?` «${catalogPrintLabel(layer)}»`:' del catálogo';
+  const retry=studio.querySelector('.catalog-studio-print-views')?'Vuelve a elegir esa vista.':'Intenta abrir el diseño de nuevo.';
+  toast(`No pudimos mostrar el estampado${print} en 3D. ${retry}`,'error');
+ }else toast('No pudimos mostrar tu estampado en 3D. Intenta volver a cargar el archivo.','error');
+});
 const colorDock=document.createElement('div');colorDock.className='color-dock';colorDock.innerHTML='<span>COLOR</span>';
 const sizeDock=document.createElement('div');sizeDock.className='size-dock';sizeDock.innerHTML='<span>TAMAÑO</span><input id="print-scale" type="range" min="0.55" max="1.70" step="0.01" value="1" aria-label="Tamaño del estampado" title="Tamaño calculado automáticamente"><output id="print-scale-value">100%</output>';
 const catalogDesignLocked=()=>Boolean(state.catalogDesign);
@@ -1662,7 +1732,7 @@ async function chooseCatalogDesign(button){
     applyCatalogDesignPurchaseMode(design,'personalized');
     state.kind=kind;state.size=products[kind].sizes[0]||'';state.color=normalizeSampleColor(design.sampleColor);
     reconcileVariant(design.sampleColor,true);
-    if(state.petRequest?.designId!==design.id||state.petRequest?.orderId)state.petRequest={designId:design.id};
+    if(state.petRequest?.designId!==design.id||state.petRequest?.orderId)state.petRequest=newPetRequest(design.id);
     applyCatalogArtwork(artwork);
     persistDraft();
     syncPreview();
@@ -1788,7 +1858,7 @@ async function prepareCatalogArtwork(design,kind){
  const main=await loadCatalogArtwork(productArtwork);
  return layers.map((layer,index)=>({
   ...layer,
-  image:index===0?artworkUrl(productArtwork):catalogAssetUrl(layer.catalogArtworkPath),
+  image:index===0?artworkUrl(productArtwork):artworkUrl({artworkPath:catalogAssetUrl(layer.catalogArtworkPath)}),
   fileName:`droska-${design.id}-${layer.id||'front'}.webp`,
   assessment:index===0?checkResolution(main.naturalWidth,main.naturalHeight):null,
  }));
@@ -2120,13 +2190,17 @@ function renderStep(){
     'Te enviaré mis fotos de referencia por este chat.'
    ].filter(Boolean).join('\n\n');
    const whatsappUrl=whatsappPurchaseUrl(storefrontSettings.whatsapp_number,whatsappMessage);
-   stepContent.innerHTML=`<button type="button" class="studio-back-choice" data-studio-choice="choose">← Cambiar ruta</button><span class="eyebrow">RUTA 2 · TU IDEA</span><h2>¿Cómo quieres solicitar tu diseño?</h2><p class="studio-choice-intro">Elige cómo enviarnos tu idea. Primero la revisaremos y te contactaremos con una propuesta.</p><div class="studio-choice-grid"><button type="button" class="studio-choice-card studio-choice-card--design" data-custom-channel="form"><span class="studio-choice-number">01 · EN ESTA PÁGINA</span><span class="studio-choice-icon" aria-hidden="true">✎</span><strong>Solicitar por formulario</strong><small>Cuéntanos tu idea, adjunta referencias y envía la solicitud aquí.</small><span class="studio-choice-link">Abrir formulario <span aria-hidden="true">→</span></span></button><a class="studio-choice-card studio-choice-card--idea" href="${escapeText(whatsappUrl)}" target="_blank" rel="noopener noreferrer"><span class="studio-choice-number">02 · EN WHATSAPP</span><span class="studio-choice-icon" aria-hidden="true">↗</span><strong>Solicitar por WhatsApp</strong><small>Cuéntanos tu idea y adjunta las fotos directamente en el chat.</small><span class="studio-choice-link">Abrir WhatsApp <span aria-hidden="true">↗</span></span></a></div>`;
+   stepContent.innerHTML=`<button type="button" class="studio-back-choice" data-studio-choice="choose">← Cambiar ruta</button><span class="eyebrow">RUTA 2 · TU IDEA</span><h2>¿Cómo quieres solicitar tu diseño?</h2><p class="studio-choice-intro">Elige cómo enviarnos tu idea. Primero la revisaremos y te contactaremos con una propuesta.</p><div class="studio-choice-grid"><button type="button" class="studio-choice-card studio-choice-card--design" data-custom-channel="form"><span class="studio-choice-number">01 · EN ESTA PÁGINA</span><span class="studio-choice-icon" aria-hidden="true">✎</span><strong>Solicitar por formulario</strong><small>Cuéntanos tu idea, adjunta referencias y envía la solicitud aquí.</small><span class="studio-choice-link">Abrir formulario <span aria-hidden="true">→</span></span></button><a class="studio-choice-card studio-choice-card--idea" data-idea-whatsapp href="${escapeText(whatsappUrl)}" target="_blank" rel="noopener noreferrer"><span class="studio-choice-number">02 · EN WHATSAPP</span><span class="studio-choice-icon" aria-hidden="true">↗</span><strong>Solicitar por WhatsApp</strong><small>Cuéntanos tu idea y adjunta las fotos directamente en el chat.</small><span class="studio-choice-link">Abrir WhatsApp <span aria-hidden="true">↗</span></span></a></div>`;
    applyDesignSystemClasses(stepContent);
    stepContent.querySelector('[data-studio-choice]').onclick=()=>{state.mode='choose';renderStep()};
    stepContent.querySelectorAll('[data-custom-channel]').forEach(button=>button.onclick=()=>{state.customChannel=button.dataset.customChannel;renderStep()});
+   stepContent.querySelector('[data-idea-whatsapp]').addEventListener('click',()=>{
+    const contents=[state.customIdea.trim()&&'Tu idea de diseño',(state.customName||state.customEmail||state.customPhone)&&'Los datos de contacto que ingresaste'].filter(Boolean);
+    showWhatsAppReceipt({url:whatsappUrl,contents,pendingAttachments:'tus imágenes de referencia si tienes'});
+   });
    restorePublicFocus();return;
   }
-  stepContent.innerHTML=state.customSubmitted?`<span class="eyebrow">SOLICITUD RECIBIDA</span><h2>Tu idea ya está en camino.</h2><p>Solicitud #${safe(state.creativeOrderId)}</p><p class="custom-request-lead">Revisaremos lo que nos contaste y te contactaremos con una propuesta de diseño, precio y plazo. Crea una cuenta con el mismo correo para seguirla en Mis pedidos.</p><div class="custom-request-success"><strong>¿Quieres acelerar la conversación?</strong><span>También puedes enviarnos el detalle directamente por WhatsApp.</span><button type="button" class="button dark ds-cta" id="custom-whatsapp">Enviar por WhatsApp <span aria-hidden="true">→</span></button></div>`:`<div class="custom-route-actions"><button type="button" class="studio-back-choice" data-studio-choice="choose">← Cambiar ruta</button><button type="button" class="studio-back-choice" id="custom-change-channel">Cambiar canal</button></div><span class="eyebrow">RUTA 2 · TU IDEA</span><h2>Cuéntanos qué imaginas.</h2><p class="custom-request-lead">No necesitas tener un diseño listo. Con tu idea y algunas referencias, preparamos una propuesta contigo.</p><label class="field">¿Qué te gustaría crear?<textarea id="custom-idea" required minlength="10" maxlength="4000" placeholder="Ej. Una polera para mi banda, con un dibujo de una serpiente y la frase…">${escapeText(state.customIdea)}</textarea></label>${customReferencesHtml()}<div class="custom-request-contact"><label class="field">Tu nombre<input id="custom-name" required autocomplete="name" placeholder="Cómo te llamas" value="${escapeText(state.customName)}"></label><label class="field">Tu email<input id="custom-email" required type="email" autocomplete="email" placeholder="tu@email.com" value="${escapeText(state.customEmail)}"></label><label class="field">Tu teléfono<input id="custom-phone" required type="tel" autocomplete="tel" placeholder="+56 9 1234 5678" value="${escapeText(state.customPhone)}"></label></div><button type="button" class="button dark ds-cta custom-submit" id="custom-submit">Enviar mi idea <span aria-hidden="true">→</span></button><p class="studio-choice-note">Todavía no estás comprando. Primero te enviaremos una propuesta y cotización.</p>`;
+  stepContent.innerHTML=state.customSubmitted?`<span class="eyebrow">SOLICITUD RECIBIDA</span><h2 tabindex="-1" data-request-receipt>Recibimos tu idea.</h2><p><strong>Solicitud #${safe(state.creativeOrderId)}</strong></p><ul><li>Tu idea de diseño</li><li>A nombre de ${safe(state.customName)}</li><li>Tus datos de contacto</li>${state.references.map(reference=>`<li>Referencia adjunta · ${safe(reference.name)}</li>`).join('')}</ul><p class="custom-request-lead">Revisaremos tu idea y te contactaremos con una propuesta de diseño, precio y plazo. Puedes seguirla en Mis pedidos con el mismo correo.</p>${state.creativeReceiptNote?`<p>${safe(state.creativeReceiptNote)}</p>`:''}<button type="button" class="button dark ds-cta" data-request-done>Entendido</button>`:`<div class="custom-route-actions"><button type="button" class="studio-back-choice" data-studio-choice="choose">← Cambiar ruta</button><button type="button" class="studio-back-choice" id="custom-change-channel">Cambiar canal</button></div><span class="eyebrow">RUTA 2 · TU IDEA</span><h2>Cuéntanos qué imaginas.</h2><p class="custom-request-lead">No necesitas tener un diseño listo. Con tu idea y algunas referencias, preparamos una propuesta contigo.</p><label class="field">¿Qué te gustaría crear?<textarea id="custom-idea" required minlength="10" maxlength="4000" placeholder="Ej. Una polera para mi banda, con un dibujo de una serpiente y la frase…">${escapeText(state.customIdea)}</textarea></label>${customReferencesHtml()}<div class="custom-request-contact"><label class="field">Tu nombre<input id="custom-name" required autocomplete="name" placeholder="Cómo te llamas" value="${escapeText(state.customName)}"></label><label class="field">Tu email<input id="custom-email" required type="email" autocomplete="email" placeholder="tu@email.com" value="${escapeText(state.customEmail)}"></label><label class="field">Tu teléfono<input id="custom-phone" required type="tel" autocomplete="tel" placeholder="+56 9 1234 5678" value="${escapeText(state.customPhone)}"></label></div><button type="button" class="button dark ds-cta custom-submit" id="custom-submit">Enviar mi idea <span aria-hidden="true">→</span></button><p class="studio-choice-note">Todavía no estás comprando. Primero te enviaremos una propuesta y cotización.</p>`;
   applyDesignSystemClasses(stepContent);
   if(!state.customSubmitted&&ideaRequestMethod()==='whatsapp'){
    const customButton=stepContent.querySelector('#custom-submit');if(customButton)customButton.innerHTML='Solicitar por WhatsApp <span aria-hidden="true">→</span>';
@@ -2137,16 +2211,16 @@ function renderStep(){
   for(const [id,key] of [['custom-idea','customIdea'],['custom-name','customName'],['custom-email','customEmail'],['custom-phone','customPhone']])stepContent.querySelector('#'+id)?.addEventListener('input',event=>{state[key]=event.target.value});
   stepContent.querySelector('#reference-files')?.addEventListener('change',event=>addReferenceFiles(event.target.files));
   stepContent.querySelectorAll('[data-remove-reference]').forEach(button=>button.onclick=()=>{const index=Number(button.dataset.removeReference),reference=state.references.splice(index,1)[0];if(reference?.url?.startsWith('blob:'))URL.revokeObjectURL(reference.url);renderStep()});
-  stepContent.querySelector('#custom-submit')?.addEventListener('click',async event=>{if(publicRequestBusy||activePublicFlow&&!activePublicFlow.guardFinal(event))return;const fields=['custom-idea','custom-name','custom-email','custom-phone'].map(id=>document.querySelector(`#${id}`));for(const field of fields)if(!field.checkValidity())return field.reportValidity();const button=event.currentTarget;state.customIdea=fields[0].value.trim();state.customName=fields[1].value.trim();state.customEmail=fields[2].value.trim();state.customPhone=fields[3].value.trim();const signature=JSON.stringify([state.customIdea,state.customEmail.toLowerCase(),state.customPhone,state.references.map(reference=>reference.name)]);try{const attempt=JSON.parse(localStorage.getItem('droska-creative-attempt')||'null');state.creativeRequestId=attempt?.signature===signature&&attempt?.id||crypto.randomUUID();localStorage.setItem('droska-creative-attempt',JSON.stringify({signature,id:state.creativeRequestId}))}catch{}const release=lockStudioRequest();button.disabled=true;button.textContent='Enviando…';try{let {data:{session}}=await supabase.auth.getSession();if(!session){const result=await signInAnonymouslyWithCaptcha(supabase);if(result.error)throw result.error;session=result.data.session}if(!session)throw new Error('No pudimos iniciar la sesión de solicitud.');const references=[];for(const reference of state.references){if(reference.path&&reference.userId!==session.user.id){reference.path=null}if(!reference.path){button.textContent='Subiendo referencias…';reference.path=await uploadPrivateDesign(supabase,session.user.id,'reference',reference.file);reference.userId=session.user.id}references.push({name:reference.name,path:reference.path})}button.textContent='Verificando solicitud…';const captchaToken=await requestCaptchaToken();button.textContent='Enviando idea…';const {data,error}=await supabase.functions.invoke('create-design-request',{body:{requestId:state.creativeRequestId,idea:state.customIdea,customer:{firstName:state.customName,email:state.customEmail,phone:state.customPhone},references,catalogDesignSlug:state.catalogDesignCustomerImage?state.catalogDesignSlug:null,captchaToken}});if(error||data?.error){const detail=error?.context?.json?await error.context.json().catch(()=>null):null;throw new Error(data?.error||detail?.error||error?.message||'No pudimos enviar tu idea.');}state.creativeOrderId=data.orderId;state.customSubmitted=true;try{localStorage.removeItem('droska-creative-attempt')}catch{}renderStep()}catch(error){if(error?.name==='CaptchaError'||/verificaci[oó]n de seguridad|verificar tu solicitud/i.test(String(error?.message||error))){button.disabled=false;button.innerHTML='Reintentar envío <span aria-hidden="true">→</span>';toast(error.message,'error');return}if(/anonymous sign-ins are disabled/i.test(String(error?.message||error))){button.disabled=false;button.innerHTML='Reintentar envío <span aria-hidden="true">→</span>';state.email=state.customEmail;renderAccount('login');document.querySelector('#account-title').textContent='Ingresa para enviar tu idea.';document.querySelector('#account-content .commerce-copy').textContent='Tus respuestas y fotos siguen aquí. Inicia sesión o crea una cuenta y luego reintenta el envío.';if(!accountModal.open)accountModal.showModal();return}button.textContent='Registrando respaldo para contactarte…';try{const order=await createWhatsAppOrder({requestType:'creative',idea:state.customIdea,details:'La solicitud web falló. El cliente enviará sus referencias por WhatsApp.',customer:{name:state.customName,email:state.customEmail,phone:state.customPhone}});const message=`Hola, soy ${state.customName}. Quiero continuar la solicitud #${order.orderId}.\n\nMi idea: ${state.customIdea}\n\nEmail: ${state.customEmail}\nTeléfono: ${state.customPhone}${state.references.length?`\n\nTengo ${state.references.length} foto(s) de referencia para enviar por aquí.`:''}`;window.location.assign(whatsappPurchaseUrl(storefrontSettings.whatsapp_number,message))}catch(fallbackError){button.disabled=false;button.innerHTML='Reintentar envío <span aria-hidden="true">→</span>';toast(fallbackError.message||error.message||'No pudimos registrar tu solicitud. Tus datos siguen aquí para reintentar.','error')}}finally{release()}});
-  stepContent.querySelector('#custom-whatsapp')?.addEventListener('click',()=>{const message=`Hola, soy ${state.customName}. Quiero diseñar una polera. Mi idea es: ${state.customIdea}`;window.open(`https://wa.me/56965217926?text=${encodeURIComponent(message)}`,'_blank','noopener')});
+  stepContent.querySelector('#custom-submit')?.addEventListener('click',async event=>{if(publicRequestBusy||activePublicFlow&&!activePublicFlow.guardFinal(event))return;const fields=['custom-idea','custom-name','custom-email','custom-phone'].map(id=>document.querySelector(`#${id}`));for(const field of fields)if(!field.checkValidity())return field.reportValidity();const button=event.currentTarget;state.customIdea=fields[0].value.trim();state.customName=fields[1].value.trim();state.customEmail=fields[2].value.trim();state.customPhone=fields[3].value.trim();const signature=JSON.stringify([state.customIdea,state.customEmail.toLowerCase(),state.customPhone,state.references.map(reference=>reference.name)]);try{const attempt=JSON.parse(localStorage.getItem('droska-creative-attempt')||'null');state.creativeRequestId=attempt?.signature===signature&&attempt?.id||crypto.randomUUID();localStorage.setItem('droska-creative-attempt',JSON.stringify({signature,id:state.creativeRequestId}))}catch{}const release=lockStudioRequest();button.disabled=true;button.textContent='Enviando…';try{let {data:{session}}=await supabase.auth.getSession();if(!session){const result=await signInAnonymouslyWithCaptcha(supabase);if(result.error)throw result.error;session=result.data.session}if(!session)throw new Error('No pudimos iniciar la sesión de solicitud.');const references=[];for(const reference of state.references){if(reference.path&&reference.userId!==session.user.id){reference.path=null}if(!reference.path){button.textContent='Subiendo referencias…';reference.path=await uploadPrivateDesign(supabase,session.user.id,'reference',reference.file);reference.userId=session.user.id}references.push({name:reference.name,path:reference.path})}button.textContent='Verificando solicitud…';const captchaToken=await requestCaptchaToken();button.textContent='Enviando idea…';const {data,error}=await supabase.functions.invoke('create-design-request',{body:{requestId:state.creativeRequestId,idea:state.customIdea,customer:{firstName:state.customName,email:state.customEmail,phone:state.customPhone},references,catalogDesignSlug:state.catalogDesignCustomerImage?state.catalogDesignSlug:null,captchaToken}});if(error||!data?.orderId){const detail=error?.context?.json?await error.context.json().catch(()=>null):null;throw new Error(data?.error||detail?.error||error?.message||'No pudimos enviar tu idea.');}state.creativeOrderId=data.orderId;state.creativeReceiptNote=receiptEmailFeedback(data.receipt,state.customEmail,'Los datos de la solicitud');state.customSubmitted=true;try{localStorage.removeItem('droska-creative-attempt')}catch{}renderStep();stepContent.querySelector('[data-request-receipt]')?.focus()}catch(error){if(error?.name==='CaptchaError'||/verificaci[oó]n de seguridad|verificar tu solicitud/i.test(String(error?.message||error))){button.disabled=false;button.innerHTML='Reintentar envío <span aria-hidden="true">→</span>';toast(error.message,'error');return}if(/anonymous sign-ins are disabled/i.test(String(error?.message||error))){button.disabled=false;button.innerHTML='Reintentar envío <span aria-hidden="true">→</span>';state.email=state.customEmail;renderAccount('login');document.querySelector('#account-title').textContent='Ingresa para enviar tu idea.';document.querySelector('#account-content .commerce-copy').textContent='Tus respuestas y fotos siguen aquí. Inicia sesión o crea una cuenta y luego reintenta el envío.';if(!accountModal.open)accountModal.showModal();return}button.textContent='Registrando respaldo para contactarte…';try{const order=await createWhatsAppOrder({requestType:'creative',idea:state.customIdea,details:'La solicitud web falló. El cliente enviará sus referencias por WhatsApp.',customer:{name:state.customName,email:state.customEmail,phone:state.customPhone}});const message=`Hola, soy ${state.customName}. Quiero continuar la solicitud #${order.orderId}.\n\nMi idea: ${state.customIdea}\n\nEmail: ${state.customEmail}\nTeléfono: ${state.customPhone}${state.references.length?`\n\nTengo ${state.references.length} foto(s) de referencia para enviar por aquí.`:''}`;const url=whatsappPurchaseUrl(storefrontSettings.whatsapp_number,message);button.innerHTML='Reintentar envío <span aria-hidden="true">→</span>';showWhatsAppReceipt({url,orderId:order.orderId,contents:['Tu idea de diseño',`A nombre de ${state.customName}`,'Tus datos de contacto'],pendingAttachments:state.references.length?'tus fotos de referencia':''})}catch(fallbackError){button.disabled=false;button.innerHTML='Reintentar envío <span aria-hidden="true">→</span>';showCommerceReceipt({title:'No pudimos confirmar el envío de tu idea',message:fallbackError.message||error.message||'Tus datos siguen aquí. Puedes reintentar el envío.',tone:'error'})}}finally{release()}});
+  stepContent.querySelector('[data-request-done]')?.addEventListener('click',()=>studio.close());
   if(!state.customSubmitted)activePublicFlow=mountIdeaFlow({container:stepContent,button:stepContent.querySelector('#custom-submit'),state,disclosure:publicFlowState(`idea:${state.creativeRequestId}:${ideaRequestMethod()}`),purchaseMethod:ideaRequestMethod()});
   restorePublicFocus();return;
  }
  if(state.step===2&&!resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant){state.step=1;toast('La talla o el color cambió. Revisa una opción disponible.','error')}
  if(state.catalogDesignCustomerImage&&state.step>1){
-  const draft=state.petRequest||(state.petRequest={designId:state.catalogDesignSlug});
+  const draft=state.petRequest||(state.petRequest=newPetRequest(state.catalogDesignSlug));
   const variant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;
-  const selection={variantId:variant?.id,model:products[state.kind].name,size:state.size,color:variant?.colorName||state.color,side:state.printSide};
+  const selection={variantId:variant?.id,model:products[state.kind].name,size:sizeLabel(state.kind,state.size),color:variant?.colorName||state.color,side:state.printSide,preliminaryPrice:preliminarySelectionPrice(variant,{personalized:true})};
   document.querySelector('.steps').innerHTML='<div class="steps-rail" style="--step-count:3;--rail-progress:'+((state.step-1)/3*100)+'%;--rail-edge:16.67%"><i aria-hidden="true"></i>'+['Detalles',selectedCatalogDesign()?.customerPhotoSubject==='people'?'Tu foto':'Tu mascota','Enviar solicitud'].map((label,index)=>`<span class="${state.step===index+1?'active':''}" ${state.step===index+1?'aria-current="step"':''}><b>${index+1}</b><small>${label}</small></span>`).join('')+'</div>';
   stepContent.innerHTML=petStepHtml({step:state.step,draft,selection,designName:state.catalogDesignName,subject:selectedCatalogDesign()?.customerPhotoSubject,purchaseMethod:currentPurchaseMethod(),escapeText});
   bindPetStep(stepContent,draft,()=>activePublicFlow?.refresh(),selectedCatalogDesign()?.customerPhotoSubject);
@@ -2396,8 +2470,8 @@ async function openWhatsAppForCurrentSelection(){
   const order=await createWhatsAppOrder({requestType:'purchase',customer:{name,email,phone},details:personalization,product:{variantId:variant.id,modelCode:state.kind,size:state.size,color:state.color,printSides,printConfiguration,catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:Boolean(state.catalogDesignCustomerImage),purchaseType:currentPurchaseType()}});
   const message=buildWhatsAppPurchaseMessage({purchaseType:currentPurchaseType(),productName:state.kind==='tote'?'Tote bag':state.kind==='body'?'Body bebé':'Polera',designName:state.catalogDesignName||state.catalogDesign,model:products[state.kind]?.name,size:sizeLabel(state.kind,state.size),color:variant?.colorName||state.color,sides:printConfigurationLabel(printConfiguration,printSides),quantity:1,personalization:[personalization,`Solicitud #${order.orderId}`].filter(Boolean).join(' · '),customer:{name,email,phone}});
   const url=whatsappPurchaseUrl(storefrontSettings.whatsapp_number,message);storeCustomerDetails();persistDraft();
-  if(popup)popup.location.replace(url);else window.location.assign(url);
- }catch(error){popup?.close();toast(error.message||'No pudimos preparar la solicitud por WhatsApp.','error')}finally{release()}
+  showWhatsAppReceipt({url,popup,orderId:order.orderId,contents:whatsappSelectionContents(variant,name),preliminaryPrice:preliminarySelectionPrice(variant,{review:state.qualityReview?QUALITY_ADJUSTMENT_CLP:0}),pendingAttachments:state.catalogDesignCustomerImage?'la foto para personalizar':personalization?'tu archivo de diseño o referencia':''});
+ }catch(error){popup?.close();showCommerceReceipt({title:'No pudimos confirmar el registro',message:error.message||'Tus datos siguen aquí. Puedes reintentar el envío.',tone:'error'})}finally{release()}
 }
 async function restoreSavedDesigns(){
  if(state.catalogDesignSlug)return;
@@ -2432,6 +2506,7 @@ document.querySelector('#design-form').onsubmit=e=>{
   if(!variant){state.step=1;renderStep();return toast('Revisa una talla y color disponibles.','error')}
   const fields=[...document.querySelectorAll('[data-pet-contact]')];
   for(const field of fields)if(!field.value.trim()||!field.reportValidity())return field.focus();
+  const preliminaryPrice=preliminarySelectionPrice(variant,{personalized:true});
   if(currentPurchaseMethod()==='whatsapp'){
    draft.busy=true;const popup=window.open('about:blank','droska-whatsapp'),release=lockStudioRequest();
    const status=document.querySelector('[data-pet-status]');if(status)status.textContent='Preparando tu solicitud para WhatsApp…';
@@ -2442,17 +2517,17 @@ document.querySelector('#design-form').onsubmit=e=>{
      const order=await createWhatsAppOrder({requestType:'purchase',customer:{name:draft.firstName,email:draft.email,phone:draft.phone},details:personalization,product:{variantId:variant.id,modelCode:state.kind,size:state.size,color:state.color,printSides,printConfiguration,catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:true,purchaseType:'personalized'}});
      const message=buildWhatsAppPurchaseMessage({purchaseType:'personalized',productName:state.kind==='tote'?'Tote bag':state.kind==='body'?'Body bebé':'Polera',designName:state.catalogDesignName,model:products[state.kind].name,size:state.size,color:variant.colorName||state.color,sides:printConfigurationLabel(printConfiguration,printSides),personalization:[personalization,`Solicitud #${order.orderId}`].filter(Boolean).join(' · '),customer:{name:draft.firstName,email:draft.email,phone:draft.phone}});
      const url=whatsappPurchaseUrl(storefrontSettings.whatsapp_number,message);
-     if(popup)popup.location.replace(url);else window.location.assign(url);
-    }catch(error){popup?.close();toast(error.message||'No pudimos registrar la solicitud. Intenta nuevamente.','error')}finally{draft.busy=false;if(status)status.textContent='';release()}
+     showWhatsAppReceipt({url,popup,orderId:order.orderId,contents:[...whatsappSelectionContents(variant),...petRequestIdentity(draft,people?'people':'pets'),draft.notes&&'Tus indicaciones para el diseño'].filter(Boolean),preliminaryPrice,pendingAttachments:people?'las fotos de las personas':'las fotos de tu mascota'});
+    }catch(error){popup?.close();showCommerceReceipt({title:'No pudimos confirmar el registro',message:error.message||'Tus datos siguen aquí. Puedes reintentar el envío.',tone:'error'})}finally{draft.busy=false;if(status)status.textContent='';release()}
    })()
    return;
   }
   const controls=[...studio.querySelectorAll('button,input,textarea')],disabled=controls.map(control=>control.disabled);
   draft.busy=true;controls.forEach(control=>control.disabled=true);studio.setAttribute('aria-busy','true');
   const status=document.querySelector('[data-pet-status]');
-  sendPetRequest({draft,design:selectedCatalogDesign(),selection:{variantId:variant.id,modelCode:state.kind,model:products[state.kind].name,size:state.size,color:variant.colorName,colorHex:state.color,side:state.printSide},supabase,
+  sendPetRequest({draft,design:selectedCatalogDesign(),selection:{variantId:variant.id,modelCode:state.kind,model:products[state.kind].name,size:state.size,sizeLabel:sizeLabel(state.kind,state.size),color:variant.colorName,colorHex:state.color,side:state.printSide,preliminaryPrice},supabase,
     uploadPhoto:(userId,file)=>uploadPrivateDesign(supabase,userId,'reference',file),onStatus:message=>{status.textContent=message}
-  }).then(()=>renderStep()).catch(error=>{status.textContent=error.message}).finally(()=>{draft.busy=false;studio.removeAttribute('aria-busy');controls.forEach((control,index)=>control.disabled=disabled[index])});
+  }).then(()=>{renderStep();studio.querySelector('[data-request-receipt]')?.focus()}).catch(error=>{status.textContent=error.message}).finally(()=>{draft.busy=false;studio.removeAttribute('aria-busy');controls.forEach((control,index)=>control.disabled=disabled[index])});
   return;
  }
  if(state.step===1){const customPlacement=studioDetailIncludesPrintPlacement(state.catalogDesignSlug);if(!detailsCanContinue()){detailsDisclosure.focus=ensureDetailsDisclosure().pending;renderStep();return toast(customPlacement?'Completa la ubicación y los archivos pendientes para continuar.':'Completa las opciones pendientes para continuar.','error')}if(customPlacement&&!confirmDetail('side')){detailsDisclosure.focus='side';renderStep();return toast('Completa la ubicación y los archivos pendientes para continuar.','error')}persistDraft();const whatsappPurchase=currentPurchaseMethod()==='whatsapp';if(!resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant)return toast('Elige una talla y color disponibles para este diseño.','error');if(customPlacement&&!whatsappPurchase&&!hasRequiredFiles())return toast('Carga el archivo pendiente de cada estampado para continuar.');state.qualityAccepted=true;state.qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:Boolean(failingSides().length)});state.step=2;activateSide(includedSides()[0]);return renderStep()}
@@ -2541,28 +2616,55 @@ async function submitTransferOrder(){
   const payload={paymentMethod:'transfer',draftOrderId:state.checkoutDraftId,items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
   const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});
   if(error||!data?.orderId)throw new Error(data?.error||await paymentFunctionError(error,'No pudimos ingresar el pedido por transferencia. Intenta nuevamente.'));
-  const submittedCart=[...cart];cart=[];state.cartItemId=null;state.checkoutDraftId=null;saveLocal(CART_KEY,cart);updateCommerceNav();for(const item of submittedCart)removeCartDesignFiles(item.id).catch(()=>{});
-  const transfer=data.paymentInstructions?.transfer||{},account=[transfer.holder&&`<div><span>Titular</span><strong>${safe(transfer.holder)}</strong></div>`,transfer.bank&&`<div><span>Banco</span><strong>${safe(transfer.bank)}</strong></div>`,(transfer.account_type||transfer.account_number)&&`<div><span>Cuenta</span><strong>${safe(`${transfer.account_type||''} ${transfer.account_number||''}`.trim())}</strong></div>`,transfer.rut&&`<div><span>RUT</span><strong>${safe(transfer.rut)}</strong></div>`,transfer.email&&`<div><span>Email</span><strong>${safe(transfer.email)}</strong></div>`].filter(Boolean).join('');const emailNote=data.email?.sent?'También enviamos estos datos a tu correo.':'Guarda estos datos para hacer la transferencia. Podrás verlos nuevamente en Mis pedidos al iniciar sesión.';const target=document.querySelector('#payment-content');setPaymentLoading(false,'Solicitar pago por transferencia');target.innerHTML=`<div class="mp-success"><div class="mp-success-icon" aria-hidden="true">✓</div><span class="eyebrow">PEDIDO RECIBIDO</span><h2>Completa tu transferencia.</h2><p>Tu pedido #${data.orderId} quedó ingresado y pendiente de confirmación.</p><dl class="account-order-payment">${account}</dl><p>${emailNote}</p><button type="button" class="button dark" id="transfer-done">Entendido</button><small>Comenzaremos a preparar tu pedido cuando confirmemos el abono.</small></div>`;target.querySelector('#transfer-done').onclick=()=>paymentModal.close();persistDraft();
+  const contents=cart.map(item=>`${item.quantity} × ${[cartProductLabel(item),catalogDesigns.find(design=>design.id===item.catalogDesignSlug)?.name||(!item.catalogDesignSlug?'Diseño propio':''),sizeLabel(item.modelCode,item.size),cartColorLabel(item)].filter(Boolean).join(' · ')}`);
+  contents.push(`A nombre de ${[state.firstName,state.lastName].filter(Boolean).join(' ')}`);
+  contents.push(state.fulfillment==='delivery'?'Tus datos de contacto y despacho':'Tus datos de contacto y la opción de retiro');
+  clearSubmittedCart();
+  setPaymentLoading(false,'Solicitar pago por transferencia');
+  showTransferReceipt(data,{contents,email:state.email});
  }catch(error){setPaymentLoading(false,'Solicitar pago por transferencia');if(errorNode){errorNode.textContent=error.message||'No pudimos ingresar el pedido por transferencia.';errorNode.hidden=false}}
 }
+function showTransferReceipt(data,{contents,email,creative=false}){
+ const transfer=data.paymentInstructions?.transfer||{};
+ const fields=[
+  ['Monto a transferir',money(data.totalClp)],
+  ['Titular',transfer.holder],['Banco',transfer.bank],
+  ['Cuenta',`${transfer.account_type||''} ${transfer.account_number||''}`.trim()],['RUT',transfer.rut],['Email',transfer.email]
+ ];
+ const accountDetails=`<dl class="account-order-payment">${fields.filter(([,value])=>value).map(([label,value])=>`<div><dt>${label}</dt><dd>${safe(value)}</dd></div>`).join('')}</dl>`;
+ const emailNote=receiptEmailFeedback(data.email,email,'Los datos para transferir');
+ showCommerceReceipt({
+  title:creative?'Transferencia habilitada':'Pedido recibido',reference:`${creative?'Solicitud':'Pedido'} #${data.orderId}`,
+  message:'El pago está pendiente. Haz la transferencia con estos datos y avísanos desde Mis pedidos.',
+  contents,details:`${accountDetails}${emailNote?`<p>${safe(emailNote)}</p>`:''}`
+ });
+}
+function clearSubmittedCart(){
+ for(const item of cart){cartDesignMemory.delete(item.id);removeCartDesignFiles(item.id).catch(()=>{})}
+ cart=[];state.cartItemId=null;state.checkoutDraftId=null;
+ saveLocal(CART_KEY,cart);updateCommerceNav();persistDraft();
+}
 async function showMercadoPagoReturn(){
- const params=new URLSearchParams(location.search),status=params.get('mp_status');
- if(!status)return;
- const orderId=params.get('order_id');
- const cleanUrl=new URL(location.href);['mp_status','order_id','payment_id','status','external_reference','preference_id'].forEach(key=>cleanUrl.searchParams.delete(key));history.replaceState(null,'',`${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
- if(status==='failure')persistDraft()
- if(/^\d+$/.test(orderId||'')){
-  const {data:order}=await supabase.from('orders').select('status,request_type').eq('id',Number(orderId)).maybeSingle();
-  if(order?.status==='paid'){
-   if(order.request_type==='creative'){toast(`Pago confirmado · Solicitud #${orderId}. Puedes seguirla en Mis pedidos.`);return}
-   for(const item of cart)removeCartDesignFiles(item.id).catch(()=>{});
-   cart=[];state.cartItemId=null;state.checkoutDraftId=null;saveLocal(CART_KEY,cart);updateCommerceNav();
-   toast(`Pago confirmado · Pedido #${orderId}. Ya puedes seguir su avance en Mis pedidos.`);
-   return;
-  }
+ const params=new URLSearchParams(location.search),returnStatus=params.get('mp_status');
+ if(!returnStatus)return;
+ const rawOrderId=params.get('order_id'),orderId=/^\d+$/.test(rawOrderId||'')?rawOrderId:null;
+ const cleanUrl=new URL(location.href);
+ ['mp_status','order_id','payment_id','collection_id','collection_status','status','external_reference','payment_type','merchant_order_id','preference_id','site_id','processing_mode','merchant_account_id'].forEach(key=>cleanUrl.searchParams.delete(key));
+ history.replaceState(null,'',`${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+ let order=null;
+ if(orderId){
+  try{
+   const result=await supabase.from('orders').select('request_type,total_clp,shipping_address,payment_confirmed_at,payment_confirmed_by,payments(provider,status),order_items(name_snapshot,quantity)').eq('id',orderId).maybeSingle();
+   order=result.data;
+  }catch{}
  }
- const messages={success:['Pago recibido','Mercado Pago recibió tu pago. Estamos confirmando el pedido y lo verás en tu cuenta en unos segundos.','info'],pending:['Pago pendiente','El pago quedó pendiente de confirmación. Te avisaremos cuando Mercado Pago nos entregue el resultado.','info'],failure:['Pago no completado','No se completó el pago. Tu carro sigue disponible para intentarlo nuevamente.','error']};
- const [title,message,tone]=messages[status]||messages.pending;toast(`${title}${orderId?` · Pedido #${orderId}`:''}. ${message}`,tone);
+ const receipt=mercadoPagoFeedback({returnStatus,order,orderId});
+ if(receipt.tone==='success'&&order?.request_type!=='creative'&&orderId===String(state.checkoutDraftId))clearSubmittedCart();
+ const customer=order?.shipping_address?.customer;
+ const name=[customer?.first_name,customer?.last_name].filter(Boolean).join(' ');
+ if(name)receipt.contents.push(`A nombre de ${name}`);
+ if(Number.isInteger(order?.total_clp))receipt.contents.push(`Monto · ${money(order.total_clp)}`);
+ showCommerceReceipt({...receipt,contentsLabel:'Detalle del pago'});
 }
 function showSaved(){}
 let toastTimer;function toast(message,tone='info'){const raw=String(message||''),guestCheckoutFailure=/no pudimos iniciar la compra como invitado/i.test(raw),looksTechnical=/invalid|credentials|email not confirmed|already registered|password should|rate limit|auth|anonymous sign-ins are disabled/i.test(raw),localized=(looksTechnical||guestCheckoutFailure)?authErrorMessage(raw):raw,resolvedTone=guestCheckoutFailure?'error':tone;const el=document.querySelector('#toast');(document.querySelector('dialog[open]')||document.body).append(el);el.dataset.tone=resolvedTone;el.setAttribute('role',resolvedTone==='error'?'alert':'status');el.innerHTML=`<span aria-hidden="true">${resolvedTone==='error'?'!':'✓'}</span><p>${safe(localized)}</p>`;el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),4500)}

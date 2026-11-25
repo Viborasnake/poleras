@@ -298,7 +298,7 @@ export async function createViewer(container, state, { hero = false, viewAngle =
     build:buildPrint,
     attach:({mesh})=>group.add(mesh),
     dispose:({mesh})=>{group.remove(mesh);mesh.geometry.dispose();mesh.material.map?.dispose();mesh.material.dispose();},
-    onError:error=>container.dispatchEvent(new CustomEvent('preview-error',{detail:error})),
+    onError:(error,layer,{catalogDesign})=>container.dispatchEvent(new CustomEvent('preview-error',{detail:{error,layer,catalogDesign}})),
   });
 
   async function buildPrint(layer,next){

@@ -30,3 +30,30 @@ test('una carga atrasada no revive un estampado quitado ni reemplaza el nuevo',a
  const late=prints.update([{id:'arm',image:'late'}],{});await prints.update([],{});loaders.get('late')();await late;
  assert.deepEqual(attached,['new']);assert.equal(prints.entries.size,0);assert.ok(removed.includes('late'));
 });
+
+test('un estampado que falla identifica su ubicación y se puede reintentar por separado',async()=>{
+ const front={id:'primary-front',side:'front',image:'front.webp'};
+ const back={id:'catalog-back',side:'back',image:'back.webp'};
+ const context={catalogDesign:true};
+ const errors=[];
+ let backAvailable=false;
+ const prints=createPrintLayerCollection({
+  build:async layer=>{
+   if(layer===back&&!backAvailable)throw new Error('Archivo temporalmente inaccesible');
+   return {id:layer.id};
+  },
+  attach:()=>{},dispose:()=>{},
+  onError:(error,layer,options)=>errors.push({error,layer,options}),
+ });
+ await prints.update([front,back],context);
+ const frontResource=prints.entries.get(front.id).resource;
+ assert.equal(errors.length,1);
+ assert.equal(errors[0].layer,back);
+ assert.equal(errors[0].options,context);
+ assert.ok(frontResource);
+ backAvailable=true;
+ await prints.update([front,back],context);
+ assert.equal(prints.entries.get(front.id).resource,frontResource);
+ assert.ok(prints.entries.get(back.id).resource);
+ assert.equal(errors.length,1);
+});

@@ -29,8 +29,11 @@ export function mountPetFlow({container,button,draft,step,disclosure,purchaseMet
   ],finalButton:button,prefix:'pet-photo-flow',busy:()=>Boolean(draft.optimizing||draft.busy)});
  }
  const contact=container.querySelector('[data-pet-contact-block]'),review=container.querySelector('[data-pet-review]'),group=groupBefore(contact);
+ const customerName=review.querySelector('[data-pet-review-name]');
  container.append(review);
- return mount({group,state:disclosure,steps:[{id:'contact',title:'Contacto',node:contact}],review,finalButton:button,prefix:'pet-contact-flow',busy:()=>Boolean(draft.busy)});
+ return mount({group,state:disclosure,steps:[{id:'contact',title:'Contacto',node:contact}],review,finalButton:button,prefix:'pet-contact-flow',busy:()=>Boolean(draft.busy),onChange:()=>{
+  if(customerName)customerName.textContent=contact.querySelector('[data-pet-value="firstName"]').value.trim();
+ }});
 }
 
 export function mountWhatsAppFlow({container,button,disclosure,busy=()=>false}){
