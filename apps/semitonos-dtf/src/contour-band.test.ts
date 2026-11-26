@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {appendContourStroke,defaultContourBand,maxContourWidth} from './contour-band.ts'
+import {appendContourStroke,contourPadding,defaultContourBand,maxContourWidth} from './contour-band.ts'
 import {garmentPresets} from './garment-presets.ts'
 import {processImage} from './process-image.ts'
 import type {Settings} from './App'
@@ -79,6 +79,33 @@ test('widening brush overrides taper only under the stroke', () => {
   const result=processImage(input,width,height,{...settings,contourBand:painted},undefined,false,padding).data
   assert.ok(inkIn(result,padding,10,10,22,22)>inkIn(normal,padding,10,10,22,22))
   assert.equal(inkIn(result,padding,42,10,54,22),inkIn(normal,padding,42,10,54,22))
+})
+
+test('a fine stroke within a straight inward band widens it beyond the automatic width', () => {
+  const automatic={...defaultContourBand,widthPx:8,flow:0,softness:0}
+  const segment={from:{x:27/width,y:42/height},to:{x:27/width,y:54/height}}
+  const widened=appendContourStroke(automatic,[segment],'widen',3,width,{width,height},0,24)
+  const before=processImage(picture(),width,height,{...settings,contourBand:automatic}).data
+  const after=processImage(picture(),width,height,{...settings,contourBand:widened}).data
+  assert.equal(inkIn(before,0,33,43,42,54),99)
+  assert.ok(inkIn(after,0,33,43,42,54)<99)
+  assert.equal(inkIn(after,0,33,62,38,66),inkIn(before,0,33,62,38,66))
+  assert.equal(contourPadding({enabled:true,contourBand:widened}),0)
+})
+
+test('a local outward stroke prints beyond the original margin without changing the artwork', () => {
+  const automatic={...defaultContourBand,side:'outside' as const,widthPx:12,flow:0,softness:0}
+  const initialPadding=12
+  const bitmap={width:width+2*initialPadding,height:height+2*initialPadding}
+  const x=(initialPadding-6)/bitmap.width
+  const segment={from:{x,y:(initialPadding+40)/bitmap.height},to:{x,y:(initialPadding+55)/bitmap.height}}
+  const widened=appendContourStroke(automatic,[segment],'widen',3,bitmap.width,bitmap,initialPadding,36)
+  const padding=contourPadding({enabled:true,contourBand:widened})
+  assert.equal(padding,36)
+  const after=processImage(picture(0),width,height,{...settings,contourBand:widened},undefined,false,padding).data
+  assert.ok(inkIn(after,padding,-31,41,-15,55)>0)
+  assert.equal(inkIn(after,padding,-31,59,-15,65),0)
+  assert.deepEqual(pixel(after,0,48,padding),color)
 })
 
 test('exclusion keeps original artwork solid and follows the outline when padding changes', () => {

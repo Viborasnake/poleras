@@ -222,6 +222,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [brushTool, setBrushTool] = useState(false)
   const [colorBrushTool, setColorBrushTool] = useState(false)
   const [contourBrush,setContourBrush] = useState<ContourBrushMode|null>(null)
+  const [contourBrushWidth,setContourBrushWidth] = useState<number>()
   const contourKeyboardPoint = useRef<CanvasPoint>({x:.5,y:.5})
   const [pickColorTool, setPickColorTool] = useState(false)
   const [colorCorrectionVersion, setColorCorrectionVersion] = useState(0)
@@ -428,7 +429,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const padding = manualBase.current?.padding ?? 0
     setPreset('custom')
     setSettings(current=>current.contourBand ? {
-      ...current,contourBand:appendContourStroke(current.contourBand,segments,mode,diameter,displayWidth,bitmap,padding)
+      ...current,contourBand:appendContourStroke(current.contourBand,segments,mode,diameter,displayWidth,bitmap,padding,contourWidenWidth)
     } : current)
   }
   const paintBrushAt = (stroke: NonNullable<typeof brushStroke.current>, point: CanvasPoint) => {
@@ -688,6 +689,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const processing = loading || (!!printOutput && readyKey !== renderKey && !error)
   const retouchPreview = !!fileName && !!displaySize && comparisonTarget !== 'rescale' && !handActive && !panning
   const activeContourBrush = settings.enabled && settings.contourBand ? contourBrush : null
+  const automaticContourWidth = settings.contourBand?.widthPx ?? defaultContourBand.widthPx
+  const minWidenWidth = Math.min(maxContourWidth,automaticContourWidth + 1)
+  const suggestedWidenWidth = Math.min(maxContourWidth,Math.max(automaticContourWidth + 8,Math.round(automaticContourWidth * 1.5)))
+  const contourWidenWidth = Math.max(minWidenWidth,contourBrushWidth ?? suggestedWidenWidth)
   const brushPreviewEnabled = retouchPreview && view !== 'original' && (brushTool || colorBrushTool || !!activeContourBrush)
   const pickerPreviewEnabled = retouchPreview && pickColorTool
   const toggleRetouchTool = (mode: 'clean'|'color'|'picker'|ContourBrushMode) => {
@@ -1231,7 +1236,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                     </div>
                     {activeContourBrush && <>
                       <RangeControl label="Tamaño del pincel de contorno" value={brushSize} min={4} max={maxSelectionBrushSize} unit=" px" onChange={setBrushSize}/>
-                      <p className="help-text" id="contour-brush-help">{activeContourBrush==='widen'?'Pinta para llevar ese tramo al ancho máximo.':'Pinta para quitar la trama de ese tramo y conservar el diseño original.'} Con teclado, enfoca el lienzo, mueve el pincel con las flechas y marca con Intro o Espacio.</p>
+                      {activeContourBrush==='widen' && minWidenWidth < maxContourWidth && <RangeControl label="Ancho al ensanchar" value={contourWidenWidth} min={minWidenWidth} max={maxContourWidth} unit=" px" onChange={setContourBrushWidth}/>}
+                      <p className="help-text" id="contour-brush-help">{activeContourBrush==='widen'
+                        ? automaticContourWidth===maxContourWidth
+                          ? `La franja general está en el límite de ${maxContourWidth} px. Puedes recuperar ese ancho en las zonas afinadas por la fluidez.`
+                          : `Pinta sobre el borde para llevar ese tramo a ${contourWidenWidth} px.`
+                        : 'Pinta para quitar la trama de ese tramo y conservar el diseño original.'} Con teclado, enfoca el lienzo, mueve el pincel con las flechas y marca con Intro o Espacio.</p>
                       {(settings.contourBand.strokes?.length??0)>=maxSelectionStrokes && <p className="help-text" role="status">Se alcanzó el máximo de trazos. Deshaz un retoque para volver a pintar.</p>}
                     </>}
                     {!!settings.contourBand.strokes?.length && <button type="button" className="text-button" onClick={()=>update('contourBand',{...settings.contourBand!,strokes:undefined})}>Restablecer retoques de contorno</button>}
