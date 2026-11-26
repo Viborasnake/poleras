@@ -33,9 +33,9 @@ export type HalftoneSettings = {
 // Clustered ordered screening: retain the source detail inside each dot.
 // Screened dots sample the pixel center so their alpha is binary without
 // expanding the dot to every pixel touched by a subpixel sample.
-export function halftone(data: Uint8ClampedArray, width: number, height: number, s: HalftoneSettings, selectionSource=data, protectionSource=selectionSource) {
+export function halftone(data: Uint8ClampedArray, width: number, height: number, s: HalftoneSettings, selectionSource=data, protectionSource=selectionSource, backgroundSource=selectionSource) {
   if(s.separateBackground){
-    const clean=removeBackground(data,width,height,s,selectionSource)
+    const clean=removeBackground(data,width,height,s,backgroundSource)
     return halftone(clean,width,height,{...s,separateBackground:false,prepared:true,background:'none',screenScope:s.affectedColors?'all':s.screenScope},selectionSource,clean)
   }
   const output = new Uint8ClampedArray(data.length)

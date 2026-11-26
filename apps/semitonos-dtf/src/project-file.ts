@@ -2,6 +2,7 @@ import type {EditorDocument} from './editor-document'
 import {validColorRange} from './color-range.ts'
 import {isEdgeMaskStyle} from './edge-mask.ts'
 import {validContourBand} from './contour-band.ts'
+import {validEdgeRepair} from './edge-decontamination.ts'
 import {isPreviewColor,type PreviewColor} from './preview-colors.ts'
 export type ProjectAsset={id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument;previewColor?:PreviewColor}
 export type ProjectFile={format:'trama-dtf';version:1;name:string;sheet:{width:number;height:number;dpi:number;gap:number;rotate:boolean;optimized?:boolean};background:string;showIndividualColors?:boolean;items:ProjectAsset[];editor?:{name:string;document:EditorDocument;assetId?:string}}
@@ -19,6 +20,7 @@ function checkDocument(d:EditorDocument) {
   if(s.affectedColors!==undefined&&!validColorRange(s.affectedColors))fail()
   if(s.protectedColors!==undefined&&!validColorRange(s.protectedColors))fail()
   if(s.contourBand!==undefined&&!validContourBand(s.contourBand))fail()
+  if(s.edgeRepair!==undefined&&!validEdgeRepair(s.edgeRepair))fail()
   if(s.organic!==undefined&&(!Number.isFinite(s.organic)||s.organic<0||s.organic>100))fail()
   if((s.colorRange!==undefined&&!validColorRange(s.colorRange))||(s.background==='custom'&&!validColorRange(s.colorRange)))fail()
   if(s.customBase!==undefined&&!['black','white'].includes(s.customBase))fail()

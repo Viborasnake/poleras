@@ -1,4 +1,5 @@
 import type {Settings} from './App'
+import type {CropRect} from './crop.ts'
 import {removeBackground} from './background-stage.ts'
 import {colorRangeRetention, selectionBrushMask, selectionCoverage, type ColorRange} from './color-range.ts'
 import {processImage} from './process-image.ts'
@@ -7,6 +8,7 @@ export type PreviewRequest = {
   original: Uint8ClampedArray<ArrayBuffer>; width: number; height: number; range: ColorRange
   settings?: Settings & {dpi: number}; purpose: 'background' | 'isolated' | 'affected' | 'protected'
   view: 'result' | 'mask' | 'background'
+  artwork?: CropRect
 }
 
 self.onmessage = ({data}: MessageEvent<PreviewRequest>) => {
@@ -14,7 +16,7 @@ self.onmessage = ({data}: MessageEvent<PreviewRequest>) => {
     const {original,width,height,settings,range,purpose,view} = data
     const screening = purpose === 'affected' || purpose === 'protected'
     const clean = settings ? removeBackground(original,width,height,settings) : original
-    const result = view === 'result' && settings ? processImage(original,width,height,settings).data : clean
+    const result = view === 'result' && settings ? processImage(original,width,height,settings,undefined,false,0,data.artwork).data : clean
     const retain = colorRangeRetention(range)
     const brush = selectionBrushMask(range,width,height)
     const mask = view === 'mask' ? new Uint8ClampedArray(original.length) : undefined

@@ -21,6 +21,7 @@ import {defaultColorRange,maxSelectionBrushSize,maxSelectionStrokes,validColorRa
 import {isEdgeMaskStyle,type EdgeMaskStyle} from './edge-mask'
 import EdgeMaskPicker from './EdgeMaskPicker'
 import {appendContourStroke, contourPadding, defaultContourBand, maxContourWidth, validContourBand, type ContourBand, type ContourBrushMode} from './contour-band'
+import {normalizedArtwork, type EdgeRepairStroke} from './edge-decontamination'
 import {isPreviewColor,type PreviewColor} from './preview-colors'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
 import HalftoneWorker from './halftone.worker?worker&inline'
@@ -56,6 +57,7 @@ export type Settings = {
   screenBase?: 'black'|'white'
   affectedColors?: ColorRange
   contourBand?: ContourBand
+  edgeRepair?: EdgeRepairStroke[]
   protectedColors?: ColorRange
   organic?: number
   featherMm: number
@@ -221,9 +223,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [handTool, setHandTool] = useState(false)
   const [brushTool, setBrushTool] = useState(false)
   const [colorBrushTool, setColorBrushTool] = useState(false)
+  const [edgeRepairTool, setEdgeRepairTool] = useState(false)
   const [contourBrush,setContourBrush] = useState<ContourBrushMode|null>(null)
   const [contourBrushWidth,setContourBrushWidth] = useState<number>()
-  const contourKeyboardPoint = useRef<CanvasPoint>({x:.5,y:.5})
+  const keyboardBrushPoint = useRef<CanvasPoint>({x:.5,y:.5})
   const [pickColorTool, setPickColorTool] = useState(false)
   const [colorCorrectionVersion, setColorCorrectionVersion] = useState(0)
   const [refinementTab, setRefinementTab] = useState<'clean'|'solid'>('clean')
@@ -237,7 +240,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const eraseHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
   const colorCorrectionHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
   const brushStroke = useRef<{
-    id:number;mode:'clean'|'color'|ContourBrushMode;canvas:HTMLCanvasElement;diameter:number;point:CanvasPoint|null
+    id:number;mode:'clean'|'color'|'edge-repair'|ContourBrushMode;canvas:HTMLCanvasElement;diameter:number;point:CanvasPoint|null
     display:{width:number;height:number};bitmap:{width:number;height:number};segments:{from:CanvasPoint;to:CanvasPoint}[]
   }|null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
@@ -292,6 +295,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   type PanelKey = keyof typeof collapsedPanels
   const togglePanel = (panel:PanelKey) => {
     if (panel !== 'trama' || !collapsedPanels.trama) setContourBrush(null)
+    setEdgeRepairTool(false)
     setCollapsedPanels(current => {
       if (current[panel]) return {presets:true,garment:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
       return {presets:true,garment:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
@@ -304,6 +308,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       return
     }
     if(destination.step!==2)setContourBrush(null)
+    setEdgeRepairTool(false)
     setWorkflowStep(destination.step)
     setTool(destination.tool)
     if (destination.panel) openWorkflowPanel(destination.panel)
@@ -432,6 +437,21 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       ...current,contourBand:appendContourStroke(current.contourBand,segments,mode,diameter,displayWidth,bitmap,padding,contourWidenWidth)
     } : current)
   }
+  const commitEdgeRepair = (segments: {from:CanvasPoint;to:CanvasPoint}[], diameter:number, displayWidth:number) => {
+    const image=imageRef.current
+    if (!image || !segments.length) return
+    const area=normalizedArtwork(crop,image.naturalWidth,image.naturalHeight)
+    const toArtwork=({x,y}:CanvasPoint)=>({x:area.x+x*area.width,y:area.y+y*area.height})
+    const radius=diameter*area.width/(2*displayWidth)
+    setPreset('custom')
+    setSettings(current=>{
+      const strokes=current.edgeRepair??[]
+      const available=maxSelectionStrokes-strokes.length
+      if (available<=0) return current
+      const added=segments.slice(0,available).map(({from,to})=>({from:toArtwork(from),to:toArtwork(to),radius}))
+      return {...current,edgeRepair:[...strokes,...added]}
+    })
+  }
   const paintBrushAt = (stroke: NonNullable<typeof brushStroke.current>, point: CanvasPoint) => {
     const from = stroke.point ?? point
     stroke.point = point
@@ -444,7 +464,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }
   const startBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((!brushPreviewEnabled && !pickerPreviewEnabled) || e.button !== 0 || brushStroke.current || processing || exporting || (activeContourBrush && readyKey !== renderKey)) return
-    const canvas = pickerPreviewEnabled || colorBrushTool ? sourceCanvas.current : resultCanvas.current
+    const canvas = pickerPreviewEnabled || colorBrushTool || edgeRepairTool ? sourceCanvas.current : resultCanvas.current
     if (!canvas?.width || !canvas.height) return
     const rect = canvas.getBoundingClientRect()
     const artwork = trackBrushCursor(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY)
@@ -459,7 +479,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       return
     }
     if (!artwork || !canPaintAt(artwork)) return
-    const mode = activeContourBrush ?? (colorBrushTool ? 'color' : 'clean')
+    const mode = activeContourBrush ?? (edgeRepairTool ? 'edge-repair' : colorBrushTool ? 'color' : 'clean')
     if (mode!=='clean' && brushGuide.current) {
       const guide=brushGuide.current
       const scale=Math.min(1,1600/rect.width,1600/rect.height)
@@ -490,7 +510,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (stroke?.id === e.pointerId) {
       brushStroke.current = null
       const {canvas,bitmap,mode,segments,display,diameter} = stroke
-      if (canvas.width===bitmap.width && canvas.height===bitmap.height && (mode==='widen'||mode==='exclude')) {
+      if (mode==='edge-repair') {
+        if (e.type==='pointerup' && canvas.width===bitmap.width && canvas.height===bitmap.height) {
+          commitEdgeRepair(segments,diameter,display.width)
+        }
+        const guide=brushGuide.current
+        guide?.getContext('2d')?.clearRect(0,0,guide.width,guide.height)
+      } else if (canvas.width===bitmap.width && canvas.height===bitmap.height && (mode==='widen'||mode==='exclude')) {
         commitContourStroke(mode,segments,diameter,display.width,bitmap)
       } else if (canvas.width===bitmap.width && canvas.height===bitmap.height) {
         const clean=mode==='clean'
@@ -514,16 +540,21 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (e.type === 'pointercancel' || (e.type === 'pointerup' && e.pointerType !== 'mouse')) clearBrushCursor()
   }
 
-  const paintContourWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const paintWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const canvas = resultCanvas.current
-    if (!activeContourBrush || !brushPreviewEnabled || !canvas) return
-    const point = contourKeyboardPoint.current
+    if ((!activeContourBrush && !edgeRepairTool) || !brushPreviewEnabled || !canvas) return
+    const point = keyboardBrushPoint.current
     const rect = canvas.getBoundingClientRect()
     if (!rect.width || !rect.height) return
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
       if (!event.repeat && !exporting && readyKey===renderKey && canPaintAt(point)) {
-        commitContourStroke(activeContourBrush,[{from:point,to:point}],brushSize,rect.width,canvas)
+        if (activeContourBrush) commitContourStroke(activeContourBrush,[{from:point,to:point}],brushSize,rect.width,canvas)
+        else if (sourceCanvas.current) {
+          const sourceRect=sourceCanvas.current.getBoundingClientRect()
+          const target=canvasPoint(sourceRect,rect.left+point.x*rect.width,rect.top+point.y*rect.height)
+          if (target) commitEdgeRepair([{from:target,to:target}],brushSize,sourceRect.width)
+        }
         positionBrushCursor(brushCursor.current,point,rect)
       }
       return
@@ -536,7 +567,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       x:Math.max(0,Math.min(1,point.x+movement[0]*step/rect.width)),
       y:Math.max(0,Math.min(1,point.y+movement[1]*step/rect.height)),
     }
-    contourKeyboardPoint.current=next
+    keyboardBrushPoint.current=next
     previewPointer.current=null
     positionBrushCursor(brushCursor.current,next,rect)
     const viewport=viewportRef.current
@@ -599,7 +630,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     setPreset('custom')
     if (panel === 'size') { setCrop(null); setDpi(300); setLastPrintSize(''); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
     if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
-    if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
+    if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup, edgeRepair:undefined})); return }
     if (panel === 'trama') { setSettings(s => ({...s, affectedColors:undefined,protectedColors:undefined,contourBand:undefined,organic:0,screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
     if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, contourShrinkPx: defaults.contourShrinkPx, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
     if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
@@ -636,7 +667,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const existing = readSavedPresets()
     let name = baseName, suffix = 2
     while (existing.some(p => p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) name = `${baseName} (${suffix++})`
-    const saved: SavedPreset = {id:`saved:${crypto.randomUUID()}`,name,garment:activeGarment,settings:{...settings,edgeSides:[...settings.edgeSides]}}
+    const saved: SavedPreset = {id:`saved:${crypto.randomUUID()}`,name,garment:activeGarment,settings:{...settings,edgeRepair:undefined,edgeSides:[...settings.edgeSides]}}
     try {
       localStorage.setItem(presetStorageKey, JSON.stringify([...existing,saved]))
       setSavedPresets([...existing,saved])
@@ -693,12 +724,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const minWidenWidth = Math.min(maxContourWidth,automaticContourWidth + 1)
   const suggestedWidenWidth = Math.min(maxContourWidth,Math.max(automaticContourWidth + 8,Math.round(automaticContourWidth * 1.5)))
   const contourWidenWidth = Math.max(minWidenWidth,contourBrushWidth ?? suggestedWidenWidth)
-  const brushPreviewEnabled = retouchPreview && view !== 'original' && (brushTool || colorBrushTool || !!activeContourBrush)
+  const brushPreviewEnabled = retouchPreview && view !== 'original' && (brushTool || colorBrushTool || edgeRepairTool || !!activeContourBrush)
+  const keyboardBrushActive = brushPreviewEnabled && (!!activeContourBrush || edgeRepairTool)
   const pickerPreviewEnabled = retouchPreview && pickColorTool
-  const toggleRetouchTool = (mode: 'clean'|'color'|'picker'|ContourBrushMode) => {
-    const activate = !(mode === 'clean' ? brushTool : mode === 'color' ? colorBrushTool : mode === 'picker' ? pickColorTool : activeContourBrush === mode)
+  const toggleRetouchTool = (mode: 'clean'|'color'|'picker'|'edge-repair'|ContourBrushMode) => {
+    const activate = !({clean:brushTool,color:colorBrushTool,picker:pickColorTool,'edge-repair':edgeRepairTool,widen:activeContourBrush==='widen',exclude:activeContourBrush==='exclude'}[mode])
     setBrushTool(activate && mode === 'clean')
     setColorBrushTool(activate && mode === 'color')
+    setEdgeRepairTool(activate && mode === 'edge-repair')
     setPickColorTool(activate && mode === 'picker')
     setContourBrush(activate && (mode==='widen'||mode==='exclude') ? mode : null)
     clearBrushCursor()
@@ -734,6 +767,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     setView('split')
     setBrushTool(false)
     setColorBrushTool(false)
+    setEdgeRepairTool(false)
     setPickColorTool(false)
     setContourBrush(null)
     if (target === 'rescale') { setFit(false); setZoom(100) }
@@ -749,7 +783,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       if (!img.naturalWidth || !img.naturalHeight) { setError('La imagen no tiene dimensiones válidas.'); setLoading(false); return }
       imageRef.current = img
       setContourBrush(null)
-      if (!document) setSettings(current=>current.contourBand?.strokes?.length ? {...current,contourBand:{...current.contourBand,strokes:undefined}} : current)
+      setEdgeRepairTool(false)
+      if (!document) setSettings(current=>({...current,edgeRepair:undefined,
+        contourBand:current.contourBand?.strokes?.length ? {...current.contourBand,strokes:undefined} : current.contourBand}))
       manualErase.current = null
       colorCorrection.current = null
       colorCorrectionHistory.current = {past:[],future:[]}
@@ -869,7 +905,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         const cached=cachedEntry ? new Uint8ClampedArray(cachedEntry.data) : null
         const workerData=cached??input.data
         const correctionData = colorCorrection.current?.width === width && colorCorrection.current.height === height ? new Uint8Array(colorCorrection.current.data) : undefined
-        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, padding, sourceWidth: input.width, sourceHeight: input.height, assetOrigin:window.location.origin,compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
+        const message = { data: workerData, colorCorrection: correctionData, artwork:normalizedArtwork(crop,native.width,native.height), preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, padding, sourceWidth: input.width, sourceHeight: input.height, assetOrigin:window.location.origin,compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
         worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
@@ -1118,7 +1154,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               const key = e.target.value
               const saved = savedPresets.find(p => p.id === key)
               setPresetMessage('');setRenamingPreset(false)
-              if(saved){setSettings({...saved.settings,edgeSides:[...saved.settings.edgeSides]});if(saved.garment)setGarment(saved.garment);setPreset(key);setComparisonTarget('result');setView('result');if(saved.settings.background==='black'||saved.settings.background==='white')setPreviewBg(saved.settings.background);else if(saved.garment)setPreviewBg(saved.garment==='light'?'white':'black')}
+              if(saved){setSettings(current=>({...saved.settings,edgeRepair:current.edgeRepair,edgeSides:[...saved.settings.edgeSides]}));if(saved.garment)setGarment(saved.garment);setPreset(key);setComparisonTarget('result');setView('result');if(saved.settings.background==='black'||saved.settings.background==='white')setPreviewBg(saved.settings.background);else if(saved.garment)setPreviewBg(saved.garment==='light'?'white':'black')}
               else applyPreset(key)
             }}><option value="custom" disabled>Personalizado</option><optgroup label={`${activeGarment==='dark'?'Prenda oscura':'Prenda clara'} · ${presetMode==='halftone'?'Semitono':'Sin semitono'}`}>{visiblePresets.map(([key,p]) => <option key={key} value={key}>{p.label}</option>)}</optgroup>{savedPresets.length>0 && <optgroup label="Mis presets">{savedPresets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}</select></label>
             <p className="help-text">{preset in presets ? presets[preset].description : preset.startsWith('saved:') ? 'Preset guardado: trama, nitidez, fondo y bordes. El tamaño de impresión se mantiene.' : 'Ajustes personalizados.'}</p>
@@ -1291,6 +1327,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <p className="help-text">1. Borra únicamente el fondo que no se imprimirá. Este paso cambia la transparencia; no genera puntos. Luego elige las zonas con trama en Semitono.</p>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {!settings.enabled && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); las zonas ya transparentes y el fondo eliminado permanecen transparentes. Úsalo para DTF si no necesitas transparencias suaves.</p></>}
+            <button type="button" className={`btn ${edgeRepairTool?'active':''}`} aria-pressed={edgeRepairTool} disabled={!displaySize || (!edgeRepairTool && processing)} onClick={()=>toggleRetouchTool('edge-repair')}><Pipette size={16} aria-hidden="true"/> Descontaminar borde</button>
+            {edgeRepairTool && <>
+              <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />
+              <p className="help-text" id="edge-repair-help">Pinta sobre el halo. El pincel toma color del borde más opaco cercano y conserva las transparencias. Con teclado, mueve el pincel con las flechas y pinta con Intro o Espacio.</p>
+            </>}
+            {!!settings.edgeRepair?.length && <button type="button" className="text-button" onClick={()=>update('edgeRepair',undefined)}>Restaurar color del borde</button>}
             <button className={`btn color-range-trigger ${settings.background==='custom'?'active':''}`} disabled={!fileName||processing} onClick={()=>{setIsolatedColorPick(false);setShowColorRange(true)}}><Pipette size={16}/><span>{settings.background==='custom'?'Editar color del sustrato…':'Gotero · Color del sustrato…'}</span></button>
             {settings.background==='custom'&&<p className="help-text">{settings.colorRange?.colors.length
               ?`Colores a borrar: ${settings.colorRange.colors.join(', ')}. Tolerancia ${settings.colorRange.tolerance}%.`
@@ -1455,8 +1497,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             }}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className={`artboard ${brushPreviewEnabled ? 'brush-active' : ''} ${pickerPreviewEnabled ? 'color-picker-active' : ''}`}
-              tabIndex={activeContourBrush&&brushPreviewEnabled ? 0 : undefined} aria-label={activeContourBrush&&brushPreviewEnabled?'Lienzo de retoque de contorno':undefined} aria-describedby={activeContourBrush&&brushPreviewEnabled?'contour-brush-help':undefined}
-              onKeyDown={paintContourWithKeyboard} onFocus={event=>{if(activeContourBrush&&event.currentTarget.matches(':focus-visible'))positionBrushCursor(brushCursor.current,contourKeyboardPoint.current,event.currentTarget.getBoundingClientRect())}} onBlur={clearBrushCursor}
+              tabIndex={keyboardBrushActive ? 0 : undefined} aria-label={keyboardBrushActive?(edgeRepairTool?'Lienzo para descontaminar el borde':'Lienzo de retoque de contorno'):undefined} aria-describedby={keyboardBrushActive?(edgeRepairTool?'edge-repair-help':'contour-brush-help'):undefined}
+              onKeyDown={paintWithKeyboard} onFocus={event=>{if(keyboardBrushActive&&event.currentTarget.matches(':focus-visible'))positionBrushCursor(brushCursor.current,keyboardBrushPoint.current,event.currentTarget.getBoundingClientRect())}} onBlur={clearBrushCursor}
               hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}
               onPointerEnter={moveBrush} onPointerDown={startBrush} onPointerMove={moveBrush} onPointerLeave={clearBrushCursor}
               onPointerUp={stopBrush} onPointerCancel={stopBrush} onLostPointerCapture={stopBrush}>
@@ -1465,7 +1507,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}>
                 <canvas ref={sourceCanvas} className="art-canvas" style={{...sourceInset,visibility: comparisonTarget === 'rescale' ? 'visible' : 'hidden'}} />
                 <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget !== 'rescale' ? 'visible' : 'hidden'}} />
-                {(colorBrushTool||activeContourBrush)&&<canvas ref={brushGuide} className="brush-guide" style={colorBrushTool?sourceInset:undefined} aria-hidden="true"/>}
+                {(colorBrushTool||edgeRepairTool||activeContourBrush)&&<canvas ref={brushGuide} className="brush-guide" style={colorBrushTool||edgeRepairTool?sourceInset:undefined} aria-hidden="true"/>}
               </div>
               {(brushPreviewEnabled||pickerPreviewEnabled) && <span ref={brushCursor} hidden className={`brush-cursor${activeContourBrush==='exclude'?' brush-cursor-erase':''}`} style={{width:pickerPreviewEnabled ? 18 : brushSize, height:pickerPreviewEnabled ? 18 : brushSize}} aria-hidden="true" />}
               {view === 'split' && <div className="comparison-labels" aria-hidden="true">

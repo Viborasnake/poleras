@@ -3,6 +3,7 @@ import {Check,Minus,Plus,Trash2,Undo2} from 'lucide-react'
 import EditorDialog from './EditorDialog'
 import {maxSelectionBrushSize,maxSelectionStrokes,type ColorRange,type SelectionStroke} from './color-range'
 import {canvasPoint,drawBrushSegment,positionBrushCursor,type CanvasPoint} from './brush-geometry'
+import {normalizedArtwork} from './edge-decontamination'
 import ColorRangePreviewWorker from './color-range-preview.worker?worker&inline'
 import type {PreviewRequest} from './color-range-preview.worker'
 import type {Settings} from './App'
@@ -71,12 +72,13 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,onA
         if(guide&&!activeStroke.current)guide.getContext('2d')!.clearRect(0,0,guide.width,guide.height)
         setStats({selected:data.selected,visible:data.visible,removed:data.removed,holes:data.holes})
       }
-      const request: PreviewRequest={original,width,height,range,settings:previewSettings,purpose,view}
+      const artwork=normalizedArtwork(crop,image.naturalWidth,image.naturalHeight)
+      const request: PreviewRequest={original,width,height,range,settings:previewSettings,purpose,view,artwork}
       worker.onerror=()=>setMessage('No se pudo actualizar la vista previa.')
       worker.postMessage(request,[original.buffer])
     })
     return()=>{cancelAnimationFrame(frame);worker?.terminate()}
-  },[baseImage,region.x,region.y,region.width,region.height,width,height,range,settings,outputWidth,view,purpose,screening])
+  },[baseImage,crop,image,region.x,region.y,region.width,region.height,width,height,range,settings,outputWidth,view,purpose,screening])
   const colors=range.useColors===false?[]:range.colors
 
   function saveHistory() {
