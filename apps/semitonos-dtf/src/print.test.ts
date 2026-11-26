@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {deflateSync,inflateSync} from 'node:zlib'
 import {encodeRgbaPng,printSize,withPngDpi,inspectPng,withCanvasPrintProfile,resolutionCheck} from './print.ts'
 import {gangPrintSize} from './gang-export.ts'
+import {presetPrintWidth, printWidthGroups} from './print-width-presets.ts'
 function crc(bytes:Uint8Array){let v=~0;for(const b of bytes){v^=b;for(let k=0;k<8;k++)v=(v>>>1)^(-(v&1)&0xedb88320)}return (~v)>>>0}
 function chunk(type:string,data:Uint8Array){const b=Buffer.alloc(12+data.length);b.writeUInt32BE(data.length);b.write(type,4);b.set(data,8);b.writeUInt32BE(crc(b.subarray(4,-4)),b.length-4);return b}
 const pixels=Buffer.from([0,255,0,0,0,0,255,0,255]) // one transparent and one opaque pixel
@@ -13,6 +14,24 @@ test('physical size uses DPI, proportional height and nearest pixel',()=>{
   assert.equal(printSize(30,2/3,300).height,5315)
   assert.equal(printSize(1024*4/300*2.54,2/3,300).height,6144)
   for(const n of [0,-1,NaN,Infinity,10000])assert.throws(()=>printSize(n,1,300))
+})
+test('tote presets fit portrait and landscape artwork within their dimensions', () => {
+  const toteGroup = printWidthGroups.find(({label}) => label === 'Tote bags')
+  assert.ok(toteGroup)
+  assert.deepEqual(toteGroup.options.map(({width, height}) => [width, height]), [[30, 30], [35, 40], [45, 50]])
+  for (const option of toteGroup.options) {
+    assert.ok(option.height)
+    assert.equal(presetPrintWidth(option, 2), option.width)
+    assert.equal(presetPrintWidth(option, 0.5), option.height / 2)
+    assert.equal(presetPrintWidth(option, option.width / option.height), option.width)
+  }
+})
+test('shirt presets keep their print widths for portrait artwork', () => {
+  assert.deepEqual(printWidthGroups.slice(0, 3).map(({options}) => options.map(option => presetPrintWidth(option, 0.5))), [
+    [26, 27, 29, 29, 29],
+    [21, 23, 26, 28, 29],
+    [26, 28, 29, 29, 29],
+  ])
 })
 test('PNG metadata supports 150/300/600 ppp without touching RGBA pixels',()=>{
   for(const dpi of [150,300,600]){

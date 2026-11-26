@@ -1,15 +1,15 @@
 import {useEffect,useRef,useState,type CSSProperties,type KeyboardEvent,type PointerEvent,type UIEvent} from 'react'
 import {Check,Minus,Plus,Trash2,Undo2} from 'lucide-react'
 import EditorDialog from './EditorDialog'
-import {colorRangeRetention,maxSelectionBrushSize,selectionBrushMask,selectionCoverage,type ColorRange} from './color-range'
-import {canvasPoint,type CanvasPoint} from './brush-geometry'
-import {removeBackground} from './background-stage'
-import {processImage} from './process-image'
+import {maxSelectionBrushSize,maxSelectionStrokes,type ColorRange,type SelectionStroke} from './color-range'
+import {canvasPoint,drawBrushSegment,positionBrushCursor,type CanvasPoint} from './brush-geometry'
+import ColorRangePreviewWorker from './color-range-preview.worker?worker&inline'
+import type {PreviewRequest} from './color-range-preview.worker'
 import type {Settings} from './App'
 import type {CropRect} from './CropPanel'
 
-type Props={image:HTMLImageElement;crop:CropRect|null;initial:ColorRange;onApply:(range:ColorRange)=>void;onCancel:()=>void;purpose?:'background'|'isolated'|'affected'|'protected';settings?:Settings&{dpi?:number};outputWidth?:number;processedSource?:HTMLCanvasElement|null}
-export default function ColorRangePanel({image,crop,initial,onApply,onCancel,purpose='background',settings,outputWidth,processedSource}:Props){
+type Props={image:HTMLImageElement;crop:CropRect|null;initial:ColorRange;onApply:(range:ColorRange)=>void;onCancel:()=>void;onAutomaticContour?:(range:ColorRange)=>void;purpose?:'background'|'isolated'|'affected'|'protected';settings?:Settings&{dpi?:number};outputWidth?:number;processedSource?:HTMLCanvasElement|null}
+export default function ColorRangePanel({image,crop,initial,onApply,onCancel,onAutomaticContour,purpose='background',settings,outputWidth,processedSource}:Props){
   const screening=purpose==='affected'||purpose==='protected'
   const [range,setRange]=useState<ColorRange>(()=>structuredClone(initial))
   const [tool,setTool]=useState<'sample'|'paint'|'erase'>(screening&&initial.useColors===false?'paint':'sample')
@@ -20,12 +20,14 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
   const [stats,setStats]=useState({selected:0,visible:0,removed:0,holes:0})
   const [message,setMessage]=useState('')
   const left=useRef<HTMLCanvasElement>(null),right=useRef<HTMLCanvasElement>(null)
+  const brushGuide=useRef<HTMLCanvasElement>(null), cursor=useRef<HTMLSpanElement>(null)
+  const sourceRaster=useRef<HTMLCanvasElement|null>(null)
   const leftViewport=useRef<HTMLDivElement>(null),rightViewport=useRef<HTMLDivElement>(null)
   const sampleButtons=useRef<HTMLUListElement>(null)
   const cleanPreview=useRef<Uint8ClampedArray>(null)
   const keyboardPoint=useRef({x:.5,y:.5})
   const pointer=useRef<CanvasPoint|null>(null)
-  const activeStroke=useRef<{id:number;point:CanvasPoint|null}|null>(null)
+  const activeStroke=useRef<{id:number;point:CanvasPoint|null;segments:SelectionStroke[]}|null>(null)
   const history=useRef<ColorRange[]>([])
   const baseImage=processedSource?.width?processedSource:image
   const region=processedSource?.width?{x:0,y:0,width:processedSource.width,height:processedSource.height}:crop??{x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}
@@ -35,37 +37,45 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
   const renderScale=Math.min(1200/region.width,900/region.height,1)
   const width=Math.max(1,Math.round(region.width*renderScale)),height=Math.max(1,Math.round(region.height*renderScale))
   const displayWidth=Math.max(1,Math.round(region.width*displayScale))
-  const [cursor,setCursor]=useState<CanvasPoint|null>(null)
   useEffect(()=>{
+    let worker: Worker | undefined
     const frame=requestAnimationFrame(()=>{
       const canvas=left.current!,ctx=canvas.getContext('2d')!
-      if(canvas.width!==width)canvas.width=width
-      if(canvas.height!==height)canvas.height=height
-      ctx.clearRect(0,0,width,height);ctx.drawImage(baseImage,region.x,region.y,region.width,region.height,0,0,width,height)
-      const original=ctx.getImageData(0,0,width,height)
+      const source=sourceRaster.current ??= document.createElement('canvas')
+      source.width=width;source.height=height
+      const sourceContext=source.getContext('2d',{willReadFrequently:true})!
+      sourceContext.drawImage(baseImage,region.x,region.y,region.width,region.height,0,0,width,height)
+      const original=sourceContext.getImageData(0,0,width,height).data
+      if(!cleanPreview.current||canvas.width!==width||canvas.height!==height){
+        canvas.width=width;canvas.height=height;ctx.drawImage(source,0,0)
+      }
       const previewSettings=settings?{...settings,separateBackground:true,dpi:(settings.dpi??300)*width/(outputWidth??region.width),
         ...(screening?(purpose==='affected'?{affectedColors:range,screenScope:'all' as const}:{protectedColors:range}):{background:'custom' as const,colorRange:range,enabled:false,solidAlpha:false})}:undefined
-      const clean=previewSettings?removeBackground(original.data,width,height,previewSettings):new Uint8ClampedArray(original.data)
-      cleanPreview.current=clean
-      const result=previewSettings?processImage(original.data,width,height,previewSettings).data:new Uint8ClampedArray(original.data)
-      const retain=colorRangeRetention(range),brush=selectionBrushMask(range,width,height)
-      const mask=new Uint8ClampedArray(original.data.length),overlay=ctx.createImageData(width,height)
-      let selected=0,visible=0,removed=0,holes=0
-      for(let p=0;p<width*height;p++){
-        const i=p*4,selection=selectionCoverage(range,retain(original.data[i],original.data[i+1],original.data[i+2]),brush?.[p])
-        if(original.data[i+3]&&!clean[i+3])removed++
-        if(clean[i+3]){visible++;if(!result[i+3])holes++}
-        const available=screening?clean[i+3]/255:original.data[i+3]/255
-        selected+=selection*available
-        mask[i]=mask[i+1]=mask[i+2]=selection*available*255;mask[i+3]=255
-        if(selection&&available){overlay.data[i]=purpose==='protected'?255:20;overlay.data[i+1]=purpose==='protected'?190:220;overlay.data[i+2]=purpose==='protected'?40:180;overlay.data[i+3]=selection*available*100}
+      worker=new ColorRangePreviewWorker()
+      worker.onmessage=({data})=>{
+        if(data.error){setMessage(data.error);return}
+        cleanPreview.current=data.clean
+        if(data.overlay){
+          ctx.putImageData(new ImageData(data.clean,width,height),0,0)
+          sourceContext.putImageData(new ImageData(data.overlay,width,height),0,0)
+          ctx.drawImage(source,0,0)
+        } else {
+          ctx.clearRect(0,0,width,height)
+          ctx.drawImage(source,0,0)
+        }
+        const target=right.current!
+        if(target.width!==width)target.width=width
+        if(target.height!==height)target.height=height
+        target.getContext('2d')!.putImageData(new ImageData(data.preview,width,height),0,0)
+        const guide=brushGuide.current
+        if(guide&&!activeStroke.current)guide.getContext('2d')!.clearRect(0,0,guide.width,guide.height)
+        setStats({selected:data.selected,visible:data.visible,removed:data.removed,holes:data.holes})
       }
-      if(screening){ctx.putImageData(new ImageData(new Uint8ClampedArray(clean),width,height),0,0);const layer=document.createElement('canvas');layer.width=width;layer.height=height;layer.getContext('2d')!.putImageData(overlay,0,0);ctx.drawImage(layer,0,0)}
-      const target=right.current!;if(target.width!==width)target.width=width;if(target.height!==height)target.height=height
-      target.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(view==='mask'?mask:view==='background'?clean:result),width,height),0,0)
-      setStats({selected:Math.round(selected),visible,removed,holes})
+      const request: PreviewRequest={original,width,height,range,settings:previewSettings,purpose,view}
+      worker.onerror=()=>setMessage('No se pudo actualizar la vista previa.')
+      worker.postMessage(request,[original.buffer])
     })
-    return()=>cancelAnimationFrame(frame)
+    return()=>{cancelAnimationFrame(frame);worker?.terminate()}
   },[baseImage,region.x,region.y,region.width,region.height,width,height,range,settings,outputWidth,view,purpose,screening])
   const colors=range.useColors===false?[]:range.colors
 
@@ -133,20 +143,25 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
 
   function clearCursor() {
     pointer.current=null
-    setCursor(null)
+    positionBrushCursor(cursor.current,null)
   }
 
   function trackPointer(rect: DOMRect, clientX: number, clientY: number) {
     pointer.current={x:clientX,y:clientY}
     const next=canvasPoint(rect,clientX,clientY)
-    setCursor(next)
+    positionBrushCursor(cursor.current,next,rect)
     return next
   }
 
-  function stroke(from: CanvasPoint, to: CanvasPoint, displayWidth: number) {
-    if(!displayWidth)return
-    const radius=size/(2*displayWidth)
-    setRange(r=>(r.strokes?.length??0)>=20000?r:{...r,strokes:[...(r.strokes??[]),{...from,toX:to.x,toY:to.y,radius,erase:tool==='erase'}]})
+  function appendStrokes(segments: SelectionStroke[]) {
+    setRange(r=>({...r,strokes:[...(r.strokes??[]),...segments].slice(0,maxSelectionStrokes)}))
+  }
+
+  function paintSegment(active: NonNullable<typeof activeStroke.current>, from: CanvasPoint, to: CanvasPoint, rect: DOMRect) {
+    if((range.strokes?.length??0)+active.segments.length>=maxSelectionStrokes)return
+    active.segments.push({...from,toX:to.x,toY:to.y,radius:size/(2*rect.width),erase:tool==='erase'})
+    const ctx=brushGuide.current?.getContext('2d')
+    if(ctx)drawBrushSegment(ctx,from,to,size,rect)
   }
 
   function paint(e: PointerEvent<HTMLCanvasElement>, start=false) {
@@ -160,18 +175,27 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
       saveHistory()
       setMessage('')
       e.currentTarget.setPointerCapture(e.pointerId)
-      activeStroke.current={id:e.pointerId,point:next}
-      stroke(next,next,rect.width)
+      const guide=brushGuide.current!
+      if(guide.width!==width||guide.height!==height){guide.width=width;guide.height=height}
+      const ctx=guide.getContext('2d')!
+      ctx.fillStyle=ctx.strokeStyle=getComputedStyle(guide).getPropertyValue(tool==='erase'?'--ds-warning':'--ds-pink').trim()
+      const current={id:e.pointerId,point:next,segments:[]}
+      activeStroke.current=current
+      paintSegment(current,next,next,rect)
       e.preventDefault()
     }else if(active){
-      if(next)stroke(active.point??next,next,rect.width)
+      if(next)paintSegment(active,active.point??next,next,rect)
       active.point=next
       e.preventDefault()
     }
   }
 
   function stopPaint(e: PointerEvent<HTMLCanvasElement>) {
-    if(activeStroke.current?.id===e.pointerId)activeStroke.current=null
+    const active=activeStroke.current
+    if(active?.id===e.pointerId){
+      activeStroke.current=null
+      if(active.segments.length)appendStrokes(active.segments)
+    }
     if(e.type==='pointercancel'||(e.type==='pointerup'&&e.pointerType!=='mouse'))clearCursor()
   }
 
@@ -181,12 +205,13 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
       event.preventDefault()
       if(event.repeat)return
       pointer.current=null
-      setCursor({x,y})
+      const rect=event.currentTarget.getBoundingClientRect()
+      positionBrushCursor(cursor.current,{x,y},rect)
       if(tool==='sample'){
         sample(x,y)
       }else{
         saveHistory()
-        stroke({x,y},{x,y},event.currentTarget.getBoundingClientRect().width)
+        if(rect.width)appendStrokes([{x,y,toX:x,toY:y,radius:size/(2*rect.width),erase:tool==='erase'}])
         setMessage(tool==='erase'?'Zona excluida.':'Zona pintada.')
       }
       return
@@ -201,7 +226,7 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
     const next={x:Math.max(0,Math.min(1,x+dx*step)),y:Math.max(0,Math.min(1,y+dy*step))}
     keyboardPoint.current=next
     pointer.current=null
-    setCursor(next)
+    positionBrushCursor(cursor.current,next,event.currentTarget.getBoundingClientRect())
     const viewport=leftViewport.current!
     const canvas=event.currentTarget
     const targetX=canvas.offsetWidth*next.x+canvas.parentElement!.offsetLeft
@@ -243,6 +268,7 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
       </>
     }>
       <div className="range-toolbar">
+        {onAutomaticContour&&<button type="button" className="btn" onClick={()=>onAutomaticContour(range)}>Contorno exterior automático</button>}
         {screening&&<div className="segmented range-segments" role="group" aria-label="Herramienta de selección">
           {tools.map(([value,label])=><button key={value} className={tool===value?'active':''} aria-pressed={tool===value} onClick={()=>{setTool(value);clearCursor()}}>{tool===value&&<Check size={14} aria-hidden="true" />}{label}</button>)}
         </div>}
@@ -313,11 +339,12 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
                 onPointerUp={stopPaint}
                 onPointerCancel={stopPaint}
                 onLostPointerCapture={stopPaint}
-                onFocus={e=>{if(e.currentTarget.matches(':focus-visible'))setCursor(keyboardPoint.current)}}
+                onFocus={e=>{if(e.currentTarget.matches(':focus-visible'))positionBrushCursor(cursor.current,keyboardPoint.current,e.currentTarget.getBoundingClientRect())}}
                 onBlur={clearCursor}
                 onKeyDown={useCanvasWithKeyboard}
               />
-              {cursor&&<span className={`brush-cursor ${tool==='erase'?'brush-cursor-erase':''}`} style={{width:tool==='sample'?12:size,height:tool==='sample'?12:size,left:`${cursor.x*100}%`,top:`${cursor.y*100}%`}} aria-hidden="true"/>}
+              <canvas ref={brushGuide} className="brush-guide" aria-hidden="true"/>
+              <span ref={cursor} hidden className={`brush-cursor ${tool==='erase'?'brush-cursor-erase':''}`} style={{width:tool==='sample'?12:size,height:tool==='sample'?12:size}} aria-hidden="true"/>
             </div>
           </div>
         </figure>
@@ -333,7 +360,7 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
         <p>{screening
           ?stats.selected?`${stats.selected.toLocaleString('es-CL')} de ${stats.visible.toLocaleString('es-CL')} píxeles visibles seleccionados.`:'Selecciona zonas con el gotero o el pincel.'
           :`${stats.removed.toLocaleString('es-CL')} píxeles de fondo eliminados en esta vista.`}
-          {screening&&stats.selected>0&&stats.holes===0&&purpose==='affected'&&' La selección no genera huecos con los ajustes actuales.'}
+          {view==='result'&&screening&&stats.selected>0&&stats.holes===0&&purpose==='affected'&&' La selección no genera huecos con los ajustes actuales.'}
         </p>
         <span role="status">{message}</span>
       </div>

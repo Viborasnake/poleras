@@ -36,7 +36,7 @@ self.onmessage = async (event) => {
       if (neural) lanczosComparison = sharpenRgba(resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
     }
     progress(76)
-    const result = processImage(resized,width,height,settings,event.data.colorCorrection,event.data.compareBackground)
+    const result = processImage(resized,width,height,settings,event.data.colorCorrection,event.data.compareBackground,event.data.padding)
     progress(96)
     self.postMessage({...result, original: resized, lanczosComparison, warning, neuralScale: appliedNeuralScale}, { transfer: [result.data.buffer, resized.buffer,...(lanczosComparison?[lanczosComparison.buffer]:[]),...(result.background?[result.background.buffer]:[])] })
   } catch (error) {

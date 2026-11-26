@@ -1,9 +1,10 @@
 import type {EditorDocument} from './editor-document'
 import {validColorRange} from './color-range.ts'
 import {isEdgeMaskStyle} from './edge-mask.ts'
+import {validContourBand} from './contour-band.ts'
 import {isPreviewColor,type PreviewColor} from './preview-colors.ts'
 export type ProjectAsset={id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument;previewColor?:PreviewColor}
-export type ProjectFile={format:'trama-dtf';version:1;name:string;sheet:{width:number;height:number;dpi:number;gap:number;rotate:boolean};background:string;showIndividualColors?:boolean;items:ProjectAsset[];editor?:{name:string;document:EditorDocument;assetId?:string}}
+export type ProjectFile={format:'trama-dtf';version:1;name:string;sheet:{width:number;height:number;dpi:number;gap:number;rotate:boolean;optimized?:boolean};background:string;showIndividualColors?:boolean;items:ProjectAsset[];editor?:{name:string;document:EditorDocument;assetId?:string}}
 // A project embeds raster assets as PNG data URLs. Keep a generous guard against
 // accidental browser freezes while allowing realistic multi-design gang sheets.
 export const MAX_PROJECT_FILE_BYTES = 1_000_000_000
@@ -17,6 +18,7 @@ function checkDocument(d:EditorDocument) {
   if(s.screenBase!==undefined&&!['black','white'].includes(s.screenBase))fail()
   if(s.affectedColors!==undefined&&!validColorRange(s.affectedColors))fail()
   if(s.protectedColors!==undefined&&!validColorRange(s.protectedColors))fail()
+  if(s.contourBand!==undefined&&!validContourBand(s.contourBand))fail()
   if(s.organic!==undefined&&(!Number.isFinite(s.organic)||s.organic<0||s.organic>100))fail()
   if((s.colorRange!==undefined&&!validColorRange(s.colorRange))||(s.background==='custom'&&!validColorRange(s.colorRange)))fail()
   if(s.customBase!==undefined&&!['black','white'].includes(s.customBase))fail()
@@ -39,6 +41,7 @@ export function parseProject(text:string):ProjectFile {
   const p=JSON.parse(text) as ProjectFile
   if(!p||p.format!=='trama-dtf'||p.version!==1||typeof p.name!=='string'||!p.sheet||!positive(p.sheet.width)||!positive(p.sheet.height)||![150,300,600].includes(p.sheet.dpi)||!Number.isFinite(p.sheet.gap)||p.sheet.gap<0||typeof p.sheet.rotate!=='boolean'||!isPreviewColor(p.background)||!Array.isArray(p.items)||p.items.length>200)fail()
   if(p.showIndividualColors!==undefined&&typeof p.showIndividualColors!=='boolean')fail()
+  if(p.sheet.optimized!==undefined&&typeof p.sheet.optimized!=='boolean')fail()
   const ids=new Set<string>();let copies=0
   for(const a of p.items){
     if(!a||typeof a.id!=='string'||ids.has(a.id)||typeof a.name!=='string'||!png(a.dataUrl)||![a.naturalWidth,a.naturalHeight,a.widthCm,a.heightCm].every(positive)||!Number.isInteger(a.quantity)||a.quantity<1||a.quantity>200)fail()

@@ -1,7 +1,10 @@
+import {rasterizeBrushSegment} from './brush-geometry.ts'
+
 export type SelectionStroke={x:number;y:number;toX:number;toY:number;radius:number;erase:boolean}
 export type ColorRange = {colors:string[]; tolerance:number; softness:number;useColors?:boolean;strokes?:SelectionStroke[]}
 export const defaultColorRange:ColorRange = {colors:['#ffffff'],tolerance:8,softness:4}
 export const maxSelectionBrushSize = 120
+export const maxSelectionStrokes = 20000
 
 export function validColorRange(value:unknown):value is ColorRange {
   if(!value||typeof value!=='object')return false
@@ -10,7 +13,7 @@ export function validColorRange(value:unknown):value is ColorRange {
     &&v.colors.every(c=>typeof c==='string'&&/^#[\da-f]{6}$/i.test(c))
     &&[v.tolerance,v.softness].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=100)
     &&(v.useColors===undefined||typeof v.useColors==='boolean')
-    &&(v.strokes===undefined||(Array.isArray(v.strokes)&&v.strokes.length<=20000&&v.strokes.every(s=>s&&typeof s.erase==='boolean'&&[s.x,s.y,s.toX,s.toY].every(n=>Number.isFinite(n)&&n>=0&&n<=1)&&Number.isFinite(s.radius)&&s.radius>0&&s.radius<=maxSelectionBrushSize/2)))
+    &&(v.strokes===undefined||(Array.isArray(v.strokes)&&v.strokes.length<=maxSelectionStrokes&&v.strokes.every(s=>s&&typeof s.erase==='boolean'&&[s.x,s.y,s.toX,s.toY].every(n=>Number.isFinite(n)&&n>=0&&n<=1)&&Number.isFinite(s.radius)&&s.radius>0&&s.radius<=maxSelectionBrushSize/2)))
 }
 
 // Rasterize normalized brush segments once per render, independent of output
@@ -18,14 +21,11 @@ export function validColorRange(value:unknown):value is ColorRange {
 export function selectionBrushMask(range:ColorRange,width:number,height:number){
   if(!range.strokes?.length)return null
   const mask=new Uint8Array(width*height)
+  const bitmap={width,height}
   for(const s of range.strokes){
-    const ax=s.x*width,ay=s.y*height,bx=s.toX*width,by=s.toY*height,r=s.radius*width
-    const dx=bx-ax,dy=by-ay,length=dx*dx+dy*dy
-    for(let y=Math.max(0,Math.floor(Math.min(ay,by)-r));y<Math.min(height,Math.ceil(Math.max(ay,by)+r));y++)
-      for(let x=Math.max(0,Math.floor(Math.min(ax,bx)-r));x<Math.min(width,Math.ceil(Math.max(ax,bx)+r));x++){
-        const t=length?Math.max(0,Math.min(1,((x+.5-ax)*dx+(y+.5-ay)*dy)/length)):0
-        if((x+.5-ax-t*dx)**2+(y+.5-ay-t*dy)**2<=r*r)mask[y*width+x]=s.erase?1:2
-      }
+    rasterizeBrushSegment(s,{x:s.toX,y:s.toY},s.radius * width * 2,bitmap,bitmap,(x,y)=>{
+      mask[y*width+x]=s.erase?1:2
+    })
   }
   return mask
 }

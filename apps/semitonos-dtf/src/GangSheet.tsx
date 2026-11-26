@@ -1,6 +1,6 @@
 import GangPreview, {type GangPreviewActions} from './GangPreview'
 import {parseProject,type ProjectAsset,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-file'
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import {useProjectAutosave,type ProjectSaveStatus} from './use-project-autosave'
 import { pack } from './packing'
 import { inspectPng, resolutionCheck } from './print'
@@ -8,13 +8,14 @@ import { exportGangPng, gangPrintSize, MAX_GANG_WIDTH_CM, MAX_GANG_PIXELS, MAX_G
 import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
 import {createHistory,recordHistory,moveHistory,type History} from './history'
-import {ChevronDown,Copy,Pencil,Trash2} from 'lucide-react'
+import {Check,ChevronDown,Copy,Pencil,Trash2} from 'lucide-react'
 import {isPreviewColor,previewColorGroups,previewColorName} from './preview-colors'
+import {contourPadding} from './contour-band'
 
 type Asset = Omit<ProjectAsset,'dataUrl'> & {img:CanvasImageSource}
 export type ProjectActions={save:()=>void;open:()=>void}
 type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void; initialProject:ProjectFile;editorRevision:string;editorLoading:boolean;onSaveStatus:(s:ProjectSaveStatus)=>void;actionsRef?:Ref<ProjectActions>}
-type GangSnapshot = {items:Asset[];projectName:string;width:number;height:number;dpi:number;gap:number;rotate:boolean;previewBg:string;showIndividualColors:boolean}
+type GangSnapshot = {items:Asset[];projectName:string;width:number;height:number;dpi:number;gap:number;rotate:boolean;optimized:boolean;previewBg:string;showIndividualColors:boolean}
 type SheetPreset = {id:string;name:string;width:number;height:number}
 const previewColorOptions = <>
   <option value="checker">Transparencia</option>
@@ -49,9 +50,10 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
     setSelectedId(id)
     const item=items.find(a=>a.id===id)
     if (item?.document && onEditDocument) {
+      const paddingCm = contourPadding(item.document.settings) * 2 / item.document.dpi * 2.54
       onEditDocument({
         ...item.document,
-        widthCm: item.widthCm,
+        widthCm: paddingCm ? Math.max(2.54 / item.document.dpi,item.widthCm - paddingCm) : item.widthCm,
         previewColor: item.document.previewColor ?? item.previewColor,
       }, item.name, item.id)
     }
@@ -96,6 +98,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
   const [dpi,setDpi] = useState(initial.current.dpi)
   const [gap,setGap] = useState(initial.current.gap)
   const [rotate,setRotate] = useState(initial.current.rotate)
+  const [optimized,setOptimized] = useState(initial.current.optimized ?? false)
   const [error,setError] = useState('')
   const [message,setMessage] = useState('')
   const [previewBg,setPreviewBg] = useState(initialProject.background)
@@ -113,14 +116,14 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
   const previewActions=useRef<GangPreviewActions>(null)
   const gangHistory=useRef<History<GangSnapshot>|null>(null)
   const historyApplying=useRef(false)
-  const previewColorChanged=useRef(false)
+  const separateHistoryChange=useRef(false)
   const [historyCounts,setHistoryCounts]=useState({undo:0,redo:0})
   const serializedImages=useRef(new WeakMap<object,string>())
   useEffect(()=>setWidthDraft(String(width)),[width])
   useEffect(()=>setHeightDraft(String(height)),[height])
   function changeAssetColor(id:string,value:string) {
     const color=isPreviewColor(value)?value:undefined
-    previewColorChanged.current=true
+    separateHistoryChange.current=true
     setItems(all=>all.map(item=>item.id===id?{...item,previewColor:color}:item))
     setSelectedId(id)
     previewActions.current?.fit()
@@ -133,7 +136,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
   function projectSnapshot():ProjectFile {
     const editor=getEditor?.()
     if(editor?.assetId&&!items.some(a=>a.id===editor.assetId))delete editor.assetId
-    const project:ProjectFile={format:'trama-dtf',version:1,name:projectName.trim(),sheet:{width,height,dpi,gap,rotate},background:previewBg,showIndividualColors,editor,items:items.map(({img,...a})=>{
+    const project:ProjectFile={format:'trama-dtf',version:1,name:projectName.trim(),sheet:{width,height,dpi,gap,rotate,optimized:optimized || undefined},background:previewBg,showIndividualColors,editor,items:items.map(({img,...a})=>{
       let dataUrl=serializedImages.current.get(img as object)
       if(!dataUrl){dataUrl=(img as HTMLCanvasElement).toDataURL('image/png');serializedImages.current.set(img as object,dataUrl)}
       return {...a,dataUrl}
@@ -141,24 +144,24 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
     if(!project.name)throw new Error('El proyecto necesita un nombre.')
     return project
   }
-  useProjectAutosave(projectSnapshot,[items,projectName,width,height,dpi,gap,rotate,previewBg,showIndividualColors,editorRevision],hydrated&&!projectBusy&&!editorLoading&&assetLoading===0,status=>{setSaveState(status.message);onSaveStatus({...status,name:status.name||projectName})})
+  useProjectAutosave(projectSnapshot,[items,projectName,width,height,dpi,gap,rotate,optimized,previewBg,showIndividualColors,editorRevision],hydrated&&!projectBusy&&!editorLoading&&assetLoading===0,status=>{setSaveState(status.message);onSaveStatus({...status,name:status.name||projectName})})
   useEffect(()=>{
     if(!hydrated)return
     if(historyApplying.current){historyApplying.current=false;return}
-    const group=previewColorChanged.current?null:0
-    previewColorChanged.current=false
-    const snapshot:GangSnapshot={items:[...items],projectName,width,height,dpi,gap,rotate,previewBg,showIndividualColors}
+    const group=separateHistoryChange.current?null:0
+    separateHistoryChange.current=false
+    const snapshot:GangSnapshot={items:[...items],projectName,width,height,dpi,gap,rotate,optimized,previewBg,showIndividualColors}
     if(!gangHistory.current)gangHistory.current=createHistory(snapshot)
     else gangHistory.current=recordHistory(gangHistory.current,snapshot,group)
     setHistoryCounts({undo:gangHistory.current.past.length,redo:gangHistory.current.future.length})
-  },[hydrated,items,projectName,width,height,dpi,gap,rotate,previewBg,showIndividualColors])
+  },[hydrated,items,projectName,width,height,dpi,gap,rotate,optimized,previewBg,showIndividualColors])
   function navigateHistory(direction:'undo'|'redo'){
     if(!gangHistory.current)return
     const next=moveHistory(gangHistory.current,direction)
     if(next===gangHistory.current)return
     gangHistory.current=next;historyApplying.current=true
     const s=next.present
-    setItems(s.items);setProjectName(s.projectName);setWidth(s.width);setHeight(s.height);setDpi(s.dpi);setGap(s.gap);setRotate(s.rotate);setPreviewBg(s.previewBg)
+    setItems(s.items);setProjectName(s.projectName);setWidth(s.width);setHeight(s.height);setDpi(s.dpi);setGap(s.gap);setRotate(s.rotate);setOptimized(s.optimized);setPreviewBg(s.previewBg)
     setShowIndividualColors(s.showIndividualColors)
     setHistoryCounts({undo:next.past.length,redo:next.future.length})
   }
@@ -216,7 +219,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
     return loaded
   }
   function applyProject(p:ProjectFile,loaded:Asset[]) {
-    setItems(loaded);setProjectName(p.name);setWidth(p.sheet.width);setHeight(p.sheet.height);setDpi(p.sheet.dpi);setGap(p.sheet.gap);setRotate(p.sheet.rotate);setPreviewBg(p.background);setAcceptedResolution('');restoreEditor?.(p.editor)
+    setItems(loaded);setProjectName(p.name);setWidth(p.sheet.width);setHeight(p.sheet.height);setDpi(p.sheet.dpi);setGap(p.sheet.gap);setRotate(p.sheet.rotate);setOptimized(p.sheet.optimized ?? false);setPreviewBg(p.background);setAcceptedResolution('');restoreEditor?.(p.editor)
     setShowIndividualColors(p.showIndividualColors ?? true)
   }
   useEffect(() => {
@@ -254,9 +257,13 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
     add(source.blob,source.name,source.widthCm,source.document,source.replaceId).catch(e=>setError(e.message))
   },[source])
 
-  let layout: ReturnType<typeof pack> = {placements:[],missing:0,usedHeight:0}
-  let layoutError = ''
-  try {layout=pack(items,width,height,gap/10,rotate)} catch(e){layoutError=(e as Error).message}
+  const {layout,layoutError} = useMemo(() => {
+    try {
+      return {layout:pack(items,width,height,gap/10,rotate,optimized),layoutError:''}
+    } catch (error) {
+      return {layout:{placements:[],missing:0,usedHeight:0,improved:false},layoutError:(error as Error).message}
+    }
+  },[items,width,height,gap,rotate,optimized])
   const {width:pxW,height:pxH,tooBig}=gangPrintSize(width,height,dpi)
   const widthOverLimit=width>MAX_GANG_WIDTH_CM || Number(widthDraft.replace(',','.'))>MAX_GANG_WIDTH_CM
   const resolutionIssues=items.filter(item=>!resolutionCheck(item,dpi).matches)
@@ -264,6 +271,9 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
   const matchingDpi=[300,150,600].find(candidate=>items.length>0&&items.every(item=>resolutionCheck(item,candidate).matches))
   const resolutionBlocked=resolutionIssues.length>0 && acceptedResolution!==resolutionKey
   const invalid = !!layoutError || widthOverLimit || tooBig || pxW<1 || pxH<1 || !items.length || layout.missing>0 || resolutionBlocked
+  const optimizationStatus = optimized && items.length > 0 && !layoutError
+    ? (layout.improved ? 'Distribución optimizada.' : 'La distribución actual ya es la mejor encontrada.')
+    : ''
   function correctResolution(){
     if(matchingDpi){setDpi(matchingDpi);setAcceptedResolution('');return}
     const changes=resolutionIssues.map(a=>`${a.name}: ${a.widthCm.toFixed(2)} × ${a.heightCm.toFixed(2)} → ${(a.naturalWidth/dpi*2.54).toFixed(2)} × ${(a.naturalHeight/dpi*2.54).toFixed(2)} cm`)
@@ -353,6 +363,12 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
   <div className="gang-stage">
     <div className="gang-toolbar">
       <div className="gang-toolbar-left">
+        <button type="button" className="btn gang-optimize" aria-pressed={optimized} disabled={!items.length || !!layoutError || widthOverLimit || assetLoading > 0 || projectBusy || busy} onClick={()=>{
+          separateHistoryChange.current=true
+          setOptimized(active=>!active)
+        }}>
+          {optimized && <Check size={16} aria-hidden="true"/>} Optimizar plancha
+        </button>
         <div className="history-controls gang-history" role="group" aria-label="Historial del Gang Sheet">
           <button className="btn" disabled={!historyCounts.undo||projectBusy||busy} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button>
           <button className="btn" disabled={!historyCounts.redo||projectBusy||busy} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button>
@@ -366,17 +382,18 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
           Color general
           <select value={previewBg} onChange={event=>{
             const color=event.target.value
-            previewColorChanged.current=true
+            separateHistoryChange.current=true
             setPreviewBg(color)
           }}>{previewColorOptions}</select>
         </label>
         <button type="button" className="btn gang-individual-colors" aria-pressed={showIndividualColors} onClick={()=>{
-          previewColorChanged.current=true
+          separateHistoryChange.current=true
           setShowIndividualColors(enabled=>!enabled)
         }}>
           Colores individuales <span aria-hidden="true">· {showIndividualColors?'Activados':'Desactivados'}</span>
         </button>
         <span>Insumo: {width} × {height} cm · {layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de alto ocupado</span>
+        <span className="gang-optimization-status" role="status">{optimizationStatus}</span>
       </div>
       <button className="btn export" disabled={invalid||busy} onClick={exportSheet}>{busy?'Exportando…':'Exportar Gang Sheet'}</button>
     </div>

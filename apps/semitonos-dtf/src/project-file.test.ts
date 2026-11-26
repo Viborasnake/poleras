@@ -8,6 +8,22 @@ const fixture=():ProjectFile=>({format:'trama-dtf',version:1,name:'Mi trabajo',s
 test('project round trip preserves images, dimensions, DPI and copies',()=>{
   const p=fixture();assert.deepEqual(parseProject(JSON.stringify(p)),p)
 })
+test('project restores optimized packing while accepting files saved without the setting', () => {
+  const legacy = fixture()
+  assert.equal(parseProject(JSON.stringify(legacy)).sheet.optimized, undefined)
+  const optimized = {...legacy, sheet:{...legacy.sheet, optimized:true}}
+  assert.deepEqual(parseProject(JSON.stringify(optimized)), optimized)
+  assert.throws(() => parseProject(JSON.stringify({...legacy, sheet:{...legacy.sheet, optimized:'true'}})))
+})
+test('project restores contour direction, width, softness and flow', () => {
+  const p=fixture()
+  const contourBand={side:'outside',widthPx:20,softness:75,flow:90} as const
+  const settings={...garmentPresets.default.values,edgeSides:[true,true,true,true],featherMm:0,trimMm:0,cornerRadiusMm:0,edgeMask:'none' as const,edgeMaskSizeMm:5,contourBand}
+  p.items[0].document={version:1,original:p.items[0].dataUrl,settings,crop:null,widthCm:10,dpi:300}
+  assert.deepEqual(parseProject(JSON.stringify(p)).items[0].document?.settings.contourBand,contourBand)
+  p.items[0].document.settings.contourBand={...contourBand,widthPx:21}
+  assert.throws(()=>parseProject(JSON.stringify(p)))
+})
 test('project accepts every garment preview color',()=>{
   for(const background of ['#596778','#8ecae6','#2563eb','#304b70','#102a43','#86efac','#16a34a','#166534','#808000','#4b5320','#c4b5fd','#7c3aed','#4c1d95','#fda4af','#c1121f','#7b2931','#fde68a','#f59e0b','#ea580c','#e7d3b0','#a16207','#3b2418']) {
     const p=fixture();p.background=background

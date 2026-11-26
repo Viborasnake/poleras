@@ -49,7 +49,6 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   // screening path selected before sampling. It is not a third screening mode.
   const processingBackground=s.background==='custom'?(s.customBase??'white'):s.background
   const dpi = s.dpi ?? 300
-  const pitch = dpi / s.lpi
   const feather = (s.featherMm ?? 0) / 25.4 * dpi
   const trim = (s.trimMm ?? 0) / 25.4 * dpi
   const cornerRadius = Math.max(0, (s.cornerRadiusMm ?? 0) / 25.4 * dpi)
@@ -61,24 +60,9 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const protectionDistance = Math.max(0, Math.min(100, s.protectSolidTolerance ?? 10)) / 100 * 441
   const protectionNeutral = !!protection && Math.max(...protection) - Math.min(...protection) <= 12
   const protectionNeutralSpread = Math.max(10, (s.protectSolidTolerance ?? 10) * .3)
-  const circleRanks = Float64Array.from({length: 4097}, (_, i) => {
-    const d = i / 2048
-    return d <= 1 ? Math.PI * d / 4 : Math.PI * d / 4 - d * Math.acos(1 / Math.sqrt(d)) + Math.sqrt(d - 1)
-  })
-  const angle = s.angle * Math.PI / 180
-  const cos = Math.cos(angle), sin = Math.sin(angle)
   const screening=s.enabled!==false
   const solidAlpha=screening||s.solidAlpha===true
-  const organic=Math.max(0,Math.min(100,s.organic??0))/100*.18
-  const hash=(a:number,b:number)=>{const n=Math.sin(a*127.1+b*311.7)*43758.5453;return n-Math.floor(n)}
-  const dotThreshold=(x:number,y:number)=>{
-    const rx=((x+.5)*cos+(y+.5)*sin)/pitch
-    const ry=(-(x+.5)*sin+(y+.5)*cos)/pitch
-    const cellX=Math.floor(rx), cellY=Math.floor(ry)
-    const u=Math.abs(rx-cellX-.5-(organic?(hash(cellX,cellY)-.5)*organic:0))*2
-    const v=Math.abs(ry-cellY-.5-(organic?(hash(cellX+19,cellY+47)-.5)*organic:0))*2
-    return s.shape==='line'?v:s.shape==='square'?Math.max(u,v)**2:circleRanks[Math.min(4096,Math.round((u*u+v*v)*2048))]
-  }
+  const dotThreshold=createDotThreshold(s)
   // Never promote barely-visible export residue to fully opaque DTF ink. This
   // matters for both continuous and screened output: many cutout PNGs contain
   // colourful alpha 1–8 pixels that are invisible on dark backgrounds but turn
@@ -250,6 +234,30 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     }
   }
   return { data: output, protectedMask, transparent: Math.round(transparent / (width * height) * 100) }
+}
+
+const circleRanks = Float64Array.from({length: 4097}, (_, i) => {
+  const d = i / 2048
+  return d <= 1 ? Math.PI * d / 4 : Math.PI * d / 4 - d * Math.acos(1 / Math.sqrt(d)) + Math.sqrt(d - 1)
+})
+
+export function createDotThreshold(s: Pick<HalftoneSettings,'dpi'|'lpi'|'angle'|'organic'|'shape'>) {
+  const pitch = (s.dpi ?? 300) / s.lpi
+  const angle = s.angle * Math.PI / 180
+  const cos = Math.cos(angle), sin = Math.sin(angle)
+  const organic = Math.max(0, Math.min(100, s.organic ?? 0)) / 100 * .18
+  const hash = (a:number,b:number) => {
+    const n = Math.sin(a * 127.1 + b * 311.7) * 43758.5453
+    return n - Math.floor(n)
+  }
+  return (x:number,y:number) => {
+    const rx = ((x + .5) * cos + (y + .5) * sin) / pitch
+    const ry = (-(x + .5) * sin + (y + .5) * cos) / pitch
+    const cellX = Math.floor(rx), cellY = Math.floor(ry)
+    const u = Math.abs(rx - cellX - .5 - (organic ? (hash(cellX,cellY) - .5) * organic : 0)) * 2
+    const v = Math.abs(ry - cellY - .5 - (organic ? (hash(cellX + 19,cellY + 47) - .5) * organic : 0)) * 2
+    return s.shape === 'line' ? v : s.shape === 'square' ? Math.max(u,v) ** 2 : circleRanks[Math.min(4096, Math.round((u*u + v*v) * 2048))]
+  }
 }
 
 function parseHexColor(hex: string): [number, number, number] | null {

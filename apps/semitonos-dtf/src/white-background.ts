@@ -1,8 +1,11 @@
 // Flood near-white/transparent regions from the canvas boundary. Scanline
 // traversal uses one byte per pixel and avoids a full-size integer queue.
 export function connectedWhiteBackground(data:Uint8ClampedArray,width:number,height:number,cutoff:number) {
+  return connectedExterior(width,height,p=>!data[p*4+3]||Math.min(data[p*4],data[p*4+1],data[p*4+2])>=cutoff)
+}
+
+export function connectedExterior(width:number,height:number,eligible:(pixel:number)=>boolean) {
   const mask=new Uint8Array(width*height)
-  const eligible=(p:number)=>!data[p*4+3]||Math.min(data[p*4],data[p*4+1],data[p*4+2])>=cutoff
   const seeds:number[]=[]
   const seed=(p:number)=>{if(!mask[p]&&eligible(p)){mask[p]=1;seeds.push(p)}}
   for(let x=0;x<width;x++){seed(x);seed((height-1)*width+x)}

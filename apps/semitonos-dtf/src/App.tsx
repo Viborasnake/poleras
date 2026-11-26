@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { inspectPng, printSize, withCanvasPrintProfile } from './print'
-import {printWidthGroups} from './print-width-presets'
+import {presetPrintWidth, printWidthGroups} from './print-width-presets'
 import GangSheet, {type ProjectActions} from './GangSheet'
 import {parseProject,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-file'
 import {readActiveProject,writeActiveProject,deleteActiveProject,emptyProject} from './project-storage'
@@ -16,10 +16,11 @@ import {createHistory,recordHistory,moveHistory,type History} from './history'
 import {assessHalftoneSafety,type HalftoneSafetyReport} from './halftone-safety'
 import CropPanel, {type CropRect} from './CropPanel'
 import ColorRangePanel from './ColorRangePanel'
-import {brushFootprint, canvasPoint, type CanvasPoint} from './brush-geometry'
+import {canvasPoint, drawBrushSegment, positionBrushCursor, rasterizeBrushSegment, type CanvasPoint} from './brush-geometry'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
 import {isEdgeMaskStyle,type EdgeMaskStyle} from './edge-mask'
 import EdgeMaskPicker from './EdgeMaskPicker'
+import {contourPadding, defaultContourBand, maxContourWidth, validContourBand, type ContourBand} from './contour-band'
 import {isPreviewColor,type PreviewColor} from './preview-colors'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
 import HalftoneWorker from './halftone.worker?worker&inline'
@@ -30,7 +31,7 @@ type ComparisonTarget = 'result' | 'rescale' | 'background'
 type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'garment' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
 type PrintReviewAction = 'export' | 'resized' | 'gang'
 
-const printWidthOptions = printWidthGroups.flatMap(group=>group.options)
+const printWidthOptions = printWidthGroups.flatMap(group => group.options)
 
 export type Settings = {
   lpi: number
@@ -54,6 +55,7 @@ export type Settings = {
   separateBackground?: boolean
   screenBase?: 'black'|'white'
   affectedColors?: ColorRange
+  contourBand?: ContourBand
   protectedColors?: ColorRange
   organic?: number
   featherMm: number
@@ -162,6 +164,7 @@ function readSavedPresets(): SavedPreset[] {
         && (s.backgroundCleanup===undefined||(Number.isFinite(s.backgroundCleanup)&&s.backgroundCleanup>=0&&s.backgroundCleanup<=100))
         && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
         && ['transitions','all'].includes(s.screenScope)
+        && (s.contourBand===undefined||validContourBand(s.contourBand))
         && typeof s.protectSolid === 'boolean' && typeof s.protectSolidColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.protectSolidColor) && typeof s.protectSmoothEdge === 'boolean'
         && typeof s.flattenColor === 'boolean' && typeof s.flattenColorValue === 'string' && /^#[0-9a-f]{6}$/i.test(s.flattenColorValue)
         && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
@@ -222,14 +225,18 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [colorCorrectionVersion, setColorCorrectionVersion] = useState(0)
   const [refinementTab, setRefinementTab] = useState<'clean'|'solid'>('clean')
   const [brushSize, setBrushSize] = useState(24)
-  const [brushCursor, setBrushCursor] = useState<CanvasPoint|null>(null)
+  const brushCursor = useRef<HTMLSpanElement>(null)
+  const brushGuide = useRef<HTMLCanvasElement>(null)
   const previewPointer = useRef<CanvasPoint|null>(null)
   const manualErase = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
   const colorCorrection = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
-  const manualBase = useRef<{data:Uint8ClampedArray;width:number;height:number}|null>(null)
+  const manualBase = useRef<{data:Uint8ClampedArray<ArrayBuffer>;width:number;height:number;padding:number}|null>(null)
   const eraseHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
   const colorCorrectionHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
-  const brushStroke = useRef<{id:number;mode:'clean'|'color'}|null>(null)
+  const brushStroke = useRef<{
+    id:number;mode:'clean'|'color';canvas:HTMLCanvasElement;diameter:number;point:CanvasPoint|null
+    display:{width:number;height:number};bitmap:{width:number;height:number};segments:{from:CanvasPoint;to:CanvasPoint}[]
+  }|null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [panning, setPanning] = useState(false)
   const panStart = useRef<{id:number;x:number;y:number;left:number;top:number} | null>(null)
@@ -249,6 +256,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [presetMessage, setPresetMessage] = useState('')
   const [showInfo, setShowInfo] = useState(false)
   const [showColorRange,setShowColorRange]=useState(false)
+  const contourControl=useRef<HTMLInputElement>(null)
   const [isolatedColorPick,setIsolatedColorPick]=useState(false)
   const [tramaColorPick,setTramaColorPick]=useState<'affected'|'protected'|null>(null)
   const [cropMessage,setCropMessage]=useState('')
@@ -261,7 +269,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [dragging, setDragging] = useState(false)
   const [widthCm, setWidthCm] = useState('11.8533')
   const [lastPrintSize, setLastPrintSize] = useState('')
-  const printSizePreset = printWidthOptions.find(({id,width}) => id===lastPrintSize && String(width)===widthCm)
   const [dpi, setDpi] = useState(300)
   const [imageVersion, setImageVersion] = useState(0)
   const [readyKey, setReadyKey] = useState('')
@@ -334,8 +341,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const eraseStack = eraseHistory.current
     const colorStack = colorCorrectionHistory.current
     const colorList = direction === 'undo' ? colorStack.past : colorStack.future
-    if (!loading && colorList.length && resultCanvas.current) {
-      const canvas = resultCanvas.current
+    if (!loading && colorList.length && sourceCanvas.current) {
+      const canvas = sourceCanvas.current
       const current = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height
         ? new Uint8Array(colorCorrection.current.data) : new Uint8Array(canvas.width * canvas.height)
       const next = colorList.pop()!
@@ -401,41 +408,33 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
   const clearBrushCursor = () => {
     previewPointer.current = null
-    setBrushCursor(null)
+    positionBrushCursor(brushCursor.current,null)
   }
   const trackBrushCursor = (rect: DOMRect, clientX: number, clientY: number) => {
     if (!brushPreviewEnabled && !pickerPreviewEnabled) return null
     previewPointer.current = {x:clientX, y:clientY}
     const point = canvasPoint(rect, clientX, clientY)
-    setBrushCursor(point)
+    positionBrushCursor(brushCursor.current,point && (pickerPreviewEnabled || canPaintAt(point)) ? point : null,rect)
     return point
   }
   const canPaintAt = (point: CanvasPoint) => view !== 'split' || point.x >= split / 100
-  const paintBrushAt = (canvas: HTMLCanvasElement, point: CanvasPoint, rect: DOMRect, mode: 'clean'|'color') => {
-    const {width, height} = canvas
-    const target = mode === 'clean' ? manualErase : colorCorrection
-    const mask = target.current?.width === width && target.current.height === height
-      ? target.current.data : new Uint8Array(width * height)
-    target.current = {data:mask, width, height}
-    const {x: centerX, y: centerY, radiusX, radiusY} = brushFootprint(point, brushSize, rect, canvas)
-    const left = Math.max(0, Math.floor(centerX - radiusX)), right = Math.min(width, Math.ceil(centerX + radiusX))
-    const top = Math.max(0, Math.floor(centerY - radiusY)), bottom = Math.min(height, Math.ceil(centerY + radiusY))
-    const ctx = mode === 'clean' ? canvas.getContext('2d')! : null
-    const pixels = ctx?.getImageData(left, top, right - left, bottom - top)
-    for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) {
-      if (((x + .5 - centerX) / radiusX) ** 2 + ((y + .5 - centerY) / radiusY) ** 2 > 1) continue
-      mask[y * width + x] = 1
-      if (pixels) pixels.data[((y - top) * pixels.width + x - left) * 4 + 3] = 0
-    }
-    if (ctx && pixels) ctx.putImageData(pixels, left, top)
-    if (mode === 'color') setColorCorrectionVersion(v => v + 1)
+  const paintBrushAt = (stroke: NonNullable<typeof brushStroke.current>, point: CanvasPoint) => {
+    const from = stroke.point ?? point
+    stroke.point = point
+    stroke.segments.push({from,to:point})
+    const ctx = (stroke.mode==='clean' ? stroke.canvas : brushGuide.current)?.getContext('2d')
+    if (!ctx) return
+    if (stroke.mode==='clean') ctx.globalCompositeOperation='destination-out'
+    drawBrushSegment(ctx,from,point,stroke.diameter,stroke.display)
+    if (stroke.mode==='clean') ctx.globalCompositeOperation='source-over'
   }
   const startBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((!brushPreviewEnabled && !pickerPreviewEnabled) || e.button !== 0 || brushStroke.current || processing || exporting) return
-    const canvas = pickerPreviewEnabled ? sourceCanvas.current : resultCanvas.current
+    const canvas = pickerPreviewEnabled || colorBrushTool ? sourceCanvas.current : resultCanvas.current
     if (!canvas?.width || !canvas.height) return
     const rect = canvas.getBoundingClientRect()
-    const point = trackBrushCursor(rect, e.clientX, e.clientY)
+    const artwork = trackBrushCursor(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY)
+    const point = canvasPoint(rect,e.clientX,e.clientY)
     if (!point) return
     if (pickerPreviewEnabled) {
       const pixel = canvas.getContext('2d')!.getImageData(Math.floor(point.x * canvas.width), Math.floor(point.y * canvas.height), 1, 1).data
@@ -445,49 +444,75 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       e.preventDefault()
       return
     }
-    if (!canPaintAt(point)) return
+    if (!artwork || !canPaintAt(artwork)) return
     const mode = colorBrushTool ? 'color' : 'clean'
-    const saved = mode === 'clean' ? manualErase.current : colorCorrection.current
-    const stack = mode === 'clean' ? eraseHistory.current : colorCorrectionHistory.current
-    const previous = saved?.width === canvas.width && saved.height === canvas.height
-      ? new Uint8Array(saved.data) : new Uint8Array(canvas.width * canvas.height)
-    stack.past.push(previous)
-    if (mode === 'color' && stack.past.length > 50) stack.past.shift()
-    stack.future = []
-    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
+    if (mode==='color' && brushGuide.current) {
+      const guide=brushGuide.current
+      const scale=Math.min(1,1600/rect.width,1600/rect.height)
+      guide.width=Math.max(1,Math.round(rect.width*scale));guide.height=Math.max(1,Math.round(rect.height*scale))
+      const ctx=guide.getContext('2d')!
+      ctx.fillStyle=ctx.strokeStyle=getComputedStyle(guide).getPropertyValue('--ds-pink').trim()
+    }
     e.preventDefault()
-    brushStroke.current = {id:e.pointerId, mode}
+    const stroke={id:e.pointerId,mode,canvas,diameter:brushSize,display:rect,bitmap:{width:canvas.width,height:canvas.height},point:null,segments:[]} as NonNullable<typeof brushStroke.current>
+    brushStroke.current = stroke
     e.currentTarget.setPointerCapture(e.pointerId)
-    paintBrushAt(canvas, point, rect, mode)
+    paintBrushAt(stroke,point)
   }
   const moveBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const canvas = resultCanvas.current
-    if ((!brushPreviewEnabled && !pickerPreviewEnabled) || !canvas?.width || !canvas.height) return
+    if (!brushPreviewEnabled && !pickerPreviewEnabled) return
     const stroke = brushStroke.current
     if (stroke && stroke.id !== e.pointerId) return
-    const rect = canvas.getBoundingClientRect()
-    const point = trackBrushCursor(rect, e.clientX, e.clientY)
-    if (point && stroke && brushPreviewEnabled && canPaintAt(point)) {
+    const point = trackBrushCursor(e.currentTarget.getBoundingClientRect(),e.clientX,e.clientY)
+    if (stroke && brushPreviewEnabled) {
+      const paintPoint=point && canPaintAt(point) ? canvasPoint(stroke.canvas.getBoundingClientRect(),e.clientX,e.clientY) : null
+      if(paintPoint)paintBrushAt(stroke,paintPoint)
+      else stroke.point=null
       e.preventDefault()
-      paintBrushAt(canvas, point, rect, stroke.mode)
     }
   }
   const stopBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (brushStroke.current?.id === e.pointerId) brushStroke.current = null
+    const stroke = brushStroke.current
+    if (stroke?.id === e.pointerId) {
+      brushStroke.current = null
+      const {canvas,bitmap,mode,segments,display,diameter} = stroke
+      if (canvas.width===bitmap.width && canvas.height===bitmap.height) {
+        const clean=mode==='clean'
+        // Keep erasures in artwork coordinates when an exterior band adds padding.
+        const offset=clean ? maxContourWidth-(manualBase.current?.padding??0) : 0
+        const width=bitmap.width+2*offset,height=bitmap.height+2*offset
+        const target=clean ? manualErase : colorCorrection
+        const stack=clean ? eraseHistory.current : colorCorrectionHistory.current
+        const existing=target.current?.width===width&&target.current.height===height ? target.current.data : undefined
+        const mask=existing ?? new Uint8Array(width*height)
+        stack.past.push(new Uint8Array(mask))
+        if(stack.past.length>50)stack.past.shift()
+        stack.future=[]
+        for(const {from,to} of segments)rasterizeBrushSegment(from,to,diameter,display,bitmap,(x,y)=>{mask[(y+offset)*width+x+offset]=1})
+        target.current={data:mask,width,height}
+        if(clean)renderManualErase(canvas)
+        else setColorCorrectionVersion(v=>v+1)
+        setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
+      }
+    }
     if (e.type === 'pointercancel' || (e.type === 'pointerup' && e.pointerType !== 'mouse')) clearBrushCursor()
   }
 
   const renderManualErase = (canvas: HTMLCanvasElement) => {
     const base = manualBase.current
-    if (base?.width === canvas.width && base.height === canvas.height) {
-      canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(base.data), base.width, base.height), 0, 0)
-    }
+    if (base?.width !== canvas.width || base.height !== canvas.height) return
     const saved = manualErase.current
-    if (!saved || saved.width !== canvas.width || saved.height !== canvas.height) return
     const ctx = canvas.getContext('2d')!
-    const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    for (let p = 0; p < saved.data.length; p++) if (saved.data[p]) image.data[p * 4 + 3] = 0
-    ctx.putImageData(image, 0, 0)
+    const offset=maxContourWidth-base.padding
+    if (!saved || saved.width!==base.width+2*offset || saved.height!==base.height+2*offset) {
+      ctx.putImageData(new ImageData(base.data,base.width,base.height),0,0)
+      return
+    }
+    const pixels=new Uint8ClampedArray(base.data)
+    for (let y=0;y<base.height;y++) for(let x=0;x<base.width;x++) {
+      if(saved.data[(y+offset)*saved.width+x+offset])pixels[(y*base.width+x)*4+3]=0
+    }
+    ctx.putImageData(new ImageData(pixels,base.width,base.height),0,0)
   }
   const clearManualBrush = () => {
     manualErase.current = null
@@ -523,10 +548,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const resetPanel = (panel: 'presets'|'size'|'retoque'|'background'|'trama'|'refinamiento'|'ajustes'|'edges') => {
     if (panel === 'presets') { applyPreset('default'); return }
     setPreset('custom')
-    if (panel === 'size') { setCrop(null); setDpi(300); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
+    if (panel === 'size') { setCrop(null); setDpi(300); setLastPrintSize(''); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
     if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
     if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
-    if (panel === 'trama') { setSettings(s => ({...s, affectedColors:undefined,protectedColors:undefined,organic:0,screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
+    if (panel === 'trama') { setSettings(s => ({...s, affectedColors:undefined,protectedColors:undefined,contourBand:undefined,organic:0,screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
     if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, contourShrinkPx: defaults.contourShrinkPx, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
     if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
     setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides],edgeMask:defaults.edgeMask,edgeMaskSizeMm:defaults.edgeMaskSizeMm}))
@@ -590,9 +615,19 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }
 
   const ratio = dimensions.width / dimensions.height
+  const printSizePreset = printWidthOptions.find(option =>
+    option.id === lastPrintSize && presetPrintWidth(option, ratio) === Number(widthCm)
+  )
   let output: ReturnType<typeof printSize> | undefined
+  let printOutput: ReturnType<typeof printSize> | undefined
   let sizeError = ''
-  try { if(fileName) output = printSize(Number(widthCm), ratio, dpi) } catch (e) { sizeError = (e as Error).message }
+  const padding = contourPadding(settings)
+  try {
+    if (fileName) {
+      output = printSize(Number(widthCm), ratio, dpi)
+      printOutput = padding ? printSize(Number(widthCm), ratio, dpi, padding) : output
+    }
+  } catch (e) { sizeError = (e as Error).message }
   const resizeInfo = output ? {
     sourceWidth: dimensions.width,
     sourceHeight: dimensions.height,
@@ -602,11 +637,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   } : null
   const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop,colorCorrectionVersion,garment,comparisonTarget==='background'])
   const resizeKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings.resampleMethod, settings.sharpness, crop])
-  const processing = loading || (!!output && readyKey !== renderKey && !error)
+  const processing = loading || (!!printOutput && readyKey !== renderKey && !error)
   const retouchPreview = !!fileName && !!displaySize && comparisonTarget !== 'rescale' && !handActive && !panning
   const brushPreviewEnabled = retouchPreview && view !== 'original' && (brushTool || colorBrushTool)
   const pickerPreviewEnabled = retouchPreview && pickColorTool
-  const showBrushCursor = brushCursor && (pickerPreviewEnabled || (brushPreviewEnabled && canPaintAt(brushCursor)))
   const toggleRetouchTool = (mode: 'clean'|'color'|'picker') => {
     const activate = !(mode === 'clean' ? brushTool : mode === 'color' ? colorBrushTool : pickColorTool)
     setBrushTool(activate && mode === 'clean')
@@ -623,6 +657,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     ? processingProgress<63?`Procesando Neural ×${settings.resampleMethod==='neural4'?4:2} en tu equipo…`:'Terminando reescalado y trama…'
     : settings.enabled?'Procesando trama…':'Procesando imagen…'
   const visibleSize=displaySize ?? dimensions
+  const sourceInset = padding && printOutput ? {
+    left:`${padding / printOutput.width * 100}%`, top:`${padding / printOutput.height * 100}%`,
+    width:`${(printOutput.width - padding * 2) / printOutput.width * 100}%`,
+    height:`${(printOutput.height - padding * 2) / printOutput.height * 100}%`,
+  } : undefined
   const previewScale = fit ? Math.min((viewport.width - 48) / visibleSize.width, (viewport.height - 48) / visibleSize.height, 1) : zoom / 100
   const shownZoom = Math.max(1, Math.round(previewScale * 100))
   // CSS assumes 96 px per inch. This maps output pixels to their physical
@@ -676,6 +715,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       }
       setShowCrop(false)
       setDimensions({ width: document?.crop?.width ?? img.naturalWidth, height: document?.crop?.height ?? img.naturalHeight })
+      setLastPrintSize('')
       setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
       setDpi(sourceDpi)
       setFileName(name)
@@ -693,10 +733,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
   useEffect(() => () => { loadId.current++ }, [])
   useEffect(() => {
-    if (!imageRef.current || !output || loading) return
+    if (!imageRef.current || !output || !printOutput || loading) return
     let cancelled = false
     let worker: Worker | undefined
     const { width, height } = output
+    const { width: printWidth, height: printHeight } = printOutput
     setError('')
     setExportMessage('')
     setProcessingProgress(0)
@@ -710,9 +751,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         ctx.drawImage(imageRef.current!, 0, 0)
         const input = ctx.getImageData(crop?.x ?? 0, crop?.y ?? 0, crop?.width ?? native.width, crop?.height ?? native.height)
         const original = originalCanvas.current!
-        original.width = input.width
-        original.height = input.height
-        original.getContext('2d')!.putImageData(input, 0, 0)
+        original.width = padding ? printWidth : input.width
+        original.height = padding ? printHeight : input.height
+        const originalContext = original.getContext('2d')!
+        if (padding) originalContext.drawImage(native,crop?.x ?? 0,crop?.y ?? 0,input.width,input.height,padding,padding,width,height)
+        else originalContext.putImageData(input, 0, 0)
         // Keep the worker in the application bundle. GitHub Pages replaces the
         // previous deployment atomically, so an older cached page could point
         // at a hashed worker file that no longer exists after a deploy.
@@ -726,24 +769,24 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             setExportMessage(data.warning || '')
             // Resize only when the replacement is ready: resizing clears canvas pixels.
             const originalPixels=new ImageData(data.original,width,height)
-            const resultPixels=new ImageData(data.data,width,height)
             if(data.lanczosComparison){
               const baseline=lanczosCanvas.current!
-              baseline.width=width;baseline.height=height
-              baseline.getContext('2d')!.putImageData(new ImageData(data.lanczosComparison,width,height),0,0)
+              baseline.width=printWidth;baseline.height=printHeight
+              baseline.getContext('2d')!.putImageData(new ImageData(data.lanczosComparison,width,height),padding,padding)
             } else if ((data.neuralScale ?? 1) === 1 && lanczosCanvas.current) {
               lanczosCanvas.current.width=lanczosCanvas.current.height=0
             }
-            if(data.background){original.width=width;original.height=height;original.getContext('2d')!.putImageData(new ImageData(data.background,width,height),0,0)}
+            if(data.background){original.width=printWidth;original.height=printHeight;original.getContext('2d')!.putImageData(new ImageData(data.background,printWidth,printHeight),0,0)}
             resizedCache.current={key:resizeKey,data:new Uint8ClampedArray(data.original),width,height,neuralScale:data.neuralScale ?? 1}
             setAppliedNeuralScale(data.neuralScale ?? 1)
-            src.width = out.width = width
-            src.height = out.height = height
+            src.width=width;src.height=height
+            out.width=printWidth;out.height=printHeight
             src.getContext('2d')!.putImageData(originalPixels, 0, 0)
-            out.getContext('2d')!.putImageData(resultPixels, 0, 0)
-            manualBase.current={data:new Uint8ClampedArray(data.data),width,height}
+            manualBase.current={data:data.data,width:printWidth,height:printHeight,padding}
             renderManualErase(out)
-            setDisplaySize({width,height})
+            const guide=brushGuide.current
+            if(guide)guide.getContext('2d')!.clearRect(0,0,guide.width,guide.height)
+            setDisplaySize({width:printWidth,height:printHeight})
             setTransparent(data.transparent)
             setReadyKey(renderKey)
             setProcessingProgress(100)
@@ -768,7 +811,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         const cached=cachedEntry ? new Uint8ClampedArray(cachedEntry.data) : null
         const workerData=cached??input.data
         const correctionData = colorCorrection.current?.width === width && colorCorrection.current.height === height ? new Uint8Array(colorCorrection.current.data) : undefined
-        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, sourceWidth: input.width, sourceHeight: input.height, assetOrigin:window.location.origin,compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
+        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, padding, sourceWidth: input.width, sourceHeight: input.height, assetOrigin:window.location.origin,compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
         worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
@@ -820,11 +863,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       // remain untouched and are rendered again inside the new rectangle.
       if(bounds&&bounds.width===area.width&&bounds.height===area.height&&readyKey===renderKey&&resultCanvas.current?.width&&resultCanvas.current.height){
         const canvas=resultCanvas.current
-        const pixels=canvas.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,canvas.width,canvas.height).data
-        const processed=contentBounds(pixels,canvas.width,canvas.height)
-        if(processed&&!(processed.x===0&&processed.y===0&&processed.width===canvas.width&&processed.height===canvas.height)){
-          const x=Math.max(0,Math.floor(processed.x*area.width/canvas.width)),y=Math.max(0,Math.floor(processed.y*area.height/canvas.height))
-          const right=Math.min(area.width,Math.ceil((processed.x+processed.width)*area.width/canvas.width)),bottom=Math.min(area.height,Math.ceil((processed.y+processed.height)*area.height/canvas.height))
+        const width=canvas.width-2*padding,height=canvas.height-2*padding
+        const pixels=canvas.getContext('2d')!.getImageData(padding,padding,width,height).data
+        const processed=contentBounds(pixels,width,height)
+        if(processed&&!(processed.x===0&&processed.y===0&&processed.width===width&&processed.height===height)){
+          const x=Math.max(0,Math.floor(processed.x*area.width/width)),y=Math.max(0,Math.floor(processed.y*area.height/height))
+          const right=Math.min(area.width,Math.ceil((processed.x+processed.width)*area.width/width)),bottom=Math.min(area.height,Math.ceil((processed.y+processed.height)*area.height/height))
           if(right>x&&bottom>y)bounds={x:area.x+x,y:area.y+y,width:right-x,height:bottom-y}
         }
       }
@@ -837,23 +881,23 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
   const exportPng = async () => {
     const canvas = resultCanvas.current
-    if (!canvas || !output || readyKey !== renderKey || loading || exporting) return
+    if (!canvas || !printOutput || readyKey !== renderKey || loading || exporting) return
     setExporting(true)
     setExportMessage('')
     try {
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo generar el PNG.')), 'image/png'))
       const bytes = withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()), dpi)
       const metadata = inspectPng(bytes)
-      if (metadata.width !== output.width || metadata.height !== output.height || Math.abs(metadata.dpi - dpi) > .02 || Math.abs(metadata.dpiY - dpi) > .02 || metadata.profile !== 'sRGB') throw new Error('El PNG no coincide con el tamaño solicitado.')
+      if (metadata.width !== printOutput.width || metadata.height !== printOutput.height || Math.abs(metadata.dpi - dpi) > .02 || Math.abs(metadata.dpiY - dpi) > .02 || metadata.profile !== 'sRGB') throw new Error('El PNG no coincide con el tamaño solicitado.')
       const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
       const link = document.createElement('a')
-      link.download = `${fileName.replace(/\.[^.]+$/, '')}-${output.width}x${output.height}-${dpi}ppp.png`
+      link.download = `${fileName.replace(/\.[^.]+$/, '')}-${printOutput.width}x${printOutput.height}-${dpi}ppp.png`
       link.href = url
       document.body.append(link)
       link.click()
       link.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
-      setExportMessage(`PNG verificado: ${metadata.width} × ${metadata.height} px · ${dpi} ppp · ${output.widthCm.toFixed(2)} × ${output.heightCm.toFixed(2)} cm. Descarga solicitada.`)
+      setExportMessage(`PNG verificado: ${metadata.width} × ${metadata.height} px · ${dpi} ppp · ${printOutput.widthCm.toFixed(2)} × ${printOutput.heightCm.toFixed(2)} cm. Descarga solicitada.`)
     } catch (e) { setError((e as Error).message) }
     finally { setExporting(false) }
   }
@@ -910,13 +954,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     else {loadId.current++;imageRef.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('')}
   }
   const sendToGang = () => {
-    if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
+    if (!output || !printOutput || readyKey !== renderKey || loading || exporting || !imageRef.current) return
     const name = fileName
-    const width = output.widthCm
+    const width = printOutput.widthCm
     const sourceDpi=dpi
     const snapshot = snapshotEditor()
     if (!snapshot) return
-    const editorDocument = {...snapshot.document, widthCm: width}
+    const editorDocument = {...snapshot.document, widthCm: output.widthCm}
     const replaceId = snapshot.assetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
@@ -926,7 +970,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }
 
   const reviewPrint = (action:PrintReviewAction) => {
-    if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
+    if (!output || (action !== 'resized' && !printOutput) || readyKey !== renderKey || loading || exporting || !imageRef.current) return
     if(action==='gang')setWorkflowStep(4)
     setPrintReviewAction(action)
     const upscaleFactor = appliedNeuralScale
@@ -1039,32 +1083,32 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <label className="field">Reescalado de imagen (%)<input aria-label="Reescalado de imagen en porcentaje" type="number" min="1" max="2000" step="25" value={widthCm && Number(widthCm) > 0 ? Number((Number(widthCm) / 2.54 * dpi / dimensions.width * 100).toFixed(1)) : ''} onChange={e => setWidthCm(e.target.value ? (dimensions.width * Number(e.target.value) / 100 / dpi * 2.54).toFixed(4) : '')} /></label>
             <div className="scale-presets">{[100,200,300,400].map(percent => <button key={percent} onClick={() => setWidthCm((dimensions.width * percent / 100 / dpi * 2.54).toFixed(4))}>{percent}%</button>)}</div>
             </div></details>
-            <label className="field">Ancho por talla
-              <select className="print-width-preset" value={printSizePreset?.id ?? ''} onChange={event=>{
-                const option=printWidthOptions.find(({id})=>id===event.target.value)
+            <label className="field">Preset de tamaño
+              <select className="print-width-preset" value={printSizePreset?.id ?? ''} onChange={event => {
+                const option = printWidthOptions.find(({id}) => id === event.target.value)
                 if (!option) return
                 setLastPrintSize(option.id)
-                setWidthCm(String(option.width))
+                setWidthCm(String(presetPrintWidth(option, ratio)))
               }}>
                 <option value="" disabled>Elegir talla</option>
-                {printWidthGroups.map(({label,options})=><optgroup key={label} label={label}>
-                  {options.map(({id,size,width})=><option key={id} value={id}>{size} · {width} cm</option>)}
+                {printWidthGroups.map(({label, options}) => <optgroup key={label} label={label}>
+                  {options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </optgroup>)}
               </select>
             </label>
             <div className="dimension-fields">
-              <label>Ancho (cm)<input aria-label="Ancho en centímetros" type="number" min="0.1" step="0.1" value={widthCm} onChange={event=>{
+              <label>Ancho (cm)<input aria-label="Ancho en centímetros" type="number" min="0.1" step="0.1" value={widthCm} onChange={event => {
                 setLastPrintSize('')
                 setWidthCm(event.target.value)
               }} /></label>
-              <label>Alto (cm)<input aria-label="Alto en centímetros" type="number" min="0.1" step="0.1" value={widthCm && Number(widthCm) > 0 ? (Number(widthCm) / ratio).toFixed(2) : ''} onChange={event=>{
+              <label>Alto (cm)<input aria-label="Alto en centímetros" type="number" min="0.1" step="0.1" value={widthCm && Number(widthCm) > 0 ? (Number(widthCm) / ratio).toFixed(2) : ''} onChange={event => {
                 setLastPrintSize('')
                 setWidthCm(event.target.value ? String(Number(event.target.value) * ratio) : '')
               }} /></label>
             </div>
             <label className="field">Resolución<select aria-label="Resolución de impresión" value={dpi} onChange={e => setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
             <p className="help-text">Salida PNG sRGB, 8 bits por canal. Comprueba los ppp requeridos por tu RIP. Aumentarlos no recupera detalle del original.</p>
-            <p className="help-text">Proporciones bloqueadas.</p>
+            <p className="help-text">El diseño conserva sus proporciones. Los presets de tote bags lo ajustan al ancho y alto indicados.</p>
             <label className="field">Método de reescalado<select aria-label="Método de reescalado" value={settings.resampleMethod} onChange={e => {const method=e.target.value as ResizeMethod;update('resampleMethod',method);if(method==='neural2'||method==='neural4')selectComparison('rescale')}}><option value="lanczos3">Lanczos-3 · fotos y detalle</option><option value="bicubic">Bicúbico · fotos suaves</option><option value="bilinear">Bilineal · rapidez</option><option value="nearest">Vecino más cercano · pixel art</option><option value="neural2">Neural x2 · experimental</option><option value="neural4">Neural x4 · experimental</option></select></label>
             <p className="help-text">{({lanczos3:'Recomendado para fotografías y ampliaciones con mucho detalle. Es el método más definido, pero puede marcar más los bordes.',bicubic:'Recomendado para fotografías cuando buscas un resultado más suave y con menos riesgo de halos.',bilinear:'Recomendado para previsualizaciones rápidas o ampliaciones moderadas. Suaviza más y conserva menos detalle fino.',nearest:'Recomendado para pixel art, gráficos con píxeles intencionales o formas muy duras. No usar para fotografías.',neural2:'Real-ESRGAN x2 en tu equipo. Procesa también imágenes grandes por bloques; el tiempo depende del tamaño y de la aceleración disponible.',neural4:'Real-ESRGAN x4 en tu equipo. Procesa también imágenes grandes por bloques. Requiere más tiempo y memoria; revisa el detalle generado al 100%.'} as Record<ResizeMethod,string>)[settings.resampleMethod]}</p>
             {resizeInfo && <div className="resize-summary" role="status">
@@ -1112,16 +1156,31 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               {settings.enabled ? <>
               <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('trama')}>Restablecer valores</button>
               <div className="preset-group"><span className="preset-group-label">Control de trama</span>
+                <label className="help-text"><input ref={contourControl} type="checkbox" checked={!!settings.contourBand} onChange={event=>{
+                  update('contourBand',event.target.checked ? {...defaultContourBand} : undefined)
+                  setComparisonTarget('result');setView('result')
+                }}/> Solo franja de contorno</label>
+                {settings.contourBand ? <>
+                  <label className="field">Lado del contorno<select value={settings.contourBand.side} onChange={event=>update('contourBand',{...settings.contourBand!,side:event.target.value as ContourBand['side']})}>
+                    <option value="inside">Hacia dentro</option><option value="outside">Hacia fuera</option>
+                  </select></label>
+                  <RangeControl label="Ancho máximo de la franja" value={settings.contourBand.widthPx} min={1} max={maxContourWidth} unit=" px" onChange={widthPx=>update('contourBand',{...settings.contourBand!,widthPx})}/>
+                  <RangeControl label="Fluidez del contorno" value={settings.contourBand.flow} min={0} max={100} unit="%" onChange={flow=>update('contourBand',{...settings.contourBand!,flow})}/>
+                  <RangeControl label="Suavizado de la franja" value={settings.contourBand.softness} min={0} max={100} unit="%" onChange={softness=>update('contourBand',{...settings.contourBand!,softness})}/>
+                  <p className="help-text">La fluidez estrecha la franja en puntas y giros. El suavizado gradúa la densidad de tinta hacia el borde transparente.</p>
+                  {padding>0 && <p className="help-text">La salida suma {padding} px por lado para imprimir la franja exterior.{printOutput?` PNG: ${printOutput.width} × ${printOutput.height} px.`:''}</p>}
+                </> : <>
                 <p className="help-text">2. Aplica la trama al diseño que quedó tras borrar el fondo. Las zonas protegidas conservan su color y no recuperan el fondo eliminado.</p>
                 <label className="field">Cómo generar los puntos<select value={settings.affectedColors?'all':settings.screenScope} disabled={!!settings.affectedColors} onChange={e=>chooseScreenScope(e.target.value as Settings['screenScope'])}><option value="all">Según los tonos del diseño</option><option value="transitions">Sólo transparencias suaves</option></select></label>
-                <button className="btn color-range-trigger" disabled={processing} onClick={()=>setTramaColorPick('affected')}><Pipette size={16}/> {settings.affectedColors?'Editar zonas con trama':'Elegir zonas con trama'}</button>
+                <button className="btn color-range-trigger" disabled={!fileName||processing} onClick={()=>setTramaColorPick('affected')}><Pipette size={16}/> {settings.affectedColors?'Editar zonas con trama':'Elegir zonas con trama'}</button>
                 <p className="help-text">{settings.affectedColors?'Trama sólo en tu selección; el resto conserva su color.':'Trama en todo el diseño visible.'}</p>
                 {settings.affectedColors&&<button className="text-button" onClick={()=>update('affectedColors',undefined)}>Volver a tramar todo</button>}
                 <button className="btn color-range-trigger" disabled={processing} onClick={()=>setTramaColorPick('protected')}><Pipette size={16}/> {settings.protectedColors?'Editar zonas protegidas':'Proteger zonas sin trama'}</button>
                 {settings.protectedColors&&<><p className="help-text">Protección activa: tiene prioridad donde se superponen las selecciones.</p><button className="text-button" onClick={()=>update('protectedColors',undefined)}>Quitar protección de trama</button></>}
+                </>}
               </div>
               <button className="btn" disabled={processing} onClick={()=>{setComparisonTarget('background');setView('split')}}>Comparar fondo eliminado / trama</button>
-              <button className="text-button" onClick={()=>{setSettings(s=>({...s,affectedColors:undefined,protectedColors:undefined,protectSolid:false,screenScope:'all',size:100,contrast:100,brightness:100,gamma:1,invert:false,organic:0}));setPreset('custom');setView('result');setComparisonTarget('result')}}>Reiniciar selección y tono de trama</button>
+              <button className="text-button" onClick={()=>{setSettings(s=>({...s,affectedColors:undefined,protectedColors:undefined,contourBand:undefined,protectSolid:false,screenScope:'all',size:100,contrast:100,brightness:100,gamma:1,invert:false,organic:0}));setPreset('custom');setView('result');setComparisonTarget('result')}}>Reiniciar selección y tono de trama</button>
               <RangeControl label="Irregularidad de los puntos" value={settings.organic??0} min={0} max={100} unit="%" onChange={v=>update('organic',v)}/>
               <p className="help-text">0%: trama regular. Aumenta para desplazar suavemente los puntos y reducir la apariencia de rejilla. Revisa los detalles al 100%.</p>
               <div className="range-setting">
@@ -1140,10 +1199,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <RangeAnchors label="Tamaño máximo" value={settings.size} unit="%" values={[75,85,90,100,110]} onChange={v=>update('size',v)}/>
               </div>
               <p className="help-text"><strong>Alfa sólido DTF.</strong> Cada punto se exporta al 100 % de opacidad. Los huecos quedan transparentes.</p>
+              {!settings.contourBand && <>
               <div className="row-label"><span>Conservar color</span><Toggle checked={settings.preserveColor} onChange={(v) => update('preserveColor', v)} /></div>
               <p className="help-text">Mantiene el color original en los puntos. Desactívalo para generar una tinta única según la prenda.</p>
               <div className="row-label"><span>Invertir trama</span><Toggle checked={settings.invert} onChange={v => update('invert', v)} /></div>
               <p className="help-text">Invierte las zonas de tinta y transparencia del semitono.</p>
+              </>}
               </> : <p className="help-text">Sin semitono conserva la imagen que quedó tras eliminar el fondo. Puedes volver a activar Semitono sin perder el color de prenda ni la selección del gotero.</p>}
             </div>
           </section>
@@ -1187,14 +1248,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                   {brushTool && <p className="help-text">Retoque puntual sobre el resultado. Arrastra sobre las pintitas o bordes contaminados; la imagen original permanece intacta.</p>}
                 </div>
               </>}
-              {refinementTab === 'solid' && <>
+              {refinementTab === 'solid' && (settings.enabled && settings.contourBand ? <p className="help-text">En modo «Solo franja de contorno», el interior conserva su tinta y la trama sigue toda la silueta exterior.</p> : <>
                 <div className="row-label"><span>Proteger color sólido</span><Toggle checked={settings.protectSolid} onChange={v => update('protectSolid', v)} /></div>
                 <label className="color-picker-field"><span>Color protegido</span><input aria-label="Color protegido" type="color" value={settings.protectSolidColor} onChange={e => update('protectSolidColor', e.target.value)} /></label>
                 <div className="solid-protection-presets"><button type="button" onClick={() => {update('protectSolidColor','#ffffff');update('protectSolidTolerance',30);update('protectSolid',true)}}>Proteger blancos</button><button type="button" onClick={() => {update('protectSolidColor','#000000');update('protectSolidTolerance',20);update('protectSolid',true)}}>Proteger negros</button></div>
                 <RangeControl label="Tolerancia de color" value={settings.protectSolidTolerance} min={0} max={40} unit="%" onChange={v => update('protectSolidTolerance', v)} />
                 {!settings.enabled&&!settings.solidAlpha&&<div className="row-label"><span>Conservar borde suave</span><Toggle checked={settings.protectSmoothEdge} onChange={v => update('protectSmoothEdge', v)} /></div>}
                 <p className="help-text">La protección mantiene sólidos los tonos elegidos que siguen visibles después de eliminar el fondo.</p>
-              </>}
+              </>)}
             </div>
           </section>
 
@@ -1316,17 +1377,18 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               if (pointer && canvas) trackBrushCursor(canvas.getBoundingClientRect(), pointer.x, pointer.y)
             }}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
-            <div className={`artboard ${brushPreviewEnabled ? 'brush-active' : ''} ${pickerPreviewEnabled ? 'color-picker-active' : ''} ${showBrushCursor && brushPreviewEnabled ? 'brush-cursor-visible' : ''}`}
+            <div className={`artboard ${brushPreviewEnabled ? 'brush-active' : ''} ${pickerPreviewEnabled ? 'color-picker-active' : ''}`}
               hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}
               onPointerEnter={moveBrush} onPointerDown={startBrush} onPointerMove={moveBrush} onPointerLeave={clearBrushCursor}
               onPointerUp={stopBrush} onPointerCancel={stopBrush} onLostPointerCapture={stopBrush}>
               <canvas ref={originalCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' || (view === 'split' && compareNeuralToLanczos) ? 'hidden' : 'visible' }} />
               <canvas ref={lanczosCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'split' && compareNeuralToLanczos ? 'visible' : 'hidden' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}>
-                <canvas ref={sourceCanvas} className="art-canvas" style={{visibility: comparisonTarget === 'rescale' ? 'visible' : 'hidden'}} />
+                <canvas ref={sourceCanvas} className="art-canvas" style={{...sourceInset,visibility: comparisonTarget === 'rescale' ? 'visible' : 'hidden'}} />
                 <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget !== 'rescale' ? 'visible' : 'hidden'}} />
+                {colorBrushTool&&<canvas ref={brushGuide} className="brush-guide" style={sourceInset} aria-hidden="true"/>}
               </div>
-              {showBrushCursor && <span className="brush-cursor" style={{left:`${brushCursor.x * 100}%`, top:`${brushCursor.y * 100}%`, width:pickerPreviewEnabled ? 18 : brushSize, height:pickerPreviewEnabled ? 18 : brushSize}} aria-hidden="true" />}
+              {(brushPreviewEnabled||pickerPreviewEnabled) && <span ref={brushCursor} hidden className="brush-cursor" style={{width:pickerPreviewEnabled ? 18 : brushSize, height:pickerPreviewEnabled ? 18 : brushSize}} aria-hidden="true" />}
               {view === 'split' && <div className="comparison-labels" aria-hidden="true">
                 <span className="comparison-label-left">{comparisonTarget==='rescale'?(compareNeuralToLanczos?`Lanczos-3 · ${resizeInfo?.outputWidth.toLocaleString()} × ${resizeInfo?.outputHeight.toLocaleString()} px`:`Original · ${resizeInfo?.sourceWidth.toLocaleString()} × ${resizeInfo?.sourceHeight.toLocaleString()} px`):comparisonTarget==='background'?'Fondo eliminado':'Original'}</span>
                 <span className="comparison-label-right">{comparisonTarget==='rescale'?`${rescaleMethodLabel} · ${resizeInfo?.outputWidth.toLocaleString()} × ${resizeInfo?.outputHeight.toLocaleString()} px`:comparisonTarget==='background'?'Con trama':'Resultado final'}</span>
@@ -1378,7 +1440,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         </section>
       </div>}
       {showCrop && imageRef.current && <CropPanel image={imageRef.current} initial={crop ?? {x:0,y:0,width:dimensions.width,height:dimensions.height}} onCancel={()=>setShowCrop(false)} onApply={rect=>{setWidthCm((Number(widthCm)*rect.width/dimensions.width).toFixed(4));setDimensions({width:rect.width,height:rect.height});setCrop(rect);setShowCrop(false);setFit(true)}}/>}
-      {tramaColorPick&&imageRef.current&&<ColorRangePanel purpose={tramaColorPick} image={imageRef.current} processedSource={readyKey===renderKey?sourceCanvas.current:null} outputWidth={output?.width} settings={{...settings,dpi,screenBase:garment==='dark'?'black':'white'}} crop={crop} initial={(tramaColorPick==='affected'?settings.affectedColors:settings.protectedColors)??{...defaultColorRange,colors:[],useColors:false,strokes:[]}} onCancel={()=>setTramaColorPick(null)} onApply={range=>{setSettings(s=>({...s,[tramaColorPick==='affected'?'affectedColors':'protectedColors']:range,...(tramaColorPick==='affected'?{screenScope:'all' as const}:{}),separateBackground:true}));setPreset('custom');setComparisonTarget('background');setView('split');setTramaColorPick(null)}}/>}
+      {tramaColorPick&&imageRef.current&&<ColorRangePanel purpose={tramaColorPick} image={imageRef.current} processedSource={readyKey===renderKey?sourceCanvas.current:null} outputWidth={output?.width} settings={{...settings,dpi,screenBase:garment==='dark'?'black':'white'}} crop={crop} initial={(tramaColorPick==='affected'?settings.affectedColors:settings.protectedColors)??{...defaultColorRange,colors:[],useColors:false,strokes:[]}} onCancel={()=>setTramaColorPick(null)} onApply={range=>{setSettings(s=>({...s,[tramaColorPick==='affected'?'affectedColors':'protectedColors']:range,...(tramaColorPick==='affected'?{screenScope:'all' as const}:{}),separateBackground:true}));setPreset('custom');setComparisonTarget('background');setView('split');setTramaColorPick(null)}} onAutomaticContour={tramaColorPick==='affected' ? range=>{
+        const hasSelection = (range.useColors!==false && range.colors.length>0) || !!range.strokes?.length
+        setSettings(s=>({...s,affectedColors:hasSelection ? range : undefined,contourBand:{...defaultContourBand}}))
+        setPreset('custom');setComparisonTarget('result');setView('result');setTramaColorPick(null)
+        requestAnimationFrame(()=>contourControl.current?.focus())
+      } : undefined}/>}
       {showColorRange&&imageRef.current&&<ColorRangePanel purpose={isolatedColorPick?'isolated':'background'} image={imageRef.current} processedSource={readyKey===renderKey?sourceCanvas.current:null} outputWidth={output?.width} settings={{...settings,dpi,screenBase:garment==='dark'?'black':'white'}} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>{setShowColorRange(false);setIsolatedColorPick(false)}} onApply={colorRange=>{setSettings(s=>({...s,background:'custom',colorRange,preserveColor:true,separateBackground:true}));setPreset('custom');setComparisonTarget('background');setView('split');setShowColorRange(false);setIsolatedColorPick(false)}}/>}
     </div>
   )

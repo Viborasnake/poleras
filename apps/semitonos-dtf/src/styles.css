@@ -96,7 +96,7 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
 .artboard { position: relative; flex-shrink: 0; margin: 0 auto; aspect-ratio: 1.4; box-shadow: 0 18px 60px rgba(0,0,0,.62), 0 0 0 1px #40464c; background-color: #fff; background-image: linear-gradient(45deg,#d7d7d7 25%,transparent 25%),linear-gradient(-45deg,#d7d7d7 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d7d7d7 75%),linear-gradient(-45deg,transparent 75%,#d7d7d7 75%); background-size: 20px 20px; background-position: 0 0,0 10px,10px -10px,-10px 0; overflow: hidden; }
 .art-canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .artboard:is(.brush-active, .color-picker-active) { touch-action:none; user-select:none; }
-.artboard.brush-cursor-visible { cursor:none; }
+.artboard.brush-active:has(.brush-cursor:not([hidden])) { cursor:none; }
 .artboard.color-picker-active { cursor:crosshair; }
 .brush-tools { display:grid; gap:8px; margin-top:10px; }
 .result-layer { position: absolute; inset: 0; }
@@ -924,6 +924,9 @@ input[type='range']::-webkit-slider-thumb {
 .sheet-preset > button:first-child[aria-pressed='true'] small { color: var(--ds-ink); }
 .save-indicator { color: var(--ds-lime); }
 .gang-toolbar-left { color: var(--ds-text-secondary); }
+.gang-toolbar .gang-optimize { min-height: 44px; }
+.gang-toolbar .gang-optimize[aria-pressed='true']:not(:disabled) { border-color: var(--ds-lime); }
+.gang-optimization-status:empty { position: absolute; }
 .gang-viewport, .gang-preview { background: #050504; }
 .empty-gang { border-color: var(--ds-pink); background: #21131ee8; }
 
@@ -941,7 +944,8 @@ input[type='range']::-webkit-slider-thumb {
 .modal-auto-list label { border-color: #55574f; border-radius: 10px; background: var(--ds-surface-panel); }
 .modal-auto-list label:has(input:checked) { border-color: var(--ds-lime); background: #2b301b; }
 .modal-strength output { color: var(--ds-pink); }
-.brush-cursor { position:absolute; z-index:5; transform:translate(-50%,-50%); pointer-events:none; border:1px solid var(--ds-pink); border-radius:50%; box-shadow:0 0 0 1px var(--ds-ink); }
+.brush-cursor { position:absolute; inset:0 auto auto 0; z-index:5; pointer-events:none; border:1px solid var(--ds-pink); border-radius:50%; box-shadow:0 0 0 1px var(--ds-ink); }
+.brush-guide { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; opacity:.45; }
 .brush-cursor-erase { border-color:var(--ds-warning); }
 .resize-summary { color: var(--ds-lilac-soft); }
 

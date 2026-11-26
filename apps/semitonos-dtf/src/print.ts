@@ -1,11 +1,12 @@
 export const MAX_PIXELS = 40_000_000
 
-export function printSize(widthCm: number, ratio: number, dpi: number) {
+export function printSize(widthCm: number, ratio: number, dpi: number, padding = 0) {
   if (![widthCm, ratio, dpi].every(Number.isFinite) || widthCm <= 0 || ratio <= 0 || dpi < 72 || dpi > 1200) {
     throw new Error('Introduce un ancho mayor que cero y una resolución válida.')
   }
-  const width = Math.max(1, Math.round(widthCm / 2.54 * dpi))
-  const height = Math.max(1, Math.round(width / ratio))
+  const contentWidth = Math.max(1, Math.round(widthCm / 2.54 * dpi))
+  const width = contentWidth + padding * 2
+  const height = Math.max(1, Math.round(contentWidth / ratio)) + padding * 2
   if (width > 12000 || height > 12000 || width * height > MAX_PIXELS) {
     throw new Error('El tamaño supera 40 megapíxeles o 12.000 px por lado. Reduce los centímetros o los ppp.')
   }

@@ -37,3 +37,60 @@ test('mixed designs reuse side gaps instead of stopping at the first row',()=>{
   assert.equal(result.missing,0)
   assert.equal(result.placements.length,7)
 })
+
+test('optimization uses less length while preserving dimensions, copies and gaps', () => {
+  const items = [
+    {id:'a', widthCm:21, heightCm:39, quantity:2},
+    {id:'b', widthCm:18, heightCm:16, quantity:1},
+    {id:'c', widthCm:15, heightCm:21, quantity:3},
+    {id:'d', widthCm:18, heightCm:10, quantity:1},
+    {id:'e', widthCm:27, heightCm:15, quantity:2},
+  ]
+  const original = structuredClone(items)
+  const gap = 0.5
+  const standard = pack(items, 58, 100, gap, false)
+  const optimized = pack(items, 58, 100, gap, false, true)
+  assert.equal(standard.missing, 0)
+  assert.equal(optimized.missing, 0)
+  assert.equal(optimized.improved, true)
+  assert.ok(optimized.usedHeight <= standard.usedHeight - 10)
+  assert.deepEqual(items, original)
+  assert.deepEqual(pack(items, 58, 100, gap, false, true), optimized)
+  for (const item of items) {
+    const copies = optimized.placements.filter(placement => placement.id === item.id)
+    assert.equal(copies.length, item.quantity)
+    for (const copy of copies) {
+      assert.equal(copy.width, item.widthCm)
+      assert.equal(copy.height, item.heightCm)
+      assert.equal(copy.rotated, false)
+      assert.ok(copy.x >= gap && copy.y >= gap)
+      assert.ok(copy.x + copy.width + gap <= 58 && copy.y + copy.height + gap <= 100)
+    }
+  }
+  for (const [index, a] of optimized.placements.entries()) {
+    for (const b of optimized.placements.slice(index + 1)) {
+      assert.ok(a.x+a.width+gap<=b.x || b.x+b.width+gap<=a.x || a.y+a.height+gap<=b.y || b.y+b.height+gap<=a.y)
+    }
+  }
+})
+
+test('optimization prioritizes fitting more pieces over shortening a partial layout', () => {
+  const items = [
+    {id:'a', widthCm:9, heightCm:27, quantity:3},
+    {id:'b', widthCm:28, heightCm:36, quantity:2},
+    {id:'c', widthCm:31, heightCm:25, quantity:1},
+    {id:'d', widthCm:18, heightCm:22, quantity:2},
+    {id:'e', widthCm:37, heightCm:7, quantity:2},
+  ]
+  assert.equal(pack(items, 58, 100, 0.5, false).missing, 1)
+  assert.equal(pack(items, 58, 100, 0.5, false, true).missing, 0)
+})
+
+test('optimization respects rotation and keeps an already efficient layout', () => {
+  const items = [{id:'a', widthCm:6, heightCm:4, quantity:2}]
+  assert.equal(pack(items, 4, 12, 0, false, true).missing, 2)
+  const standard = pack(items, 4, 12, 0, true)
+  assert.equal(standard.missing, 0)
+  assert.ok(standard.placements.every(placement => placement.rotated))
+  assert.deepEqual(pack(items, 4, 12, 0, true, true), standard)
+})
