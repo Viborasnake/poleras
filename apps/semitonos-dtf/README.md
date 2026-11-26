@@ -85,6 +85,8 @@ npm test
 
 Al iniciar sin un proyecto activo, escribe su nombre o abre un `.trama.json`. El proyecto se guarda automáticamente en **este navegador y esta dirección**, incluyendo el editor, originales disponibles, ajustes, recortes, categoría de prenda y Gang Sheet. Al volver se recupera el último guardado. La cabecera indica cambios pendientes, guardando, guardado o error; espera la confirmación antes de cerrar.
 
+Al enviar un diseño al Gang Sheet se guardan sus ajustes de semitono, el preset seleccionado y su fondo de vista previa. «Editar original» recupera esos valores junto con el recorte y la resolución. Para guardar los cambios en la plancha, usa «Revisar y actualizar Gang Sheet». Si el preset personal ya no está en «Mis presets», los valores guardados se abren como «Personalizado».
+
 **No se sobrescribe automáticamente un archivo del disco.** Usa **Descargar proyecto** para una copia portable y **Abrir proyecto** para retomarla. Borrar los datos del navegador, usar otro navegador/dirección o cerrar antes de completar el guardado puede hacer perder cambios. «Nuevo proyecto» sustituye el autoguardado activo tras confirmación; descarga antes una copia para conservarlo. La apertura acepta proyectos de hasta 1 GB; el límite evita congelar el navegador al cargar archivos excesivos.
 
 En «Mis presets», selecciona uno para **Renombrar preset** o **Eliminar preset**. Eliminar exige confirmación, no es reversible y no modifica los ajustes de la imagen abierta. Los presets incluidos no se pueden borrar.

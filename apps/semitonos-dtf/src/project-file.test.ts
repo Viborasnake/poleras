@@ -1,6 +1,8 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {parseProject,type ProjectFile} from './project-file.ts'
+import {restoreEditorAdjustments,type EditorDocument} from './editor-document.ts'
+import {garmentPresets} from './garment-presets.ts'
 
 const fixture=():ProjectFile=>({format:'trama-dtf',version:1,name:'Mi trabajo',sheet:{width:58,height:100,dpi:600,gap:5,rotate:true},background:'black',items:[{id:'a',name:'Diseño',dataUrl:'data:image/png;base64,AAAA',naturalWidth:100,naturalHeight:200,widthCm:2.54,heightCm:5.08,quantity:2}]})
 test('project round trip preserves images, dimensions, DPI and copies',()=>{
@@ -39,4 +41,55 @@ test('project rejects invalid geometry, resolution and missing editor settings',
   const p=fixture();p.sheet.dpi=96;assert.throws(()=>parseProject(JSON.stringify(p)))
   const q=fixture();q.items[0].quantity=-1;assert.throws(()=>parseProject(JSON.stringify(q)))
   assert.throws(()=>parseProject(JSON.stringify({...fixture(),editor:{name:'x',document:{version:1,original:'data:image/png;base64,AAAA',widthCm:25,dpi:300}}})))
+})
+
+test('reopening designs restores their own adjustments, preset and editor preview from the project', () => {
+  const p = fixture()
+  const asset = p.items[0]
+  const defaults = {
+    ...garmentPresets.default.values, edgeSides: [true,true,true,true],
+    edgeMask: 'none' as const, edgeMaskSizeMm: 5, trimMm: 0, featherMm: 0, cornerRadiusMm: 0,
+  }
+  const dark: EditorDocument = {
+    version: 1, original: asset.dataUrl, settings: {...defaults, ...garmentPresets.darkFine.values},
+    widthCm: 5.08, dpi: 150, crop: null, garment: 'dark', presetId: 'darkFine', previewColor: '#102a43',
+  }
+  const light: EditorDocument = {
+    ...dark, dpi: 600, crop: {x:1,y:2,width:50,height:80}, garment: 'light',
+    presetId: 'saved:light', previewColor: 'white',
+    settings: {
+      ...defaults, ...garmentPresets.lightBold.values, angle: 30, edgeSides: [true,false,true,false],
+      background: 'custom', colorRange: {colors:['#ffffff'],tolerance:15,softness:20},
+    },
+  }
+  p.items[0].document = dark
+  p.items.push({...asset, id:'b', document:light})
+  const [a, b] = parseProject(JSON.stringify(p)).items
+  assert.deepEqual(a.document, JSON.parse(JSON.stringify(dark)))
+  assert.deepEqual(b.document, JSON.parse(JSON.stringify(light)))
+
+  const savedPresets = [{id:'saved:light', settings:{lpi:65}}]
+  const editedLight = restoreEditorAdjustments(b.document!, defaults, savedPresets)
+  assert.equal(editedLight.preset, 'saved:light')
+  assert.equal(editedLight.garment, 'light')
+  assert.equal(editedLight.settings.lpi, 24)
+  assert.equal(editedLight.settings.angle, 30)
+  assert.equal(editedLight.previewColor, 'white')
+  editedLight.settings.edgeSides[1] = true
+  assert.equal(b.document!.settings.edgeSides[1], false)
+  const editedDark = restoreEditorAdjustments(a.document!, defaults, savedPresets)
+  assert.equal(editedDark.preset, 'darkFine')
+  assert.equal(editedDark.garment, 'dark')
+  assert.equal(editedDark.settings.lpi, 45)
+  assert.equal(editedDark.settings.colorRange, undefined)
+  assert.equal(editedDark.previewColor, '#102a43')
+
+  const missingPreset = restoreEditorAdjustments(b.document!, defaults, [])
+  assert.equal(missingPreset.preset, 'custom')
+  assert.deepEqual(JSON.parse(JSON.stringify(missingPreset.settings)), b.document!.settings)
+  const legacy = {...dark, presetId:undefined, previewColor:undefined, garment:undefined, settings:{...defaults,background:'white' as const}}
+  const restoredLegacy = restoreEditorAdjustments(legacy, defaults, [])
+  assert.equal(restoredLegacy.garment, 'light')
+  assert.equal(restoredLegacy.previewColor, 'white')
+  assert.equal(restoredLegacy.preset, 'custom')
 })

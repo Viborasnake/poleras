@@ -21,6 +21,8 @@ function checkDocument(d:EditorDocument) {
   if((s.colorRange!==undefined&&!validColorRange(s.colorRange))||(s.background==='custom'&&!validColorRange(s.colorRange)))fail()
   if(s.customBase!==undefined&&!['black','white'].includes(s.customBase))fail()
   if(d.garment!==undefined&&!['dark','light'].includes(d.garment))fail()
+  if(d.presetId!==undefined&&(typeof d.presetId!=='string'||!d.presetId||d.presetId.length>100))fail()
+  if(d.previewColor!==undefined&&!isPreviewColor(d.previewColor))fail()
   if(s.whiteRemoval!==undefined&&!['all','connected'].includes(s.whiteRemoval))fail()
   if(s.whiteDetail!==undefined&&(!Number.isFinite(s.whiteDetail)||s.whiteDetail<0||s.whiteDetail>100))fail()
   if(s.backgroundCleanup!==undefined&&(!Number.isFinite(s.backgroundCleanup)||s.backgroundCleanup<0||s.backgroundCleanup>100))fail()

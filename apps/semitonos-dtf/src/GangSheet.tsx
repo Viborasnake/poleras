@@ -13,7 +13,7 @@ import {isPreviewColor,previewColorGroups,previewColorName} from './preview-colo
 
 type Asset = Omit<ProjectAsset,'dataUrl'> & {img:CanvasImageSource}
 export type ProjectActions={save:()=>void;open:()=>void}
-type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; previewColor?:string; onPreviewColorChange?:(value:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void; initialProject:ProjectFile;editorRevision:string;editorLoading:boolean;onSaveStatus:(s:ProjectSaveStatus)=>void;actionsRef?:Ref<ProjectActions>}
+type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void; initialProject:ProjectFile;editorRevision:string;editorLoading:boolean;onSaveStatus:(s:ProjectSaveStatus)=>void;actionsRef?:Ref<ProjectActions>}
 type GangSnapshot = {items:Asset[];projectName:string;width:number;height:number;dpi:number;gap:number;rotate:boolean;previewBg:string;showIndividualColors:boolean}
 type SheetPreset = {id:string;name:string;width:number;height:number}
 const previewColorOptions = <>
@@ -37,7 +37,7 @@ function savedSheetSettings() {
   } catch { return {width:58,height:100,dpi:300,gap:5,rotate:true} }
 }
 
-export default function GangSheet({source,onImportFile,onEditDocument,previewColor,onPreviewColorChange,getEditor,restoreEditor,initialProject,editorRevision,editorLoading,onSaveStatus,actionsRef}: Props) {
+export default function GangSheet({source,onImportFile,onEditDocument,getEditor,restoreEditor,initialProject,editorRevision,editorLoading,onSaveStatus,actionsRef}: Props) {
   const [items,setItems] = useState<Asset[]>([])
   const [selectedId,setSelectedId]=useState<string|null>(null)
   const [renamingId,setRenamingId]=useState<string|null>(null)
@@ -48,7 +48,13 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   function editAsset(id:string){
     setSelectedId(id)
     const item=items.find(a=>a.id===id)
-    if(item?.document&&onEditDocument)onEditDocument({...item.document,widthCm:item.widthCm},item.name,item.id)
+    if (item?.document && onEditDocument) {
+      onEditDocument({
+        ...item.document,
+        widthCm: item.widthCm,
+        previewColor: item.document.previewColor ?? item.previewColor,
+      }, item.name, item.id)
+    }
     else setError('Este diseño no tiene el original editable guardado. Importa el original al editor para evitar volver a tramar un PNG procesado.')
   }
   function startRename(item:Asset){
@@ -92,7 +98,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const [rotate,setRotate] = useState(initial.current.rotate)
   const [error,setError] = useState('')
   const [message,setMessage] = useState('')
-  const [previewBg,setPreviewBg] = useState(previewColor || 'checker')
+  const [previewBg,setPreviewBg] = useState(initialProject.background)
   const [showIndividualColors,setShowIndividualColors] = useState(initialProject.showIndividualColors ?? true)
   const [busy,setBusy] = useState(false)
   const [saveState,setSaveState]=useState('Cargando guardado…')
@@ -152,7 +158,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     if(next===gangHistory.current)return
     gangHistory.current=next;historyApplying.current=true
     const s=next.present
-    setItems(s.items);setProjectName(s.projectName);setWidth(s.width);setHeight(s.height);setDpi(s.dpi);setGap(s.gap);setRotate(s.rotate);setPreviewBg(s.previewBg);onPreviewColorChange?.(s.previewBg)
+    setItems(s.items);setProjectName(s.projectName);setWidth(s.width);setHeight(s.height);setDpi(s.dpi);setGap(s.gap);setRotate(s.rotate);setPreviewBg(s.previewBg)
     setShowIndividualColors(s.showIndividualColors)
     setHistoryCounts({undo:next.past.length,redo:next.future.length})
   }
@@ -210,7 +216,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     return loaded
   }
   function applyProject(p:ProjectFile,loaded:Asset[]) {
-    setItems(loaded);setProjectName(p.name);setWidth(p.sheet.width);setHeight(p.sheet.height);setDpi(p.sheet.dpi);setGap(p.sheet.gap);setRotate(p.sheet.rotate);setPreviewBg(p.background);onPreviewColorChange?.(p.background);setAcceptedResolution('');restoreEditor?.(p.editor)
+    setItems(loaded);setProjectName(p.name);setWidth(p.sheet.width);setHeight(p.sheet.height);setDpi(p.sheet.dpi);setGap(p.sheet.gap);setRotate(p.sheet.rotate);setPreviewBg(p.background);setAcceptedResolution('');restoreEditor?.(p.editor)
     setShowIndividualColors(p.showIndividualColors ?? true)
   }
   useEffect(() => {
@@ -222,7 +228,6 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     })
     return ()=>{cancelled=true}
   },[])
-  useEffect(()=>{if(previewColor && previewColor !== previewBg) setPreviewBg(previewColor)},[previewColor])
 
   async function add(blob:Blob,name:string,widthCm?:number,document?:EditorDocument,replaceId?:string) {
     setAssetLoading(n=>n+1)
@@ -363,7 +368,6 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
             const color=event.target.value
             previewColorChanged.current=true
             setPreviewBg(color)
-            onPreviewColorChange?.(color)
           }}>{previewColorOptions}</select>
         </label>
         <button type="button" className="btn gang-individual-colors" aria-pressed={showIndividualColors} onClick={()=>{

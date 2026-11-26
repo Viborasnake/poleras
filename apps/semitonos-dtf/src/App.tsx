@@ -8,7 +8,7 @@ import type {ProjectSaveStatus} from './use-project-autosave'
 import {renamePersonalPreset,deletePersonalPreset} from './preset-library'
 import {clearActiveProject} from './reset-project'
 import type {ResizeMethod} from './resample'
-import type {EditorDocument,GangSource} from './editor-document'
+import {restoreEditorAdjustments,type EditorDocument,type GangSource} from './editor-document'
 import {migratePresetSettings} from './preset-migration'
 import {garmentPresets as presets,presetsFor,type GarmentTone,type PresetMode} from './garment-presets'
 import {contentBounds,imageContentBounds} from './crop'
@@ -20,6 +20,7 @@ import {brushFootprint, canvasPoint, type CanvasPoint} from './brush-geometry'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
 import {isEdgeMaskStyle,type EdgeMaskStyle} from './edge-mask'
 import EdgeMaskPicker from './EdgeMaskPicker'
+import {isPreviewColor,type PreviewColor} from './preview-colors'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
 import HalftoneWorker from './halftone.worker?worker&inline'
 
@@ -274,7 +275,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const [exportMessage, setExportMessage] = useState('')
   const [transparent, setTransparent] = useState(0)
-  const [previewBg, setPreviewBg] = useState('checker')
+  const [previewBg, setPreviewBg] = useState<PreviewColor>('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
   const [collapsedPanels, setCollapsedPanels] = useState({presets:false, garment:true, size:true, crop:true, retoque:false, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
@@ -521,6 +522,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
   const resetPanel = (panel: 'presets'|'size'|'retoque'|'background'|'trama'|'refinamiento'|'ajustes'|'edges') => {
     if (panel === 'presets') { applyPreset('default'); return }
+    setPreset('custom')
     if (panel === 'size') { setCrop(null); setDpi(300); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
     if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
     if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
@@ -660,7 +662,18 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       setBrushTool(false)
       setCrop(document?.crop ?? null)
       setEditingAssetId(assetId)
-      if(document){setSettings({...defaults,...document.settings,edgeSides:[...document.settings.edgeSides]});if(document.garment)setGarment(document.garment);setPreset('custom')}
+      if (document) {
+        const restored = restoreEditorAdjustments(document, defaults, savedPresets)
+        setSettings(restored.settings)
+        setGarment(restored.garment)
+        setPreset(restored.preset)
+        setPreviewBg(restored.previewColor)
+        setComparisonTarget('result')
+        setView('result')
+        setSavingPreset(false)
+        setRenamingPreset(false)
+        setPresetMessage('')
+      }
       setShowCrop(false)
       setDimensions({ width: document?.crop?.width ?? img.naturalWidth, height: document?.crop?.height ?? img.naturalHeight })
       setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
@@ -878,7 +891,17 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       originalSnapshot.current={image:imageRef.current,data:native.toDataURL('image/png')}
       native.width=native.height=1
     }
-    const doc:EditorDocument={version:1,original:originalSnapshot.current.data,settings:structuredClone(settings),crop:crop?{...crop}:null,widthCm:Number(widthCm),dpi,garment:activeGarment}
+    const doc:EditorDocument = {
+      version: 1,
+      original: originalSnapshot.current.data,
+      settings: structuredClone(settings),
+      crop: crop ? {...crop} : null,
+      widthCm: Number(widthCm),
+      dpi,
+      garment: activeGarment,
+      presetId: preset === 'custom' ? undefined : preset,
+      previewColor: previewBg,
+    }
     return {name:fileName,document:doc,assetId:editingAssetId}
   }
   const restoreProjectEditor = (editor:{name:string;document:EditorDocument;assetId?:string}|undefined) => {
@@ -891,12 +914,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const name = fileName
     const width = output.widthCm
     const sourceDpi=dpi
-    const native=document.createElement('canvas')
-    native.width=imageRef.current.naturalWidth;native.height=imageRef.current.naturalHeight
-    native.getContext('2d',{colorSpace:'srgb'})!.drawImage(imageRef.current,0,0)
-    const editorDocument:EditorDocument={version:1,original:native.toDataURL('image/png'),settings:structuredClone(settings),crop:crop?{...crop}:null,widthCm:width,dpi:sourceDpi,garment:activeGarment}
-    native.width=native.height=1
-    const replaceId=editingAssetId
+    const snapshot = snapshotEditor()
+    if (!snapshot) return
+    const editorDocument = {...snapshot.document, widthCm: width}
+    const replaceId = snapshot.assetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
       try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(5);setTool('gang')}
@@ -983,7 +1004,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={() => goToWorkflow({step:5,tool:'gang'})}><b>5</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
       </nav>
-      <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
+      <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,preset,previewBg])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
       <main className={`workspace workflow-layout-${workflowStep} ${prepressCollapsed || !fileName ? 'prepress-collapsed' : ''} ${!fileName ? 'empty-editor' : ''}`} style={{display: tool === 'design' ? undefined : 'none'}}>
         <aside className={`sidebar workflow-step-${workflowStep}`} id="prepress-panel" hidden={prepressCollapsed || !fileName}>
           <div className="sidebar-title"><div><Sparkles size={18} /><span>Pre-prensa</span></div><div className="sidebar-title-actions"><button type="button" className="sidebar-collapse-toggle" aria-label="Ocultar controles de Pre-prensa" title="Ocultar controles" onClick={()=>setPrepressCollapsed(true)}><ChevronLeft size={17}/></button><button type="button" aria-label="Información" aria-expanded={showInfo} onClick={() => setShowInfo(v => !v)}><Info size={17} /></button></div></div>
@@ -995,7 +1016,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               const key = e.target.value
               const saved = savedPresets.find(p => p.id === key)
               setPresetMessage('');setRenamingPreset(false)
-              if(saved){setSettings({...saved.settings,edgeSides:[...saved.settings.edgeSides]});if(saved.garment)setGarment(saved.garment);setPreset(key);setComparisonTarget('result');setView('result');if(saved.settings.background!=='none')setPreviewBg(saved.settings.background);else if(saved.garment)setPreviewBg(saved.garment==='light'?'white':'black')}
+              if(saved){setSettings({...saved.settings,edgeSides:[...saved.settings.edgeSides]});if(saved.garment)setGarment(saved.garment);setPreset(key);setComparisonTarget('result');setView('result');if(saved.settings.background==='black'||saved.settings.background==='white')setPreviewBg(saved.settings.background);else if(saved.garment)setPreviewBg(saved.garment==='light'?'white':'black')}
               else applyPreset(key)
             }}><option value="custom" disabled>Personalizado</option><optgroup label={`${activeGarment==='dark'?'Prenda oscura':'Prenda clara'} · ${presetMode==='halftone'?'Semitono':'Sin semitono'}`}>{visiblePresets.map(([key,p]) => <option key={key} value={key}>{p.label}</option>)}</optgroup>{savedPresets.length>0 && <optgroup label="Mis presets">{savedPresets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}</select></label>
             <p className="help-text">{preset in presets ? presets[preset].description : preset.startsWith('saved:') ? 'Preset guardado: trama, nitidez, fondo y bordes. El tamaño de impresión se mantiene.' : 'Ajustes personalizados.'}</p>
@@ -1235,7 +1256,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <button type="button" className={comparisonTarget==='background'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='background'} onClick={()=>selectComparison('background')}>Fondo / trama</button>
               </div>
             </div>
-            <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}>
+            <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={e => {if(isPreviewColor(e.target.value))setPreviewBg(e.target.value)}}>
               <option value="checker">Transparencia</option>
               <optgroup label="Neutros · claro → normal → oscuro">
                 <option value="white">Blanco · claro</option>
