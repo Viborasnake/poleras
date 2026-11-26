@@ -3,7 +3,11 @@ export type Placement = { id: string; x: number; y: number; width: number; heigh
 type Rect = { x:number; y:number; w:number; h:number }
 type Layout = {placements: Placement[]; missing: number; usedHeight: number}
 type PlacementRule = 'short-side' | 'bottom-left' | 'area' | 'upright'
+type Strategy = {order: PackItem[]; rule: PlacementRule; alternate: ReadonlySet<number>}
 const placementRules: PlacementRule[] = ['short-side', 'bottom-left', 'area', 'upright']
+const noAlternates: ReadonlySet<number> = new Set()
+const better = (candidate: Layout, current: Layout) => candidate.missing < current.missing
+  || (candidate.missing === current.missing && candidate.usedHeight + 1e-8 < current.usedHeight)
 const intersects = (a:Rect,b:Rect) => a.x < b.x+b.w-1e-8 && a.x+a.w > b.x+1e-8 && a.y < b.y+b.h-1e-8 && a.y+a.h > b.y+1e-8
 const contains = (a:Rect,b:Rect) => a.x <= b.x+1e-8 && a.y <= b.y+1e-8 && a.x+a.w >= b.x+b.w-1e-8 && a.y+a.h >= b.y+b.h-1e-8
 
@@ -14,6 +18,26 @@ export function pack(items: PackItem[], width: number, height: number, gap: numb
     return Array.from({length:item.quantity}, () => item)
   })
   if (expanded.length > 200) throw new Error('Máximo 200 copias por plancha.')
+  const paddedWidth = width - gap
+  const paddedArea = expanded.reduce((area,item) => area + (item.widthCm + gap) * (item.heightCm + gap), 0)
+  let wideHeight = 0, wideCopies = 0, tallest = 0
+  for (const item of expanded) {
+    const upright = item.widthCm + gap <= paddedWidth + 1e-8
+    const sideways = rotate && item.heightCm + gap <= paddedWidth + 1e-8
+    if (!upright && !sideways) continue
+    const leastHeight = Math.min(upright ? item.heightCm : Infinity, sideways ? item.widthCm : Infinity) + gap
+    const leastWidth = Math.min(upright ? item.widthCm : Infinity, sideways ? item.heightCm : Infinity) + gap
+    tallest = Math.max(tallest, leastHeight)
+    // Two pieces wider than half the padded strip must occupy different
+    // intervals along the roll, even if both can be turned.
+    if (leastWidth > paddedWidth / 2 + 1e-8) {
+      wideHeight += leastHeight
+      wideCopies++
+    }
+  }
+  const minimumUsedHeight = expanded.length && paddedWidth > 0
+    ? gap + Math.max(paddedArea / paddedWidth, wideHeight, tallest) : 0
+  const constrainedByWidth = wideCopies > 1 && wideHeight + gap >= minimumUsedHeight - 1e-8
   // Try several deterministic orders and placement rules. A single greedy
   // choice can strand space even when every copy fits in another arrangement.
   const orders = [
@@ -24,13 +48,13 @@ export function pack(items: PackItem[], width: number, height: number, gap: numb
     [...expanded].sort((a,b)=>Math.min(b.heightCm,b.widthCm)-Math.min(a.heightCm,a.widthCm)),
     expanded,
   ]
-  function attempt(order:PackItem[], rule:PlacementRule, limit:number): Layout {
+  function attempt({order,rule,alternate}: Strategy, limit:number): Layout {
     // Occupied rectangles include a trailing gap; the outer bin needs only
     // one deducted margin so designs can reach the right/bottom inner edge.
     const free: Rect[] = [{x:gap,y:gap,w:width-gap,h:limit-gap}]
     const placements: Placement[] = []
     let missing = 0
-    for (const item of order) {
+    for (const [index,item] of order.entries()) {
       const variants = [{w:item.widthCm,h:item.heightCm,rotated:false}, ...(rotate && item.widthCm !== item.heightCm ? [{w:item.heightCm,h:item.widthCm,rotated:true}] : [])]
       const choices: {freeIndex:number;w:number;h:number;rotated:boolean;short:number;long:number}[] = []
       free.forEach((rect,freeIndex) => variants.forEach(v => {
@@ -45,7 +69,9 @@ export function pack(items: PackItem[], width: number, height: number, gap: numb
         if(rule==='area') return (ar.w*ar.h-(a.w+gap)*(a.h+gap))-(br.w*br.h-(b.w+gap)*(b.h+gap)) || a.short-b.short
         return a.short-b.short || a.long-b.long
       })
-      const choice=choices[0], rect=free[choice.freeIndex], placed:Rect={x:rect.x,y:rect.y,w:choice.w+gap,h:choice.h+gap}
+      const first = choices[0]
+      const choice = alternate.has(index) ? choices.find(option => option.rotated !== first.rotated) ?? first : first
+      const rect=free[choice.freeIndex], placed:Rect={x:rect.x,y:rect.y,w:choice.w+gap,h:choice.h+gap}
       const next:Rect[]=[]
       for(const candidate of free) {
         if(!intersects(candidate,placed)){next.push(candidate);continue}
@@ -60,14 +86,14 @@ export function pack(items: PackItem[], width: number, height: number, gap: numb
     return {placements,missing,usedHeight: placements.length ? Math.max(...placements.map(p=>p.y+p.height)) + gap : 0}
   }
   let best: Layout = {placements: [], missing: expanded.length, usedHeight: 0}
-  let bestOrder = expanded
-  let bestRule: PlacementRule = 'short-side'
-  function tryLayout(order: PackItem[], rule: PlacementRule, limit: number) {
-    const candidate = attempt(order, rule, limit)
-    if (candidate.missing < best.missing || (candidate.missing === best.missing && candidate.usedHeight + 1e-8 < best.usedHeight)) {
+  let bestStrategy: Strategy = {order:expanded,rule:'short-side',alternate:noAlternates}
+  const reachedMinimum = () => best.missing === 0 && best.usedHeight <= minimumUsedHeight + 1e-7
+  function tryLayout(order: PackItem[], rule: PlacementRule, limit: number, alternate = noAlternates) {
+    const strategy = {order,rule,alternate}
+    const candidate = attempt(strategy, limit)
+    if (better(candidate,best)) {
       best = candidate
-      bestOrder = order
-      bestRule = rule
+      bestStrategy = strategy
     }
     return candidate
   }
@@ -77,7 +103,7 @@ export function pack(items: PackItem[], width: number, height: number, gap: numb
   }
   const standard = best
 
-  if (optimize && expanded.length > 1) {
+  if (optimize && expanded.length > 1 && !reachedMinimum()) {
     const byAspect = [...expanded].sort((a,b) => a.widthCm / a.heightCm - b.widthCm / b.heightCm)
     const byPerimeter = [...expanded].sort((a,b) => b.widthCm + b.heightCm - a.widthCm - a.heightCm)
     const additionalOrders = [byAspect, [...byAspect].reverse(), byPerimeter, [...orders[0]].reverse()]
@@ -87,11 +113,10 @@ export function pack(items: PackItem[], width: number, height: number, gap: numb
 
     if (best.missing === 0) {
       // Packing in a shorter bin changes which gaps the placement rules prefer.
-      const paddedArea = expanded.reduce((area,item) => area + (item.widthCm + gap) * (item.heightCm + gap), 0)
-      let minimumTrialHeight = gap + paddedArea / (width - gap)
-      for (let step = 0; step < 6 && best.usedHeight - minimumTrialHeight > 0.01; step++) {
+      let minimumTrialHeight = gap + paddedArea / paddedWidth
+      for (let step = 0; step < 6 && !reachedMinimum() && best.usedHeight - minimumTrialHeight > 0.01; step++) {
         const limit = (minimumTrialHeight + best.usedHeight) / 2
-        const first = tryLayout(bestOrder, bestRule, limit)
+        const first = tryLayout(bestStrategy.order, bestStrategy.rule, limit)
         if (first.missing === 0) continue
         const second = tryLayout(orders[0], 'bottom-left', limit)
         if (second.missing === 0) continue
@@ -99,7 +124,37 @@ export function pack(items: PackItem[], width: number, height: number, gap: numb
         if (third.missing > 0) minimumTrialHeight = limit
       }
     }
+
+    if (rotate && !reachedMinimum()) {
+      // Repack after deliberately turning individual copies. A small loss
+      // at one placement can open a slot for a much larger piece later.
+      const seeds: Strategy[] = [bestStrategy]
+      if (bestStrategy.order !== orders[0] || bestStrategy.rule !== 'bottom-left') {
+        seeds.push({order:orders[0],rule:'bottom-left',alternate:noAlternates})
+      }
+      for (const seed of seeds) {
+        const {order,rule} = seed
+        const stride = order.length <= 20 ? 1 : Math.ceil(order.length / 6)
+        const limit = best.missing ? height : best.usedHeight
+        let alternate = seed.alternate
+        let current = tryLayout(order,rule,limit,alternate)
+        for (let round = 0; round < (stride === 1 ? 2 : 1) && !reachedMinimum(); round++) {
+          let next = current, nextAlternate = alternate
+          for (let i = round; i < order.length && !reachedMinimum(); i += stride) {
+            const {widthCm,heightCm} = order[i]
+            if (widthCm === heightCm || Math.max(widthCm,heightCm) + gap > paddedWidth + 1e-8) continue
+            const flipped = new Set(alternate)
+            if (!flipped.delete(i)) flipped.add(i)
+            const candidate = tryLayout(order,rule,limit,flipped)
+            if (better(candidate,next)) { next = candidate; nextAlternate = flipped }
+          }
+          if (next === current) break
+          current = next
+          alternate = nextAlternate
+        }
+      }
+    }
   }
 
-  return {...best, improved: best !== standard}
+  return {...best, improved: best !== standard, minimumReached: reachedMinimum(), constrainedByWidth}
 }

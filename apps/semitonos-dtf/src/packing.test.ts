@@ -94,3 +94,38 @@ test('optimization respects rotation and keeps an already efficient layout', () 
   assert.ok(standard.placements.every(placement => placement.rotated))
   assert.deepEqual(pack(items, 4, 12, 0, true, true), standard)
 })
+
+test('optimization tries different orientations per copy to shorten a 58 cm roll', () => {
+  const sizes = [[29,43.4,1],[27,40.7,1],[26,38.9,1],[30,35.5,1],[29,36.2,3],
+    [21,26.2,1],[30,34.4,1],[31.9,29,1],[14.6,8.7,1],[8,4.6,1]]
+  const items = sizes.map(([widthCm,heightCm,quantity],index)=>({id:String(index),widthCm,heightCm,quantity}))
+  const gap = .1
+  const result = pack(items,58,300,gap,true,true)
+  assert.equal(result.missing,0)
+  assert.ok(result.usedHeight <= 223.8 + 1e-8)
+  assert.ok(result.placements.some(p=>p.rotated) && result.placements.some(p=>!p.rotated))
+  for (const item of items) {
+    const copies=result.placements.filter(p=>p.id===item.id)
+    assert.equal(copies.length,item.quantity)
+    for (const copy of copies) {
+      assert.equal(copy.width,copy.rotated?item.heightCm:item.widthCm)
+      assert.equal(copy.height,copy.rotated?item.widthCm:item.heightCm)
+      assert.ok(copy.x>=gap && copy.y>=gap && copy.x+copy.width+gap<=58+1e-8 && copy.y+copy.height+gap<=result.usedHeight+1e-8)
+    }
+  }
+  for (const [index,a] of result.placements.entries()) {
+    for (const b of result.placements.slice(index+1)) {
+      assert.ok(a.x+a.width+gap<=b.x+1e-8 || b.x+b.width+gap<=a.x+1e-8 || a.y+a.height+gap<=b.y+1e-8 || b.y+b.height+gap<=a.y+1e-8)
+    }
+  }
+})
+
+test('the width fixes the roll length when both orientations exceed half the available width', () => {
+  const items=[{id:'large',widthCm:29,heightCm:36.2,quantity:2},{id:'small',widthCm:21,heightCm:26.2,quantity:1}]
+  const result=pack(items,58,300,.1,true,true)
+  assert.equal(result.missing,0)
+  assert.ok(Math.abs(result.usedHeight-58.3)<1e-8)
+  assert.equal(result.minimumReached,true)
+  assert.equal(result.constrainedByWidth,true)
+  assert.equal(pack(items,57,58,.1,true,true).minimumReached,false)
+})

@@ -261,7 +261,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
     try {
       return {layout:pack(items,width,height,gap/10,rotate,optimized),layoutError:''}
     } catch (error) {
-      return {layout:{placements:[],missing:0,usedHeight:0,improved:false},layoutError:(error as Error).message}
+      return {layout:{placements:[],missing:0,usedHeight:0,improved:false,minimumReached:false,constrainedByWidth:false},layoutError:(error as Error).message}
     }
   },[items,width,height,gap,rotate,optimized])
   const {width:pxW,height:pxH,tooBig}=gangPrintSize(width,height,dpi)
@@ -271,9 +271,16 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
   const matchingDpi=[300,150,600].find(candidate=>items.length>0&&items.every(item=>resolutionCheck(item,candidate).matches))
   const resolutionBlocked=resolutionIssues.length>0 && acceptedResolution!==resolutionKey
   const invalid = !!layoutError || widthOverLimit || tooBig || pxW<1 || pxH<1 || !items.length || layout.missing>0 || resolutionBlocked
-  const optimizationStatus = optimized && items.length > 0 && !layoutError
-    ? (layout.improved ? 'Distribución optimizada.' : 'La distribución actual ya es la mejor encontrada.')
-    : ''
+  let optimizationStatus = ''
+  if (optimized && items.length > 0 && !layoutError) {
+    if (layout.minimumReached) {
+      optimizationStatus = layout.constrainedByWidth
+        ? 'El ancho de la plancha fija este largo mínimo.'
+        : 'Largo mínimo con estas medidas y separación.'
+    } else {
+      optimizationStatus = layout.improved ? 'Distribución optimizada.' : 'La distribución actual ya es la mejor encontrada.'
+    }
+  }
   function correctResolution(){
     if(matchingDpi){setDpi(matchingDpi);setAcceptedResolution('');return}
     const changes=resolutionIssues.map(a=>`${a.name}: ${a.widthCm.toFixed(2)} × ${a.heightCm.toFixed(2)} → ${(a.naturalWidth/dpi*2.54).toFixed(2)} × ${(a.naturalHeight/dpi*2.54).toFixed(2)} cm`)
@@ -392,7 +399,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,getEditor,
         }}>
           Colores individuales <span aria-hidden="true">· {showIndividualColors?'Activados':'Desactivados'}</span>
         </button>
-        <span>Insumo: {width} × {height} cm · {layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de alto ocupado</span>
+        <span>Insumo: {width} × {height} cm · {layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de largo ocupado</span>
         <span className="gang-optimization-status" role="status">{optimizationStatus}</span>
       </div>
       <button className="btn export" disabled={invalid||busy} onClick={exportSheet}>{busy?'Exportando…':'Exportar Gang Sheet'}</button>
