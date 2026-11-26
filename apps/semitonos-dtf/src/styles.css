@@ -569,7 +569,8 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
-summary:focus-visible {
+summary:focus-visible,
+.artboard:focus-visible {
   outline: 3px solid var(--ds-lilac);
   outline-offset: 3px;
 }

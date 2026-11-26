@@ -15,13 +15,13 @@ test('project restores optimized packing while accepting files saved without the
   assert.deepEqual(parseProject(JSON.stringify(optimized)), optimized)
   assert.throws(() => parseProject(JSON.stringify({...legacy, sheet:{...legacy.sheet, optimized:'true'}})))
 })
-test('project restores contour direction, width, softness and flow', () => {
+test('project restores a 60 px contour with exterior brush strokes', () => {
   const p=fixture()
-  const contourBand={side:'outside',widthPx:20,softness:75,flow:90} as const
+  const contourBand={side:'outside' as const,widthPx:60,softness:75,flow:90,strokes:[{from:{x:-.03,y:.5},to:{x:.02,y:.5},radius:.03,mode:'exclude' as const}]}
   const settings={...garmentPresets.default.values,edgeSides:[true,true,true,true],featherMm:0,trimMm:0,cornerRadiusMm:0,edgeMask:'none' as const,edgeMaskSizeMm:5,contourBand}
   p.items[0].document={version:1,original:p.items[0].dataUrl,settings,crop:null,widthCm:10,dpi:300}
   assert.deepEqual(parseProject(JSON.stringify(p)).items[0].document?.settings.contourBand,contourBand)
-  p.items[0].document.settings.contourBand={...contourBand,widthPx:21}
+  p.items[0].document.settings.contourBand={...contourBand,widthPx:61}
   assert.throws(()=>parseProject(JSON.stringify(p)))
 })
 test('project accepts every garment preview color',()=>{

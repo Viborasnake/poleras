@@ -1,9 +1,30 @@
 import {createDotThreshold, type HalftoneSettings} from './halftone.ts'
 import {connectedExterior} from './white-background.ts'
+import {rasterizeBrushSegment, type CanvasPoint} from './brush-geometry.ts'
+import {maxSelectionBrushSize, maxSelectionStrokes} from './color-range.ts'
 
-export const maxContourWidth = 20
-export type ContourBand = {side: 'inside' | 'outside'; widthPx: number; softness: number; flow: number}
+export const maxContourWidth = 60
+export type ContourBrushMode = 'widen' | 'exclude'
+type ContourStroke = {from: CanvasPoint; to: CanvasPoint; radius: number; mode: ContourBrushMode}
+export type ContourBand = {side: 'inside' | 'outside'; widthPx: number; softness: number; flow: number; strokes?: ContourStroke[]}
 export const defaultContourBand: ContourBand = {side: 'inside', widthPx: 8, softness: 100, flow: 70}
+
+export function appendContourStroke(band: ContourBand, segments: {from: CanvasPoint; to: CanvasPoint}[], mode: ContourBrushMode, diameter: number, displayWidth: number, bitmap: {width: number; height: number}, padding: number): ContourBand {
+  const strokes = band.strokes ?? []
+  const available = maxSelectionStrokes - strokes.length
+  if (!segments.length || available <= 0) return band
+
+  // Artwork coordinates keep the brush aligned if the output margin changes.
+  const artworkWidth = bitmap.width - 2 * padding
+  const artworkHeight = bitmap.height - 2 * padding
+  const toArtwork = (point: CanvasPoint) => ({
+    x: (point.x * bitmap.width - padding) / artworkWidth,
+    y: (point.y * bitmap.height - padding) / artworkHeight,
+  })
+  const radius = diameter / (2 * displayWidth) * bitmap.width / artworkWidth
+  const added = segments.slice(0,available).map(({from,to})=>({from:toArtwork(from),to:toArtwork(to),radius,mode}))
+  return {...band,strokes:[...strokes,...added]}
+}
 
 export function contourPadding({enabled, contourBand}: {enabled: boolean; contourBand?: ContourBand}) {
   return enabled && contourBand?.side === 'outside' ? contourBand.widthPx : 0
@@ -11,10 +32,14 @@ export function contourPadding({enabled, contourBand}: {enabled: boolean; contou
 
 export function validContourBand(value: unknown): value is ContourBand {
   if (!value || typeof value !== 'object') return false
-  const {side, widthPx, softness, flow} = value as ContourBand
+  const {side, widthPx, softness, flow, strokes} = value as ContourBand
+  const validPoint = (point: CanvasPoint | undefined) => !!point && [point.x,point.y].every(n=>Number.isFinite(n) && n >= -maxContourWidth && n <= 1+maxContourWidth)
   return (side === 'inside' || side === 'outside') && Number.isInteger(widthPx) && widthPx >= 1 && widthPx <= maxContourWidth
     && Number.isInteger(softness) && softness >= 0 && softness <= 100
     && Number.isInteger(flow) && flow >= 0 && flow <= 100
+    && (strokes === undefined || (Array.isArray(strokes) && strokes.length <= maxSelectionStrokes && strokes.every(stroke => stroke
+      && (stroke.mode === 'widen' || stroke.mode === 'exclude') && validPoint(stroke.from) && validPoint(stroke.to)
+      && Number.isFinite(stroke.radius) && stroke.radius > 0 && stroke.radius <= maxSelectionBrushSize * (1 + 2 * maxContourWidth) / 2)))
 }
 
 export function padRgba(data: Uint8ClampedArray, width: number, height: number, padding: number) {
@@ -34,9 +59,20 @@ const sampleAngles = Array.from({length:16},(_,i)=>{
 
 /** Screen only the exterior perimeter. Enclosed transparent holes are left alone. */
 export function applyContourBand(data: Uint8ClampedArray, width: number, height: number, band: ContourBand, settings: HalftoneSettings, padding: number) {
+  const artworkWidth = width, artworkHeight = height
   const result = padRgba(data, width, height, padding)
   width += 2 * padding
   height += 2 * padding
+  const retouch = band.strokes?.length ? new Uint8Array(width * height) : null
+  if (retouch) {
+    const bitmap = {width,height}
+    const toOutput = ({x,y}: CanvasPoint) => ({x:(x * artworkWidth + padding)/width,y:(y * artworkHeight + padding)/height})
+    for (const {from,to,radius,mode} of band.strokes!) {
+      rasterizeBrushSegment(toOutput(from),toOutput(to),radius * artworkWidth * 2,bitmap,bitmap,(x,y)=>{
+        retouch[y * width + x] = mode === 'exclude' ? 1 : 2
+      })
+    }
+  }
   const outside = band.side === 'outside'
   const exterior = connectedExterior(width,height,pixel => result[pixel * 4 + 3] === 0)
   const visible = (pixel: number) => result[pixel * 4 + 3] !== 0
@@ -105,7 +141,8 @@ export function applyContourBand(data: Uint8ClampedArray, width: number, height:
     let nearest = 0
     for (let y = 0; y < height; y++) {
       const pixel = y * width + x
-      if (outside ? !exterior[pixel] : !visible(pixel)) continue
+      const brush = retouch?.[pixel]
+      if (brush === 1 || (outside ? !exterior[pixel] : !visible(pixel))) continue
       while (nearest + 1 < count && starts[nearest + 1] < y) nearest++
       let seedY = count ? sites[nearest] : -1
       let seedX = count ? x + horizontal[seedY * width + x] : x
@@ -121,7 +158,7 @@ export function applyContourBand(data: Uint8ClampedArray, width: number, height:
       if (distanceSquared > radiusSquared) continue
 
       const distance = Math.sqrt(distanceSquared)
-      const localWidth = flow && radius > 1 ? flowingWidth(seedX+(x-seedX)*.5/distance,seedY+(y-seedY)*.5/distance) : radius
+      const localWidth = brush !== 2 && flow && radius > 1 ? flowingWidth(seedX+(x-seedX)*.5/distance,seedY+(y-seedY)*.5/distance) : radius
       if (distance > localWidth) continue
       const progress = (distance - .5) / localWidth
       const towardsSolid = outside ? 1 - progress : progress
