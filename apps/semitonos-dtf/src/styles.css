@@ -472,6 +472,7 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .top-actions .top-change-image,
 .top-actions .top-gang-send { height:40px; white-space:nowrap; }
 .top-actions .top-change-image { border-color:var(--ds-border-control); }
+.top-actions .top-remove-image { min-height:44px; border-color:var(--ds-border-control); white-space:nowrap; }
 .top-actions .top-gang-send {
   border-color:var(--ds-pink);
   background:var(--ds-black);
@@ -503,6 +504,8 @@ input[type=checkbox] { accent-color:var(--aqua); }
 @media (max-width:600px) {
   .top-actions .btn { width:40px; min-width:40px; padding:0; justify-content:center; }
   .top-actions .btn span { display:none; }
+  .top-actions .top-remove-image { width:auto; padding-inline:12px; }
+  .top-actions .top-remove-image span { display:inline; }
   .top-actions .export-trigger { min-width:40px; }
 }
 .stage-toolbar { justify-content:flex-start; gap:8px; padding:10px 12px; }

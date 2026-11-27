@@ -209,6 +209,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const lanczosCanvas = useRef<HTMLCanvasElement>(null)
   const resultCanvas = useRef<HTMLCanvasElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const uploadButton = useRef<HTMLButtonElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
   const [settings, setSettings] = useState(initialSettings)
   const [garment, setGarment] = useState<GarmentTone>(initialProject.editor?.document.garment??(initialProject.background==='white'?'light':'dark'))
@@ -827,7 +828,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
   useEffect(() => () => { loadId.current++ }, [])
   useEffect(() => {
-    if (!imageRef.current || !output || !printOutput || loading) return
+    const image = imageRef.current
+    if (!image || !output || !printOutput || loading) return
     let cancelled = false
     let worker: Worker | undefined
     const { width, height } = output
@@ -836,13 +838,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     setExportMessage('')
     setProcessingProgress(0)
     const timer = setTimeout(() => {
+      if (imageRef.current !== image) return
       try {
         const src = sourceCanvas.current!, out = resultCanvas.current!
         const native = document.createElement('canvas')
-        native.width = imageRef.current!.naturalWidth
-        native.height = imageRef.current!.naturalHeight
+        native.width = image.naturalWidth
+        native.height = image.naturalHeight
         const ctx = native.getContext('2d', { willReadFrequently: true })!
-        ctx.drawImage(imageRef.current!, 0, 0)
+        ctx.drawImage(image, 0, 0)
         const input = ctx.getImageData(crop?.x ?? 0, crop?.y ?? 0, crop?.width ?? native.width, crop?.height ?? native.height)
         const original = originalCanvas.current!
         original.width = padding ? printWidth : input.width
@@ -856,7 +859,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         worker = new HalftoneWorker()
         processingWorker.current = worker
         worker.onmessage = ({ data }) => {
-          if (cancelled) return
+          if (cancelled || processingWorker.current !== worker) return
           if (data.type === 'progress') { setProcessingProgress(data.progress); return }
           if (data.error) setError(data.error)
           else {
@@ -889,7 +892,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           if (processingWorker.current === worker) processingWorker.current = null
         }
         worker.onerror = event => {
-          if (!cancelled) {
+          if (!cancelled && processingWorker.current === worker) {
             const detail = event.message && event.message !== 'Script error.' ? ` Detalle: ${event.message}` : ''
             setError(`No se pudo iniciar el procesador.${detail} Recarga la aplicación e inténtalo nuevamente.`)
           }
@@ -897,7 +900,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           if (processingWorker.current === worker) processingWorker.current = null
         }
         worker.onmessageerror = () => {
-          if (!cancelled) setError('El navegador no pudo leer el resultado del procesador. Recarga la aplicación e inténtalo nuevamente.')
+          if (!cancelled && processingWorker.current === worker) setError('El navegador no pudo leer el resultado del procesador. Recarga la aplicación e inténtalo nuevamente.')
           worker?.terminate()
           if (processingWorker.current === worker) processingWorker.current = null
         }
@@ -913,12 +916,16 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     return () => { cancelled = true; clearTimeout(timer); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
   }, [renderKey, loading, resizeKey])
 
-  const stopProcessing = () => {
+  const cancelImageWork = () => {
     loadId.current++
     processingWorker.current?.terminate()
     processingWorker.current = null
     setLoading(false)
     setProcessingProgress(0)
+  }
+
+  const stopProcessing = () => {
+    cancelImageWork()
     setError('Procesamiento detenido.')
   }
 
@@ -1042,10 +1049,68 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     }
     return {name:fileName,document:doc,assetId:editingAssetId}
   }
+
+  const clearEditorImage = () => {
+    cancelImageWork()
+    imageRef.current = null
+    originalSnapshot.current = null
+    resizedCache.current = null
+    manualBase.current = null
+    manualErase.current = null
+    colorCorrection.current = null
+    eraseHistory.current = {past:[],future:[]}
+    colorCorrectionHistory.current = {past:[],future:[]}
+    brushStroke.current = null
+    clearBrushCursor()
+    for (const canvas of [originalCanvas.current, sourceCanvas.current, resultCanvas.current, lanczosCanvas.current, brushGuide.current]) {
+      if (canvas) canvas.width = canvas.height = 0
+    }
+    setImageVersion(version => version + 1)
+    setFileName('')
+    setEditingAssetId(undefined)
+    setCrop(null)
+    setShowCrop(false)
+    setDisplaySize(null)
+    setReadyKey('')
+    setAppliedNeuralScale(1)
+    setBrushTool(false)
+    setColorBrushTool(false)
+    setEdgeRepairTool(false)
+    setPickColorTool(false)
+    setContourBrush(null)
+    setPendingWorkflowDestination(null)
+    setGangSafetyReport(null)
+    setPrintReviewAction(null)
+    setShowColorRange(false)
+    setIsolatedColorPick(false)
+    setTramaColorPick(null)
+    setExportMenuOpen(false)
+    setError('')
+    setExportMessage('')
+  }
+
+  const removeEditorImage = () => {
+    if (exporting || !imageRef.current || !window.confirm('¿Quitar la imagen del lienzo? Se descartarán los ajustes de esta edición.')) return
+    clearEditorImage()
+    setSettings(initialSettings)
+    setGarment('dark')
+    setPreset('default')
+    setPreviewBg('checker')
+    setComparisonTarget('result')
+    setView('split')
+    setFit(true)
+    setLastPrintSize('')
+    setCropMessage('')
+    setPresetMessage('')
+    setReadyForNewImage(true)
+    setWorkflowStep(1)
+    requestAnimationFrame(() => uploadButton.current?.focus())
+  }
+
   const restoreProjectEditor = (editor:{name:string;document:EditorDocument;assetId?:string}|undefined) => {
     setGangSource(undefined)
     if(editor){loadImage(editor.document.original,editor.name,editor.document.dpi,editor.document.widthCm,editor.document,editor.assetId)}
-    else {loadId.current++;imageRef.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('')}
+    else clearEditorImage()
   }
   const sendToGang = () => {
     if (!output || !printOutput || readyKey !== renderKey || loading || exporting || !imageRef.current) return
@@ -1058,7 +1123,15 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const replaceId = snapshot.assetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
-      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(5);setTool('gang')}
+      try {
+        if (!blob) throw new Error('No se pudo generar el diseño.')
+        const tagged = new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()), sourceDpi)], {type:'image/png'})
+        setGangSource({id:Date.now(), blob:tagged, widthCm:width, name, document:editorDocument, replaceId})
+        clearEditorImage()
+        setReadyForNewImage(true)
+        setWorkflowStep(5)
+        setTool('gang')
+      }
       catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
@@ -1111,6 +1184,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         <div className="top-actions">
           {fileName && tool === 'design' && <>
             <button type="button" className="btn top-change-image" onClick={() => fileInput.current?.click()}><Upload size={16} aria-hidden="true"/><span>Cambiar imagen</span></button>
+            <button type="button" className="btn top-remove-image" disabled={exporting} onClick={removeEditorImage}><Trash2 size={16} aria-hidden="true"/><span>Quitar imagen</span></button>
             <button type="button" className="btn top-gang-send" title="Revisar la seguridad de la trama y añadir el diseño a la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={reviewBeforeGang}><Layers3 size={16} aria-hidden="true"/><span>{editingAssetId?'Revisar y actualizar Gang Sheet':'Revisar y enviar a Gang Sheet'}</span></button>
             <div className="export-dropdown" ref={exportMenuRef}>
               <button type="button" className="btn export export-trigger" aria-expanded={exportMenuOpen} aria-haspopup="menu" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={() => setExportMenuOpen(value => !value)}><Download size={17} /> <span>{exporting ? 'Exportando…' : 'Exportar'}</span><ChevronDown size={15} /></button>
@@ -1495,7 +1569,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               const pointer = previewPointer.current, canvas = resultCanvas.current
               if (pointer && canvas) trackBrushCursor(canvas.getBoundingClientRect(), pointer.x, pointer.y)
             }}>
-            {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
+            {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button ref={uploadButton} className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className={`artboard ${brushPreviewEnabled ? 'brush-active' : ''} ${pickerPreviewEnabled ? 'color-picker-active' : ''}`}
               tabIndex={keyboardBrushActive ? 0 : undefined} aria-label={keyboardBrushActive?(edgeRepairTool?'Lienzo para descontaminar el borde':'Lienzo de retoque de contorno'):undefined} aria-describedby={keyboardBrushActive?(edgeRepairTool?'edge-repair-help':'contour-brush-help'):undefined}
               onKeyDown={paintWithKeyboard} onFocus={event=>{if(keyboardBrushActive&&event.currentTarget.matches(':focus-visible'))positionBrushCursor(brushCursor.current,keyboardBrushPoint.current,event.currentTarget.getBoundingClientRect())}} onBlur={clearBrushCursor}
