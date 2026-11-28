@@ -1,0 +1,309 @@
+.pet-collection {
+  width: min(1320px, 90%);
+  margin: clamp(28px, 5vw, 68px) auto;
+}
+
+.pet-collection-lookbook {
+  display: grid;
+  grid-template-areas: "preview intro" "preview controls";
+  grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 22px clamp(24px, 5vw, 74px);
+}
+
+.pet-collection-intro {
+  grid-area: intro;
+  padding-top: clamp(0px, 2vw, 28px);
+}
+
+.pet-collection-intro h2 {
+  margin: 0;
+  font: 700 clamp(38px, 5.3vw, 72px)/1.02 var(--ds-font-display);
+  letter-spacing: -.055em;
+}
+
+.pet-collection-intro h2 span {
+  display: table;
+  margin-top: .06em;
+  padding: .01em .13em .09em;
+  background: var(--ds-brand-accent);
+  color: var(--ds-text-primary);
+}
+
+.pet-collection-intro p {
+  max-width: 38ch;
+  margin: 16px 0 0;
+  color: var(--ds-text-secondary);
+  font: 500 clamp(15px, 1.5vw, 18px)/1.5 var(--ds-font-body);
+}
+
+.pet-collection-preview {
+  position: relative;
+  grid-area: preview;
+  min-height: clamp(440px, 45vw, 610px);
+  margin: 0;
+  overflow: hidden;
+  border-radius: calc(2 * var(--ds-radius-control));
+  background: var(--ds-surface-subtle);
+}
+
+.pet-collection-visual {
+  position: absolute;
+  inset: 0;
+}
+
+.pet-collection-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pet-collection-photo {
+    animation: pet-collection-preview-in .24s ease-out;
+  }
+}
+
+@keyframes pet-collection-preview-in {
+  from { opacity: .76; }
+  to { opacity: 1; }
+}
+
+.pet-collection-visual .catalog-missing-mockup {
+  padding: 12px 12px 58px;
+}
+
+.pet-collection-name {
+  position: absolute;
+  inset: auto 18px 18px;
+  width: fit-content;
+  max-width: calc(100% - 36px);
+  padding: 8px 14px 10px;
+  border-radius: 0 var(--ds-radius-control) 0 var(--ds-radius-control);
+  background: var(--ds-brand-primary);
+  color: var(--ds-text-inverse);
+  box-shadow: 4px 4px 0 var(--ds-brand-accent);
+  font: 700 clamp(24px, 3vw, 40px)/1.05 var(--ds-font-display);
+  letter-spacing: -.035em;
+}
+
+.pet-collection-controls {
+  display: grid;
+  grid-area: controls;
+  align-content: start;
+  gap: 14px;
+}
+
+.pet-collection-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pet-collection-picker legend {
+  margin-bottom: 9px;
+  padding: 0;
+  font: 700 15px/1.4 var(--ds-font-body);
+}
+
+.pet-collection-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pet-collection-option {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.pet-collection-option input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pet-collection-option input:disabled {
+  cursor: wait;
+}
+
+.pet-collection-option-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid var(--ds-border-control);
+  border-radius: var(--ds-radius-control);
+  background: var(--ds-surface-raised);
+  color: var(--ds-text-primary);
+}
+
+.pet-collection-option-body img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  object-fit: cover;
+  background: var(--ds-surface-subtle);
+}
+
+.pet-collection-option-name {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 5px 4px;
+  font: 700 14px/1.1 var(--ds-font-body);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.pet-collection-option input:checked + .pet-collection-option-body {
+  background: var(--ds-color-lime);
+}
+
+.pet-collection-option input:checked + .pet-collection-option-body::after {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  width: 21px;
+  height: 21px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ds-color-lime);
+  color: var(--ds-text-primary);
+  font: 700 14px/1 var(--ds-font-body);
+  content: '✓' / '';
+}
+
+.pet-collection-option input:focus-visible + .pet-collection-option-body,
+.pet-collection-all:focus-visible {
+  outline: 3px solid var(--ds-focus-ring);
+  outline-offset: var(--ds-focus-offset-control);
+}
+
+.pet-collection-choice {
+  position: relative;
+  justify-content: space-between;
+  width: 100%;
+  margin: 2px 0 3px;
+  text-align: start;
+}
+
+.pet-collection-choice svg,
+.pet-collection-all svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.pet-collection-choice.is-preparing {
+  cursor: wait;
+}
+
+.pet-collection-choice.is-preparing > :is(.pet-collection-choice-label, svg) {
+  visibility: hidden;
+}
+
+.pet-collection-choice > .catalog-design-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.pet-collection-choice .catalog-design-loading > .catalog-design-loading-content {
+  display: contents;
+}
+
+.pet-collection-choice .catalog-design-loading-content i {
+  display: none;
+}
+
+.pet-collection-all:not([hidden]) {
+  display: flex;
+}
+
+.pet-collection-all {
+  align-items: center;
+  justify-self: end;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-link);
+  font-weight: 700;
+}
+
+.pet-collection-all:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.pet-collection-example {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 1px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.pet-collection-example img {
+  display: block;
+  width: 120px;
+  height: 102px;
+  object-fit: contain;
+}
+
+.pet-collection-example figcaption {
+  font: 600 14px/1.4 var(--ds-font-body);
+}
+
+.theme-dark :is(.pet-collection-intro p, .pet-collection-all) {
+  color: var(--ds-text-inverse);
+}
+
+.theme-dark .pet-collection-choice:not(:disabled) {
+  background: var(--ds-action-accent);
+  color: var(--ds-text-primary);
+}
+
+.theme-dark .pet-collection-choice:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--ds-color-lime);
+}
+
+@media (max-width: 720px) {
+  .pet-collection-lookbook {
+    grid-template-areas: "intro" "preview" "controls";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 16px;
+  }
+
+  .pet-collection-intro {
+    padding-top: 0;
+  }
+
+  .pet-collection-preview {
+    min-height: 0;
+    aspect-ratio: 5 / 4;
+  }
+
+  .pet-collection-option-body img {
+    aspect-ratio: 5 / 2;
+  }
+}

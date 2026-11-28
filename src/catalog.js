@@ -99,6 +99,15 @@ export function filterCatalog(collection='all',designs=catalogDesigns){
   return collection==='all'?visible:visible.filter(design=>design.collection===collection);
 }
 
+export function storefrontPetCollection(collections, designs, products){
+  const collection=collections.find(item=>item.id==='tu-mascota'&&item.active!==false);
+  if(!collection||!products.some(product=>product.slug==='poleras'&&product.active!==false))return null;
+  const styles=filterCatalog(collection.id,designs).filter(design=>
+    design.acceptsCustomerImage&&design.customerPhotoSubject==='pets'&&designForProduct(design,'poleras')
+  );
+  return styles.length?{collection,styles}:null;
+}
+
 export function collectionsWithDesigns(collectionRows=[],designRows=[]){
   const visibleDesigns=designRows.filter(design=>design.active!==false);
   return collectionRows.filter(collection=>visibleDesigns.some(design=>

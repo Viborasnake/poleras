@@ -20,6 +20,7 @@ import './design-system.css';
 import './style.css';
 import './accessibility.css';
 import './drop-wall.css';
+import './pet-collection.css';
 import './dialog-motion.js';
 import {supabase,SUPABASE_URL,initialStoreSettings,localSignOutOptions,useDropWall} from './storefront-runtime.js';
 import { applyStoreSettings, defaultStoreSettings } from './store-settings.js';
@@ -27,7 +28,7 @@ import { authErrorMessage } from './auth-messages.js';
 import {authWithCaptcha,requestCaptchaToken,signInAnonymouslyWithCaptcha} from './auth-captcha.js';
 import { PRINT_POLICY, PRINT_EXTRAS_CLP, QUALITY_ADJUSTMENT_CLP as DEFAULT_QUALITY_ADJUSTMENT_CLP, checkResolution, orderTotal } from './print-check.js';
 import { quoteShipping } from './shipping.js';
-import { collections as fallbackCollections, categories as fallbackCategories, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, catalogAssetUrl, designCountLabel, loadCatalog, normalizeSampleColor, compareCatalogPriority, collectionsWithDesigns } from './catalog.js';
+import { collections as fallbackCollections, categories as fallbackCategories, catalogDesigns as fallbackCatalogDesigns, filterCatalog, artworkUrl, catalogAssetUrl, designCountLabel, loadCatalog, normalizeSampleColor, compareCatalogPriority, collectionsWithDesigns, storefrontPetCollection } from './catalog.js';
 import { catalogCollectionDialogPath, catalogCollectionPath, catalogDesignPath, catalogProductPath } from './catalog-routes.js';
 import { shareLink } from './share.js';
 import { createIntroTurn } from './intro-turn.js';
@@ -1151,6 +1152,56 @@ document.body.classList.add('drop-wall-enabled');
 document.querySelector('main').prepend(document.querySelector('.drop-intro-decor'));
 const pageDots=document.createElement('div');pageDots.className='drop-page-dots';pageDots.setAttribute('aria-hidden','true');document.body.prepend(pageDots);
 }
+const PET_COLLECTION_PREVIEW_LIMIT=3;
+const petCollectionSection=document.createElement('section');
+petCollectionSection.className='pet-collection';
+petCollectionSection.hidden=true;
+petCollectionSection.setAttribute('aria-labelledby','pet-collection-title');
+petCollectionSection.innerHTML=`<div class="pet-collection-lookbook">
+ <div class="pet-collection-intro">
+  <h2 id="pet-collection-title">Tu mascota <span>en una polera.</span></h2>
+  <p>Envíanos una foto. Ilustramos a tu mascota en el estilo que elijas.</p>
+ </div>
+ <figure class="pet-collection-preview">
+  <div class="pet-collection-visual"></div>
+  <figcaption class="pet-collection-name"></figcaption>
+ </figure>
+ <div class="pet-collection-controls">
+  <fieldset class="pet-collection-picker">
+   <legend>Elige un estilo</legend>
+   <div class="pet-collection-options"></div>
+  </fieldset>
+  <button type="button" class="pet-collection-choice ds-cta ds-cta--md" data-product="poleras">
+   <span class="pet-collection-choice-label">Personalizar este estilo</span>${dropArrowIcon}
+  </button>
+  <button type="button" class="pet-collection-all" hidden>Ver toda la colección ${dropArrowIcon}</button>
+  <figure class="pet-collection-example">
+   <img src="/hero-customization.webp" alt="La foto de un perro junto a su retrato ilustrado y estampado en una polera" width="1254" height="1254" loading="lazy" decoding="async">
+   <figcaption>Ejemplo de<br> foto a estampado</figcaption>
+  </figure>
+ </div>
+</div>`;
+document.querySelector(useDropWall?'.drop-intro':'.hero').after(petCollectionSection);
+const petCollectionVisual=petCollectionSection.querySelector('.pet-collection-visual');
+const petCollectionName=petCollectionSection.querySelector('.pet-collection-name');
+const petCollectionPicker=petCollectionSection.querySelector('.pet-collection-picker');
+const petCollectionOptions=petCollectionSection.querySelector('.pet-collection-options');
+const petCollectionChoice=petCollectionSection.querySelector('.pet-collection-choice');
+const petCollectionAll=petCollectionSection.querySelector('.pet-collection-all');
+let petCollectionStyles=[];
+petCollectionAll.addEventListener('click',()=>openCatalogCollection(petCollectionAll.dataset.collection,'poleras'));
+petCollectionOptions.addEventListener('change',event=>{
+ const design=petCollectionStyles.find(style=>style.id===event.target.value);
+ if(design)showPetCollectionStyle(design);
+});
+petCollectionChoice.addEventListener('click',async()=>{
+ const focusStyle=()=>petCollectionChoice.focus({preventScroll:true});
+ petCollectionPicker.disabled=true;
+ try{await chooseCatalogDesign(petCollectionChoice,{preselectProduct:true})}
+ finally{petCollectionPicker.disabled=false}
+ if(studio.open)studio.addEventListener('close',focusStyle,{once:true});
+ else focusStyle();
+});
 const catalogDialog=document.createElement('dialog');
 catalogDialog.className='catalog-dialog';
 catalogDialog.setAttribute('aria-labelledby','catalog-dialog-title');
@@ -1193,6 +1244,37 @@ function catalogProductBadges(designs,selected,cardKey){
 function catalogMissingMockup(design){
  const product=catalogProductName(design.previewProductSlug);
  return `<div class="catalog-missing-mockup">${productFamilyIcon(catalogProductFamily(design.previewProductSlug))}<strong>${safe(product)}</strong><span>Mockup pendiente</span><small>Vista del diseño para este producto</small>${artworkUrl(design)?`<img src="${safe(artworkUrl(design))}" alt="Diseño ${safe(design.name)} sin mockup de ${safe(product)}" loading="lazy">`:''}</div>`;
+}
+function showPetCollectionStyle(design){
+ const {x,y}=design.mockupFocus;
+ petCollectionVisual.innerHTML=design.featuredPhoto
+  ?`<img class="pet-collection-photo" src="${safe(design.featuredPhoto)}" alt="Polera con el diseño ${safe(design.name)}" style="object-position:${x}% ${y}%" loading="lazy" decoding="async">`
+  :catalogMissingMockup(design);
+ petCollectionName.textContent=design.name;
+ petCollectionChoice.dataset.design=design.id;
+ petCollectionChoice.setAttribute('aria-label',`Personalizar este estilo · ${design.name}`);
+}
+function renderPetCollection(){
+ const feature=catalogAvailable?storefrontPetCollection(collections,catalogDesigns,catalogProducts):null;
+ petCollectionSection.hidden=!feature;
+ if(!feature)return;
+ const {collection,styles}=feature;
+ petCollectionStyles=styles.slice(0,PET_COLLECTION_PREVIEW_LIMIT).map(style=>designWithProductMockup(style,'poleras'));
+ const selected=petCollectionStyles.find(style=>style.id===petCollectionChoice.dataset.design)||petCollectionStyles[0];
+ petCollectionOptions.innerHTML=petCollectionStyles.map(design=>{
+  const {x,y}=design.mockupFocus;
+  const image=design.featuredPhoto||artworkUrl(design);
+  return `<label class="pet-collection-option">
+   <input type="radio" name="pet-collection-style" value="${safe(design.id)}"${design===selected?' checked':''}>
+   <span class="pet-collection-option-body">
+    <img src="${safe(image)}" alt="" style="object-position:${x}% ${y}%" loading="lazy" decoding="async">
+    <span class="pet-collection-option-name">${safe(design.name)}</span>
+   </span>
+  </label>`;
+ }).join('');
+ showPetCollectionStyle(selected);
+ petCollectionAll.dataset.collection=collection.id;
+ petCollectionAll.hidden=styles.length<=PET_COLLECTION_PREVIEW_LIMIT;
 }
 function catalogPreviewDesign(design,defaultSlug,productSlug=selectedCatalogProduct){return designWithProductMockup(design,productSlug,defaultSlug,catalogProducts.filter(product=>product.active!==false).map(product=>product.slug))}
 function catalogDesignPrice(design,productSlug){
@@ -1568,7 +1650,7 @@ async function refreshCatalog(){
   const result=await loadCatalog(supabase);
   if(result.source==='fallback'){
    console.warn('No se pudo cargar el catálogo publicado:',result.error);
-   catalogAvailable=false;renderCatalog();
+   catalogAvailable=false;renderCatalog();renderPetCollection();
    return;
   }
   const wasAvailable=catalogAvailable;catalogAvailable=true;
@@ -1603,7 +1685,7 @@ async function refreshCatalog(){
   if(variantRows.length)reconcileVariant(selectedCatalogDesign()?.sampleColor,true);
   normalizeCartPrices();
   if(before!==after||productsChanged||!wasAvailable){
-   renderCatalog();renderHeroCatalogSamples();if(catalogRenderStarted)requestCatalogMockups();
+   renderCatalog();renderPetCollection();renderHeroCatalogSamples();if(catalogRenderStarted)requestCatalogMockups();
    if(catalogDialog.open){const collection=collections.find(item=>item.id===catalogDialog.dataset.collectionId);if(collection)openCatalogCollection(collection.id,catalogDialog.dataset.productSlug);else catalogDialog.close()}
    if(designDialog.open){const design=catalogDesigns.find(item=>item.id===designDialog.dataset.designId),collection=collections.find(item=>item.id===design?.collection);if(design&&collection&&catalogProductOptions(catalogProducts,[design]).length)openCatalogDesign(design,collection);else designDialog.close()}
   }
@@ -1713,7 +1795,7 @@ catalogSection.querySelector('.catalog-actions').addEventListener('change',event
  selectedCatalogProduct=select.value;
  renderCatalogWithMotion().then(()=>catalogSection.querySelector('select[data-catalog-product]')?.focus());
 });
-async function chooseCatalogDesign(button){
+async function chooseCatalogDesign(button,{preselectProduct=false}={}){
   if(!button||button.disabled)return;
   if(!catalogAvailable){toast('El catálogo publicado no está disponible. Vuelve a intentarlo más tarde.','error');return}
   const design=catalogDesigns.find(item=>item.id===button.dataset.design);if(!design)return;
@@ -1735,10 +1817,15 @@ async function chooseCatalogDesign(button){
     reconcileVariant(design.sampleColor,true);
     if(state.petRequest?.designId!==design.id||state.petRequest?.orderId)state.petRequest=newPetRequest(design.id);
     applyCatalogArtwork(artwork);
+    if(preselectProduct){
+     ensureDetailsDisclosure();
+     detailsDisclosure.confirmed.product=productFamilyForKind(kind);
+     detailsDisclosure.active=null;
+    }
     persistDraft();
     syncPreview();
     catalogDialog.close();designDialog.close();
-    openStudio('browse');
+    openStudio(preselectProduct?'ready':'browse');
   }catch(error){console.warn('No pudimos abrir el diseño del catálogo:',error);toast('No pudimos abrir este diseño. Vuelve a intentarlo.')}finally{loading.remove();button.disabled=false;button.classList.remove('is-preparing');button.removeAttribute('aria-busy')}
 }
 let requestedDesignOpened=false;
@@ -2356,7 +2443,7 @@ function renderStep(){
    if(next)void selectProductKind(next[0],'product');
   };
  });
- document.querySelectorAll('[data-product]').forEach(button=>button.onclick=()=>selectProductKind(button.dataset.product));
+ stepContent.querySelectorAll('[data-product]').forEach(button=>button.onclick=()=>selectProductKind(button.dataset.product));
  document.querySelectorAll('[data-size]').forEach(b=>b.onclick=()=>{state.size=b.dataset.size;reconcileVariant(selectedCatalogDesign()?.sampleColor,true);confirmDetail('size');persistDraft();renderStep()});
  document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{state.color=b.dataset.color;reconcileVariant();confirmDetail('color');persistDraft();renderStep();viewer?.update(previewState())});
  const guide=document.querySelector('#size-guide-modal');

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collections, catalogDesigns, filterCatalog, artworkSvg, artworkUrl, designCountLabel, catalogFromRows, collectionsWithDesigns, normalizeAllowedColors, normalizeSampleColor, compareCatalogPriority, catalogAssetUrl } from './catalog.js';
+import { collections, catalogDesigns, filterCatalog, artworkSvg, artworkUrl, designCountLabel, catalogFromRows, collectionsWithDesigns, normalizeAllowedColors, normalizeSampleColor, compareCatalogPriority, catalogAssetUrl, storefrontPetCollection } from './catalog.js';
 
 test('catalog assets can move to R2 without changing stored Supabase paths',()=>{
  const source='https://dgndcklmmnnxyqfmnckh.supabase.co/storage/v1/object/public/catalog-designs/aves-chilenas/arte.png';
@@ -28,6 +28,24 @@ test('every original catalog design belongs to a visible collection',()=>{
 test('collection filter returns only matching designs',()=>{
   assert.equal(filterCatalog().length,catalogDesigns.length);
   assert.ok(filterCatalog('juegos').every(design=>design.collection==='juegos'));
+});
+
+test('the storefront feature uses published pet styles for Poleras in Tu mascota',()=>{
+  const collection={id:'tu-mascota',active:true};
+  const shirts={slug:'poleras',active:true};
+  const style={id:'la-playera',collection:collection.id,acceptsCustomerImage:true,customerPhotoSubject:'pets',productArtworks:{poleras:'/playera.webp'}};
+  const designs=[
+    {...style,id:'navidad',collection:'mascota-navidad'},
+    style,
+    {...style,id:'hidden',active:false},
+    {...style,id:'people',customerPhotoSubject:'people'},
+    {...style,id:'original',acceptsCustomerImage:false},
+    {...style,id:'tote',productArtworks:{totebags:'/tote.webp'}},
+  ];
+  assert.deepEqual(storefrontPetCollection([collection],designs,[shirts]),{collection,styles:[style]});
+  assert.equal(storefrontPetCollection([{...collection,active:false}],designs,[shirts]),null);
+  assert.equal(storefrontPetCollection([collection],designs,[{...shirts,active:false}]),null);
+  assert.equal(storefrontPetCollection([collection],designs.filter(design=>design!==style),[shirts]),null);
 });
 
 test('empty collections are excluded from the public catalog',()=>{
