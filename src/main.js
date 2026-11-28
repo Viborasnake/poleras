@@ -1152,7 +1152,7 @@ document.body.classList.add('drop-wall-enabled');
 document.querySelector('main').prepend(document.querySelector('.drop-intro-decor'));
 const pageDots=document.createElement('div');pageDots.className='drop-page-dots';pageDots.setAttribute('aria-hidden','true');document.body.prepend(pageDots);
 }
-const PET_COLLECTION_PREVIEW_LIMIT=3;
+const PET_COLLECTION_PREVIEW_LIMIT=6;
 const petCollectionSection=document.createElement('section');
 petCollectionSection.className='pet-collection';
 petCollectionSection.hidden=true;
@@ -1174,7 +1174,7 @@ petCollectionSection.innerHTML=`<div class="pet-collection-lookbook">
   <button type="button" class="pet-collection-choice ds-cta ds-cta--md" data-product="poleras">
    <span class="pet-collection-choice-label">Personalizar este estilo</span>${dropArrowIcon}
   </button>
-  <button type="button" class="pet-collection-all" hidden>Ver toda la colección ${dropArrowIcon}</button>
+  <button type="button" class="pet-collection-all" hidden>Ver más estilos ${dropArrowIcon}</button>
   <figure class="pet-collection-example">
    <img src="/hero-customization.webp" alt="La foto de un perro junto a su retrato ilustrado y estampado en una polera" width="1254" height="1254" loading="lazy" decoding="async">
    <figcaption>Ejemplo de<br> foto a estampado</figcaption>
