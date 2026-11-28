@@ -1,5 +1,6 @@
 import { printConfigurationLabel } from './print-configuration.js'
 import { surveyTokenPattern } from './service-survey.js'
+import { bankTransferWindowNotice, isBankTransferExpired } from './bank-transfer.js'
 
 export const orderEmailLabels: Record<string, string> = {
   submitted: 'Pedido ingresado',
@@ -57,7 +58,7 @@ const htmlEntities: Record<string, string> = {
 }
 export const escapeHtml = (value: unknown) => String(value || '').replace(/[&<>"']/g, char => htmlEntities[char] || char)
 type OrderEmailItem = { name_snapshot?: string; quantity?: number; unit_price_clp?: number; line_total_clp?: number; print_sides?: string; print_configuration?: Record<string, unknown> }
-type PaymentInstructions = { transfer?: { holder?: string; bank?: string; account_type?: string; account_number?: string; rut?: string; email?: string }; mercado_pago_url?: string }
+type PaymentInstructions = { transfer?: { holder?: string; bank?: string; account_type?: string; account_number?: string; rut?: string; email?: string }; transfer_due_at?: string; mercado_pago_url?: string }
 type OrderDelivery = { fulfillment?: string; region?: string; commune?: string; address?: string; address_extra?: string; delivery_notes?: string }
 type OrderEmailDetails = { items?: OrderEmailItem[]; subtotal_clp?: number; shipping_clp?: number; discount_clp?: number; total_clp?: number; coupon_code?: string; shipping_address?: OrderDelivery; price_snapshot?: Record<string, unknown>; payment_instructions?: PaymentInstructions; orderEdited?: boolean; creative?: boolean; request_details?: string; quote_message?: string; adminNotice?: boolean; referenceCount?: number; surveyToken?: string; surveyIdempotency?: boolean }
 const formatClp = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0))
@@ -97,7 +98,7 @@ function orderDetails(details: OrderEmailDetails = {}) {
       : delivery.fulfillment ? ['Entrega: Por coordinar'] : []
   const deliveryHtml = deliveryText.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;padding:12px 14px;background:#F5F2FF;border-radius:10px;color:#262920;font-size:12px;line-height:1.55"><tr><td><strong style="display:block;margin-bottom:5px;color:#6A529C;font-size:10px;letter-spacing:1.4px;text-transform:uppercase">Entrega</strong>${deliveryText.map((line,index)=>`${index ? '' : '<b>'}${escapeHtml(line.replace(/^Entrega:\s*/,''))}${index ? '' : '</b>'}<br>`).join('')}</td></tr></table>` : ''
   const payment = details.payment_instructions || {}
-  const transfer = payment.transfer || {}
+  const transfer = isBankTransferExpired(payment.transfer_due_at) ? {} : payment.transfer || {}
   const paymentText = [transfer.holder && `Titular: ${transfer.holder}`, transfer.bank && `Banco: ${transfer.bank}`, transfer.account_type && `Tipo de cuenta: ${transfer.account_type}`, transfer.account_number && `Número de cuenta: ${transfer.account_number}`, transfer.rut && `RUT: ${transfer.rut}`, transfer.email && `Email: ${transfer.email}`, payment.mercado_pago_url && `Link de pago Mercado Pago: ${payment.mercado_pago_url}`].filter(Boolean).join('\n')
   const paymentHtml = paymentText ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;padding:14px 16px;background:#F4F1EB;border-radius:12px;color:#262920;font-size:13px;line-height:1.55"><tr><td><strong style="display:block;margin-bottom:6px;color:#B52D6B;font-size:11px;letter-spacing:1.5px;text-transform:uppercase">Datos para pagar</strong>${paymentText.split('\n').map(line=>`${escapeHtml(line)}<br>`).join('')}</td></tr></table>` : ''
   return { text: [...text, ...deliveryText, paymentText].filter(Boolean).join('\n'), html: `${htmlLines.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;color:#262920;font-size:13px;line-height:1.4"><tr><td colspan="2" style="padding-bottom:6px;color:#B52D6B;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Detalle del pedido</td></tr>${htmlLines.join('')}</table>` : ''}${deliveryHtml}${paymentHtml}` }
@@ -171,15 +172,18 @@ export function buildOrderEmail(name: string, orderId: string, status: string, s
   const actionUrl = hasSurvey ? `${siteUrl}/encuesta.html#${encodeURIComponent(surveyToken)}` : `${siteUrl}/?panel=account`
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hola Droska, necesito ayuda con mi pedido #${orderId}`)}`
   const summary = orderDetails(details)
+  const transferNotice = details.payment_instructions?.transfer
+    ? `${bankTransferWindowNotice(details.payment_instructions.transfer_due_at)} Si ya transferiste, envíanos el comprobante por WhatsApp o responde a este correo.`
+    : ''
   if (details.creative && status !== 'delivered') {
     const quote = status === 'quoted' || status === 'awaiting_deposit'
     const subject = `${details.adminNotice ? 'Nueva idea recibida' : quote ? 'Tu cotización está disponible' : status === 'paid' ? 'Confirmamos tu pago' : 'Recibimos tu idea'} · Solicitud #${orderId}`
-    const message = details.adminNotice ? `Nueva solicitud de ${name}. Idea: ${details.request_details || ''}. Referencias adjuntas: ${details.referenceCount || 0}. Revisa los archivos en Administración.` : quote ? `Tu propuesta: ${details.quote_message || ''}. Total: ${formatClp(details.total_clp)}. Crea una cuenta con este correo o ingresa a Mis pedidos para aceptarla y continuar al pago.` : status === 'paid' ? `Confirmamos el pago de tu solicitud por ${formatClp(details.total_clp)}. Nuestro equipo continuará con tu diseño.` : 'Recibimos tu idea y la revisaremos. Crea una cuenta con este correo para seguir la solicitud en Mis pedidos.'
+    const message = details.adminNotice ? `Nueva solicitud de ${name}. Idea: ${details.request_details || ''}. Referencias adjuntas: ${details.referenceCount || 0}. Revisa los archivos en Administración.` : transferNotice || (quote ? `Tu propuesta: ${details.quote_message || ''}. Total: ${formatClp(details.total_clp)}. Crea una cuenta con este correo o ingresa a Mis pedidos para aceptarla y continuar al pago.` : status === 'paid' ? `Confirmamos el pago de tu solicitud por ${formatClp(details.total_clp)}. Nuestro equipo continuará con tu diseño.` : 'Recibimos tu idea y la revisaremos. Crea una cuenta con este correo para seguir la solicitud en Mis pedidos.')
     const action = details.adminNotice ? `${siteUrl}/admin#pedidos` : `${siteUrl}/?panel=account`
     return { subject, text: `${message}${summary.text ? `\n\n${summary.text}` : ''}\n\nSolicitud #${orderId}\n${action}`, html: `<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif;background:#F9F7F2;color:#262920;padding:24px"><main style="max-width:600px;margin:auto;background:#FFFDFA;padding:30px;border-radius:18px"><h1 style="font-size:27px">${escapeHtml(subject)}</h1><p style="line-height:1.6;white-space:pre-wrap">${escapeHtml(message)}</p>${summary.html}<a href="${escapeHtml(action)}" style="display:inline-block;margin-top:20px;background:#262920;color:white;padding:14px 20px;border-radius:99px;text-decoration:none">${details.adminNotice ? 'Abrir pedidos' : 'Ver mi solicitud'}</a></main></body></html>` }
   }
   const hasPaymentInstructions = Boolean(details.payment_instructions && (details.payment_instructions.transfer || details.payment_instructions.mercado_pago_url))
-  const emailBody = hasPaymentInstructions ? 'Te dejamos los datos para pagar tu pedido. Cuando realices la transferencia, envíanos el comprobante por WhatsApp o responde este correo.' : details.orderEdited ? 'Actualizamos tu pedido con los cambios aprobados por nuestro equipo. Revisa el nuevo detalle y total a continuación.' : status === 'delivered' && !hasSurvey ? 'Gracias por confiar en Droska. Esperamos que disfrutes tu pedido.' : copy.body
+  const emailBody = hasPaymentInstructions ? (transferNotice || 'Te dejamos el enlace para pagar tu pedido en Mercado Pago.') : details.orderEdited ? 'Actualizamos tu pedido con los cambios aprobados por nuestro equipo. Revisa el nuevo detalle y total a continuación.' : status === 'delivered' && !hasSurvey ? 'Gracias por confiar en Droska. Esperamos que disfrutes tu pedido.' : copy.body
   const actionLabel = hasSurvey ? 'Responder encuesta' : copy.action
   return {
     subject: `${hasPaymentInstructions ? 'Datos de pago' : details.orderEdited ? 'Tu pedido fue actualizado' : status === 'delivered' && !hasSurvey ? label : copy.subject} · Pedido #${orderId}`,

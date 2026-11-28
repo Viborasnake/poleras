@@ -57,6 +57,7 @@ Deno.serve(async request => {
     const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,product_artworks,polera_prints,allowed_colors,allowed_product_colors').eq('slug', catalogDesignSlug).maybeSingle()
     if (error) return json({ error: 'No pudimos validar el diseño de colección.' }, 503)
     if (!data?.active || !data.accepts_customer_image) return json({ error: 'Este diseño no admite referencias del cliente.' }, 409)
+    if (data.customer_photo_subject !== 'people') return json({ error: 'Vuelve al estudio para adjuntar las fotos de tu mascota y continuar al pago.' }, 409)
     catalogDesign = data
     const photoLimit = 3
     if (references.length > photoLimit) return json({ error: `Puedes adjuntar hasta ${photoLimit} ${photoLimit === 1 ? 'foto' : 'fotos'} para este diseño.` }, 400)

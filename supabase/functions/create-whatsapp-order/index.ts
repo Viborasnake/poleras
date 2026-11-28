@@ -85,6 +85,7 @@ Deno.serve(async request => {
   if (catalogDesignSlug) {
     const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,product_artworks,polera_prints,allowed_colors,allowed_product_colors').eq('slug', catalogDesignSlug).maybeSingle()
     if (error || !data?.active) return json({ error: 'El diseño elegido ya no está disponible.' }, 409)
+    if (data.accepts_customer_image && data.customer_photo_subject !== 'people') return json({ error: 'Vuelve al estudio para adjuntar las fotos de tu mascota y continuar al pago.' }, 409)
     if (customerImage && !data.accepts_customer_image) return json({ error: 'Este diseño no acepta una imagen del cliente.' }, 409)
     if (catalogDesignRequiresCustomerImage(data, customerImage)) return json({ error: 'Este diseño requiere una foto del cliente.' }, 409)
     if (!designProductArtworks(data)[modelProductSlug(model.code)]) return json({ error: 'El diseño no está disponible para este producto.' }, 409)

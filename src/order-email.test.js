@@ -71,6 +71,23 @@ test('las notas internas no se filtran al correo del cliente',()=>{
   assert.match(email.html,/Tocar el timbre rojo/);
 });
 
+test('el correo de cobro avisa el plazo y deja de dar datos de una transferencia vencida', () => {
+  const transfer = { account_number: '12345678', bank: 'Banco Uno' };
+  const render = (deadline, creative = false) => buildOrderEmail('Ana', '62', creative ? 'awaiting_deposit' : 'submitted', 'https://droska.frontbook.cl', true, {
+    ...deliveryDetails, creative,
+    payment_instructions: { transfer, transfer_due_at: deadline },
+  });
+  for (const message of [render(new Date(Date.now() + 3_600_000).toISOString()), render(new Date(Date.now() + 3_600_000).toISOString(), true)]) {
+    assert.match(message.text, /60 minutos/);
+    assert.match(message.html, /No iniciaremos ningún trabajo hasta confirmar el pago/);
+    assert.match(message.text, /hora de Chile continental/);
+    assert.match(message.text, /12345678/);
+  }
+  const expired = render(new Date(Date.now() - 60_000).toISOString());
+  assert.match(expired.text, /El plazo de transferencia venció/);
+  assert.doesNotMatch(expired.html, /12345678/);
+});
+
 test('el correo de cierre enlaza la invitación individual en HTML y texto', () => {
   const surveyToken = '48ac78c1-001d-498c-8e83-5461503569ee';
   const url = 'https://droska.frontbook.cl/encuesta.html#' + surveyToken;

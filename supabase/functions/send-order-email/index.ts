@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { buildOrderEmail, orderEmailLabels, sendOrderEmail } from '../_shared/order-email.ts'
 import { markServiceSurveySent, serviceSurveyLink } from '../_shared/service-survey-email.ts'
+import { bankTransferDeadline } from '../_shared/bank-transfer.js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,7 +54,10 @@ Deno.serve(async request => {
   if (!email) return json({ error: 'El cliente no tiene email.' }, 422)
   const name = String(customer.first_name || account?.data?.user?.user_metadata?.full_name || '').trim()
   try {
-    const paymentInstructions = body.paymentInstructions || order.payment_instructions || null
+    const requestedPaymentInstructions = body.paymentInstructions || order.payment_instructions || null
+    const paymentInstructions = paymentEmail && requestedPaymentInstructions?.transfer
+      ? { ...requestedPaymentInstructions, transfer_due_at: bankTransferDeadline(order.payment_email_sent_at || new Date(), order.payment_instructions?.transfer_due_at) }
+      : requestedPaymentInstructions
     if (paymentEmail && !paymentInstructions?.transfer && !paymentInstructions?.mercado_pago_url) return json({ error: 'Agrega datos de transferencia o un link de Mercado Pago.' }, 422)
     const shippingAddress = { ...(order.shipping_address || {}), delivery_notes: order.shipping_address?.delivery_notes || (order.source === 'online' ? order.shipping_address?.notes : '') }
     delete shippingAddress.notes

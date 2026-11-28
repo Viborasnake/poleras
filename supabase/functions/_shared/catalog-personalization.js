@@ -16,6 +16,10 @@ export function catalogDesignAllowsBasePurchase(design){
   return acceptsCustomerImage(design)&&customerPhotoSubject(design)==='people';
 }
 
+export function isPetPhotoDesign(design){
+  return acceptsCustomerImage(design)&&customerPhotoSubject(design)==='pets';
+}
+
 export function normalizeCatalogDesignPurchaseMode(design,mode){
   if(!acceptsCustomerImage(design))return 'base';
   if(!catalogDesignAllowsBasePurchase(design))return 'personalized';

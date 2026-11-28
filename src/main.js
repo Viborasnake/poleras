@@ -36,7 +36,7 @@ import { DETAIL_BLOCK_ORDER, preserveStudioView, replaceStudioControl, studioDet
 import { createDisclosureState, reconcileDisclosure, confirmDisclosure, mountDisclosure, focusDisclosure } from './progressive-disclosure.js';
 import {mountIdeaFlow,mountPetFlow,mountWhatsAppFlow,mountCheckoutFlow} from './public-form-flows.js';
 import { previewKey, needsGeneratedPreview } from './catalog-preview-cache.js';
-import {catalogDesignAllowsBasePurchase,catalogDesignForVariantSelection,isCatalogPrintIncluded,normalizeCatalogDesignPurchaseMode} from '../supabase/functions/_shared/catalog-personalization.js';
+import {catalogDesignAllowsBasePurchase,catalogDesignForVariantSelection,isCatalogPrintIncluded,isPetPhotoDesign,normalizeCatalogDesignPurchaseMode} from '../supabase/functions/_shared/catalog-personalization.js';
 import {stableRequestId} from './request-attempt.js';
 import {accountOrderFollowUp,hasPendingMercadoPagoCharge,mercadoPagoFeedback,paymentConfirmationFollowUp,quoteEmailFollowUp,receiptEmailFeedback,unconfirmedRequestFeedback,whatsappFeedback} from './commerce-feedback.js';
 import {effectiveQualityReview} from './quality-review.js';
@@ -54,7 +54,8 @@ import { orderTypeLabel } from './order-type.js';
 import { communes, provinces } from '@clregions/data/array';
 import { uploadPrivateDesign, sharePrivateDesign } from './design-storage.js';
 import {buildWhatsAppPurchaseMessage,effectivePurchaseMethod,hasCartPurchase,purchaseMethodLabel,purchaseTypeFor,whatsappPurchaseUrl} from './purchase-methods.js';
-import { petPhotoError, petRequestIdentity, petStepHtml, petSubmitLabel, bindPetStep, sendPetRequest } from './pet-personalization.js';
+import { BANK_TRANSFER_POLICY, bankTransferWindowNotice, isBankTransferExpired } from '../supabase/functions/_shared/bank-transfer.js';
+import { petFiles, petPhotoError, petRequestIdentity, petStepHtml, petSubmitLabel, bindPetStep, sendPetRequest } from './pet-personalization.js';
 import { CUSTOMER_IMAGE_POLICY, imageFileError, optimizeImage } from './image-optimization.js';
 import { productFamilyIcon } from './product-family-icons.js';
 const icons={arrow:'↗',spark:'✳',close:'×'};
@@ -78,8 +79,9 @@ function openDesignDatabase(){return new Promise((resolve,reject)=>{if(!('indexe
 async function saveDesignFile(side,file){const database=await openDesignDatabase();await new Promise((resolve,reject)=>{const transaction=database.transaction(DESIGN_STORE,'readwrite');transaction.objectStore(DESIGN_STORE).put({side,file,expiresAt:Date.now()+SAVED_DETAILS_TTL});transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error)});database.close()}
 async function removeSavedDesignFile(side){const database=await openDesignDatabase();await new Promise((resolve,reject)=>{const transaction=database.transaction(DESIGN_STORE,'readwrite');transaction.objectStore(DESIGN_STORE).delete(side);transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error)});database.close()}
 async function savedDesignFiles(){const database=await openDesignDatabase();const files=await new Promise((resolve,reject)=>{const request=database.transaction(DESIGN_STORE).objectStore(DESIGN_STORE).getAll();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});database.close();return files}
-async function saveCartDesignFiles(id,front,back,prints={}){const database=await openDesignDatabase();try{await new Promise((resolve,reject)=>{const transaction=database.transaction(CART_DESIGN_STORE,'readwrite');transaction.objectStore(CART_DESIGN_STORE).put({id,front,back,prints});transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error)})}finally{database.close()}}
+async function saveCartDesignFiles(id,front,back,prints={},petPersonalization){const database=await openDesignDatabase();try{await new Promise((resolve,reject)=>{const transaction=database.transaction(CART_DESIGN_STORE,'readwrite');transaction.objectStore(CART_DESIGN_STORE).put({id,front,back,prints,petPersonalization});transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error)})}finally{database.close()}}
 async function cartDesignFiles(id){
+ if(cartDesignMemory.has(id))return cartDesignMemory.get(id);
  try{const database=await openDesignDatabase();try{return await new Promise((resolve,reject)=>{const request=database.transaction(CART_DESIGN_STORE).objectStore(CART_DESIGN_STORE).get(id);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}finally{database.close()}}
  catch{return cartDesignMemory.get(id)||null}
 }
@@ -398,7 +400,8 @@ function clearExpiredConfirmationLink(){
 }
 const currentProductConfig=()=>catalogProducts.find(product=>product.slug===modelProductSlug(state.kind))||{slug:modelProductSlug(state.kind),purchase_method:'inherit',active:true};
 const currentPurchaseType=()=>purchaseTypeFor(state);
-const currentPurchaseMethod=()=>effectivePurchaseMethod({product:currentProductConfig(),settings:storefrontSettings,purchaseType:currentPurchaseType()});
+const isPayingForPet=()=>state.catalogDesignCustomerImage&&isPetPhotoDesign(selectedCatalogDesign());
+const currentPurchaseMethod=()=>isPayingForPet()?'cart':effectivePurchaseMethod({product:currentProductConfig(),settings:storefrontSettings,purchaseType:currentPurchaseType()});
 const ideaRequestMethod=()=>state.customChannel||currentPurchaseMethod();
 async function createWhatsAppOrder({requestType='purchase',customer,idea='',product=null,details=''}){
  let {data:{session}}=await supabase.auth.getSession();
@@ -437,7 +440,7 @@ function preliminarySelectionPrice(variant,{personalized=currentPurchaseType()==
  const price=variantPriceForPurchase(variant,personalized);
  return Number.isInteger(price)?money(currentPrintPricing(price,review).total):'';
 }
-function updateCommerceNav(){const itemCount=cart.reduce((sum,item)=>sum+item.quantity,0),cartAvailable=hasCartPurchase(catalogProducts,storefrontSettings),navigation=accountNavigationState(account);accountButton.innerHTML=navigation.authenticated?`<span class="account-initial" aria-hidden="true">${safe(navigation.label).slice(0,1).toUpperCase()}</span><span class="account-label">${safe(navigation.label)}</span>`:`<span class="account-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span><span class="account-label">${safe(navigation.label)}</span>`;accountButton.setAttribute('aria-label',navigation.ariaLabel);headerLogoutButton.hidden=!navigation.authenticated;headerLogoutButton.setAttribute('aria-label',navigation.authenticated?`Cerrar sesión de ${navigation.label}`:'Cerrar sesión');cartButton.innerHTML=`<svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>${itemCount}</b>`;cartButton.hidden=!cartAvailable;cartButton.classList.toggle('has-items',itemCount>0)}
+function updateCommerceNav(){const itemCount=cart.reduce((sum,item)=>sum+item.quantity,0),cartAvailable=hasCartPurchase(catalogProducts,storefrontSettings)||cart.some(item=>item.petPhotoReview),navigation=accountNavigationState(account);accountButton.innerHTML=navigation.authenticated?`<span class="account-initial" aria-hidden="true">${safe(navigation.label).slice(0,1).toUpperCase()}</span><span class="account-label">${safe(navigation.label)}</span>`:`<span class="account-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span><span class="account-label">${safe(navigation.label)}</span>`;accountButton.setAttribute('aria-label',navigation.ariaLabel);headerLogoutButton.hidden=!navigation.authenticated;headerLogoutButton.setAttribute('aria-label',navigation.authenticated?`Cerrar sesión de ${navigation.label}`:'Cerrar sesión');cartButton.innerHTML=`<svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-1 14H5L4 5Zm4 0a4 4 0 0 1 8 0"/></svg><b>${itemCount}</b>`;cartButton.hidden=!cartAvailable;cartButton.classList.toggle('has-items',itemCount>0)}
 document.addEventListener('click',event=>{
  const button=event.target.closest('#custom-submit');
  if(!button||ideaRequestMethod()!=='whatsapp')return;
@@ -463,7 +466,38 @@ async function accountOrders(){
 }
 async function claimOrdersToAccount(){if(!account)return;try{const {data,error}=await supabase.functions.invoke('claim-orders');if(error||data?.error)throw error||new Error(data.error)}catch(error){console.error('No pudimos asociar los pedidos existentes',error);toast('No pudimos asociar tus solicitudes anteriores. Reintenta al abrir tu cuenta.','error')}}
 function orderDestination(order){const address=order.shipping_address||{};if(address.fulfillment==='pickup')return 'Retiro coordinado';return [address.address,address.commune,address.region].filter(Boolean).join(', ')||'Dirección por confirmar'}
-function accountOrderPaymentMarkup(order){if(order.archived_at)return '';const transfer=order.payment_instructions?.transfer||{},hasTransfer=Object.values(transfer).some(Boolean),paymentLink=order.payment_instructions?.mercado_pago_url,notice=order.payment_transfer_notice_at,noticeSupported=order.payment_transfer_notice_supported===true,paymentState=orderPaymentState(order),paymentConfirmed=paymentState==='paid';if(!hasTransfer&&!paymentLink)return '';return `<section class="account-order-payment" data-account-order-payment="${safe(order.id)}" aria-label="Datos de pago"><div class="account-order-payment-head"><span>Datos de pago</span><strong>${money(order.total_clp)}</strong></div><p>${paymentConfirmed?'Tu pago fue confirmado. Ya podemos preparar tu pedido.':paymentState==='issue'?'El pago presenta una reversa o mediación. Te contactaremos para resolverla antes de continuar.':paymentState==='review'?'Recibimos información de tu pago. Administración lo está revisando.':'Debes pagar este monto para que podamos preparar tu pedido.'}</p>${hasTransfer?`<dl>${transfer.holder?`<div><dt>Titular</dt><dd>${safe(transfer.holder)}</dd></div>`:''}${transfer.bank?`<div><dt>Banco</dt><dd>${safe(transfer.bank)}</dd></div>`:''}${transfer.account_type||transfer.account_number?`<div><dt>Cuenta</dt><dd>${safe(`${transfer.account_type||''} ${transfer.account_number||''}`.trim())}</dd></div>`:''}${transfer.rut?`<div><dt>RUT</dt><dd>${safe(transfer.rut)}</dd></div>`:''}${transfer.email?`<div><dt>Email</dt><dd>${safe(transfer.email)}</dd></div>`:''}</dl>${noticeSupported&&notice&&paymentState==='review'?'<p class="account-order-payment-notice">Recibimos tu aviso de transferencia. Estamos verificando el abono.</p>':noticeSupported&&paymentState==='unpaid'?`<div class="account-order-payment-action"><button type="button" class="account-order-payment-link" data-notify-payment-transfer="${safe(order.id)}">Avisar que ya pagué</button></div>`:''}`:''}${paymentLink&&paymentState==='unpaid'?`<a class="account-order-payment-link" href="${safe(paymentLink)}" target="_blank" rel="noreferrer">Pagar online</a>`:''}</section>`}
+function accountOrderPaymentMarkup(order){
+ if(order.archived_at)return '';
+ const instructions=order.payment_instructions||{},transfer=instructions.transfer||{};
+ const hasTransfer=Object.values(transfer).some(Boolean),paymentLink=instructions.mercado_pago_url;
+ if(!hasTransfer&&!paymentLink)return '';
+ const paymentState=orderPaymentState(order);
+ const transferNotice=hasTransfer&&paymentState==='unpaid'?bankTransferWindowNotice(instructions.transfer_due_at):'';
+ const showBankDetails=hasTransfer&&(!isBankTransferExpired(instructions.transfer_due_at)||paymentState!=='unpaid');
+ const statusMessage={
+  paid:'Tu pago fue confirmado. Ya podemos preparar tu pedido.',
+  issue:'El pago presenta una reversa o mediación. Te contactaremos para resolverla antes de continuar.',
+  review:'Recibimos información de tu pago. Administración lo está revisando.',
+ }[paymentState]||'Debes pagar este monto para que podamos preparar tu pedido.';
+ const bankFields=[
+  ['Titular',transfer.holder],['Banco',transfer.bank],
+  ['Cuenta',[transfer.account_type,transfer.account_number].filter(Boolean).join(' ')],
+  ['RUT',transfer.rut],['Email',transfer.email],
+ ];
+ const details=showBankDetails?`<dl>${bankFields.filter(([,value])=>value).map(([label,value])=>`<div><dt>${label}</dt><dd>${safe(value)}</dd></div>`).join('')}</dl>`:'';
+ let action='';
+ if(hasTransfer&&order.payment_transfer_notice_supported===true){
+  if(order.payment_transfer_notice_at&&paymentState==='review')action='<p class="account-order-payment-notice">Recibimos tu aviso de transferencia. Estamos verificando el abono.</p>';
+  else if(paymentState==='unpaid')action=`<div class="account-order-payment-action"><button type="button" class="account-order-payment-link" data-notify-payment-transfer="${safe(order.id)}">Avisar que ya pagué</button></div>`;
+ }
+ return `<section class="account-order-payment" data-account-order-payment="${safe(order.id)}" aria-label="Datos de pago">
+  <div class="account-order-payment-head"><span>Datos de pago</span><strong>${money(order.total_clp)}</strong></div>
+  <p>${statusMessage}</p>
+  ${transferNotice?`<p><strong>${safe(transferNotice)}</strong></p>`:''}
+  ${details}${action}
+  ${paymentLink&&paymentState==='unpaid'?`<a class="account-order-payment-link" href="${safe(paymentLink)}" target="_blank" rel="noreferrer">Pagar online</a>`:''}
+ </section>`;
+}
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-notify-payment-transfer]');
  if(!button||button.disabled)return;
@@ -509,7 +543,7 @@ async function renderAccountOrders(){
  if(orders.some(order=>order.request_type==='creative'&&['quoted','awaiting_deposit'].includes(order.status))){
   try{const {data,error}=await supabase.functions.invoke('create-payment-preference',{method:'GET'});creativeTransferAvailable=!error&&data?.bankTransferAvailable===true}catch{}
  }
- panel.innerHTML=`<div class="account-orders-head"><span>Tus pedidos se actualizan automáticamente.</span><button type="button" id="account-refresh-orders">Actualizar</button></div><div class="account-orders">${orders.map(order=>{const followUp=accountOrderFollowUp(order),paymentState=orderPaymentState(order);return `<article class="account-order${order.archived_at?' is-archived':''}"><div><span>Pedido #${safe(order.id)}${order.price_snapshot?.flow_type==='mixed'?' · Pedido combinado':''}</span><strong>${order.request_type==='creative'&&order.status==='submitted'?'Por cotizar':money(order.total_clp)}</strong></div><div><div class="account-order-states"><span class="account-order-status">${order.archived_at?'Archivado':safe(orderStatusLabel(order.status))}</span><span class="account-payment-badge is-${paymentState}">${paymentStateLabels[paymentState]}</span></div><time datetime="${safe(order.created_at)}">${safe(accountDate(order.created_at))}</time></div>${order.request_type==='creative'&&['submitted','quoted','awaiting_deposit'].includes(order.status)?`<section class="account-creative-quote"><strong>${order.status==='quoted'?'Tu propuesta está lista':order.status==='awaiting_deposit'?(paymentState==='review'?'Pago en revisión':'Pago pendiente'):'Estamos revisando tu idea'}</strong><p>${safe(['quoted','awaiting_deposit'].includes(order.status)?order.quote_message||'Revisa la cotización.':order.request_details||'Te contactaremos con una propuesta.')}</p>${['quoted','awaiting_deposit'].includes(order.status)&&!order.archived_at&&paymentState==='unpaid'&&!hasPendingMercadoPagoCharge(order)&&!order.payment_instructions?.transfer?`<div class="account-creative-methods" role="group" aria-label="Elige cómo pagar la cotización"><button type="button" class="button dark" data-pay-creative="${safe(order.id)}" data-payment-method="mercado_pago">Mercado Pago · ${money(order.quoted_total_clp)}</button>${creativeTransferAvailable&&!order.payments?.some(payment=>payment.provider==='mercado_pago'&&payment.status==='pending')?`<button type="button" class="button dark" data-pay-creative="${safe(order.id)}" data-payment-method="transfer">Transferencia bancaria</button>`:''}</div><small>Confirma que el detalle incluya la entrega acordada antes de pagar.</small>`:''}${accountOrderPaymentMarkup(order)}</section>`:orderStepper(order)}${followUp?`<p>${safe(followUp)}</p>`:''}<p>${order.request_type==='creative'?'Solicitud de diseño personalizado':safe(orderDestination(order))} · ${safe(orderTypeLabel(order))}</p><details><summary>Ver detalle e historial <b>+</b></summary><div>${(order.order_items||[]).map(item=>`<span><span><strong>${safe(item.name_snapshot)}</strong><small>${safe(printConfigurationLabel(item.print_configuration,item.print_sides))} · ${item.quantity} ${item.quantity===1?'unidad':'unidades'}</small></span><b>${money(item.line_total_clp)}</b></span>`).join('')||'<small>Sin productos asociados.</small>'}</div>${(order.order_status_history||[]).length?`<ul class="account-order-history">${[...order.order_status_history].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(item=>`<li><span>${safe(orderStatusLabel(item.status))}</span><time datetime="${safe(item.created_at)}">${safe(accountDate(item.created_at))}</time></li>`).join('')}</ul>`:''}</details></article>`}).join('')}</div>`;document.querySelector('#account-refresh-orders').onclick=renderAccountOrders;watchAccountOrders()}
+ panel.innerHTML=`<div class="account-orders-head"><span>Tus pedidos se actualizan automáticamente.</span><button type="button" id="account-refresh-orders">Actualizar</button></div><div class="account-orders">${orders.map(order=>{const followUp=accountOrderFollowUp(order),paymentState=orderPaymentState(order);return `<article class="account-order${order.archived_at?' is-archived':''}"><div><span>Pedido #${safe(order.id)}${order.price_snapshot?.flow_type==='mixed'?' · Pedido combinado':''}</span><strong>${order.request_type==='creative'&&order.status==='submitted'?'Por cotizar':money(order.total_clp)}</strong></div><div><div class="account-order-states"><span class="account-order-status">${order.archived_at?'Archivado':safe(orderStatusLabel(order.status))}</span><span class="account-payment-badge is-${paymentState}">${paymentStateLabels[paymentState]}</span></div><time datetime="${safe(order.created_at)}">${safe(accountDate(order.created_at))}</time></div>${order.request_type==='creative'&&['submitted','quoted','awaiting_deposit'].includes(order.status)?`<section class="account-creative-quote"><strong>${order.status==='quoted'?'Tu propuesta está lista':order.status==='awaiting_deposit'?(paymentState==='review'?'Pago en revisión':'Pago pendiente'):'Estamos revisando tu idea'}</strong><p>${safe(['quoted','awaiting_deposit'].includes(order.status)?order.quote_message||'Revisa la cotización.':order.request_details||'Te contactaremos con una propuesta.')}</p>${['quoted','awaiting_deposit'].includes(order.status)&&!order.archived_at&&paymentState==='unpaid'&&!hasPendingMercadoPagoCharge(order)&&!order.payment_instructions?.transfer?`<div class="account-creative-methods" role="group" aria-label="Elige cómo pagar la cotización"><button type="button" class="button dark" data-pay-creative="${safe(order.id)}" data-payment-method="mercado_pago">Mercado Pago · ${money(order.quoted_total_clp)}</button>${creativeTransferAvailable&&!order.payments?.some(payment=>payment.provider==='mercado_pago'&&payment.status==='pending')?`<button type="button" class="button dark" data-pay-creative="${safe(order.id)}" data-payment-method="transfer">Transferencia bancaria</button>`:''}</div>${creativeTransferAvailable?`<small>${safe(BANK_TRANSFER_POLICY)}</small>`:''}<small>Confirma que el detalle incluya la entrega acordada antes de pagar.</small>`:''}${accountOrderPaymentMarkup(order)}</section>`:orderStepper(order)}${followUp?`<p>${safe(followUp)}</p>`:''}<p>${order.request_type==='creative'?'Solicitud de diseño personalizado':safe(orderDestination(order))} · ${safe(orderTypeLabel(order))}</p><details><summary>Ver detalle e historial <b>+</b></summary><div>${(order.order_items||[]).map(item=>`<span><span><strong>${safe(item.name_snapshot)}</strong><small>${safe(printConfigurationLabel(item.print_configuration,item.print_sides))} · ${item.quantity} ${item.quantity===1?'unidad':'unidades'}</small></span><b>${money(item.line_total_clp)}</b></span>`).join('')||'<small>Sin productos asociados.</small>'}</div>${(order.order_status_history||[]).length?`<ul class="account-order-history">${[...order.order_status_history].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(item=>`<li><span>${safe(orderStatusLabel(item.status))}</span><time datetime="${safe(item.created_at)}">${safe(accountDate(item.created_at))}</time></li>`).join('')}</ul>`:''}</details></article>`}).join('')}</div>`;document.querySelector('#account-refresh-orders').onclick=renderAccountOrders;watchAccountOrders()}
  catch(error){console.error(error);if(panel){panel.innerHTML='<section class="account-empty error"><strong>No pudimos cargar tus pedidos.</strong><p>Revisa tu conexión y vuelve a intentarlo.</p><button type="button" class="button dark" id="retry-account-orders">Reintentar</button></section>';panel.querySelector('#retry-account-orders').onclick=renderAccountOrders}}
 }
 async function accountProfile(){
@@ -563,13 +597,17 @@ async function beginCheckout(asGuest=false){
   const design=catalogDesigns.find(candidate=>candidate.id===item.catalogDesignSlug)||null;
   if(item.catalogDesignSlug&&!design)return toast('Un diseño del carro ya no está disponible. Quítalo y vuelve a elegirlo antes de pagar.','error');
   if(design&&!designForProduct(design,modelProductSlug(item.modelCode)))return toast('El diseño ya no está disponible para ese producto. Quítalo y vuelve a elegirlo.','error');
-  const selected=resolveAvailableVariant(item.modelCode,item.size,item.color,design);
+  const selected=resolveExactVariant(variantRows,item.modelCode,item.size,item.color,catalogDesignForVariantSelection(design,Boolean(item.catalogDesignCustomerImage)));
   if(!selected.variant)return toast('Un producto del carro ya no está disponible en ese color o talla. Quítalo y vuelve a elegirlo antes de pagar.','error');
   item.variantId=selected.variant.id;
  }
  normalizeCartPrices();
  saveLocal(CART_KEY,cart);
- publicFlowStates.delete('checkout');state.mode='ready';state.checkoutAsGuest=!account&&asGuest;if(account)await hydrateCheckoutFromProfile();state.editingContact=!(state.firstName&&state.lastName&&state.email&&state.phone);state.shippingQuote=null;recalculateShippingQuote();state.step=3;if(!studio.open)openDialog(studio);renderStep();faceSelectedSide()
+ publicFlowStates.delete('checkout');
+ if(state.catalogDesignCustomerImage){
+  Object.assign(state,{catalogDesignCustomerImage:false,catalogDesignPurchaseMode:'base',catalogDesign:null,catalogDesignSlug:null,catalogDesignName:null});
+ }
+ state.mode='ready';state.checkoutAsGuest=!account&&asGuest;if(account)await hydrateCheckoutFromProfile();state.editingContact=!(state.firstName&&state.lastName&&state.email&&state.phone);state.shippingQuote=null;recalculateShippingQuote();state.step=3;if(!studio.open)openDialog(studio);renderStep();faceSelectedSide()
 }
 function catalogPreviewForCart(slug,kind='basic'){const source=catalogDesigns.find(item=>item.id===slug),design=source&&designForProduct(source,modelProductSlug(kind));return design?artworkUrl(design):''}
 async function cartPreviewPng(file,fallback=''){if(!(file instanceof Blob))return fallback;const url=URL.createObjectURL(file);try{const image=new Image();image.src=url;await image.decode();const canvas=document.createElement('canvas'),limit=320,scale=Math.min(limit/image.naturalWidth,limit/image.naturalHeight,1);canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d')?.drawImage(image,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/png')}catch{return fallback}finally{URL.revokeObjectURL(url)}}
@@ -585,15 +623,22 @@ async function cartPreviewFile(preview,side){
 }
 let addingCurrentToCart=false;
 const cartDesignMemory=new Map();
-async function addCurrentToCart(){
+async function addCurrentToCart(petDraft=null){
  if(addingCurrentToCart)return;
  const selection=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign());
  if(!selection.variant)return toast('El color o la talla ya no está disponible. Elige una combinación válida.','error');
  addingCurrentToCart=true;
   try{
-  const product=products[state.kind],personalized=currentPurchaseType()==='personalized',basePrice=productPrice(state.kind,state.size,state.color,selectedCatalogDesign(),personalized),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:state.qualityReview}),pricing=currentPrintPricing(basePrice,qualityReview?QUALITY_ADJUSTMENT_CLP:0),id=state.cartItemId||`${state.kind==='tote'?'tote':'shirt'}-${Date.now()}`,catalogPreview=state.catalogDesignCustomerImage?'':catalogPreviewForCart(state.catalogDesignSlug,state.kind),fallback=state.images.front||state.images[state.printSide]||'',designPreview=catalogPreview||await cartPreviewPng(state.uploadFiles.front||state.uploadFiles[state.printSide],fallback),item={id,kind:product.name,modelCode:state.kind,size:state.size,sides:printSidesLabel(),printSides:printChoice(),printConfiguration:currentPrintConfiguration(),color:state.color,variantId:state.variantId,catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:Boolean(state.catalogDesignCustomerImage),purchaseType:currentPurchaseType(),qualityReview,designPreview,initial:state.files[state.printSide]?.slice(0,1).toUpperCase()||'*',basePrice,price:pricing.total,quantity:1},existing=cart.findIndex(entry=>entry.id===id);
+  const product=products[state.kind],personalized=currentPurchaseType()==='personalized',basePrice=productPrice(state.kind,state.size,state.color,selectedCatalogDesign(),personalized),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:Boolean(petDraft)||state.qualityReview}),pricing=currentPrintPricing(basePrice,qualityReview?QUALITY_ADJUSTMENT_CLP:0),id=state.cartItemId||`${state.kind==='tote'?'tote':'shirt'}-${Date.now()}`,catalogPreview=state.catalogDesignCustomerImage?'':catalogPreviewForCart(state.catalogDesignSlug,state.kind),fallback=state.images.front||state.images[state.printSide]||'',designPreview=catalogPreview||await cartPreviewPng(state.uploadFiles.front||state.uploadFiles[state.printSide],fallback),item={id,kind:product.name,modelCode:state.kind,size:state.size,sides:printSidesLabel(),printSides:printChoice(),printConfiguration:currentPrintConfiguration(),color:state.color,variantId:state.variantId,catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:Boolean(state.catalogDesignCustomerImage),purchaseType:currentPurchaseType(),qualityReview,designPreview,initial:state.files[state.printSide]?.slice(0,1).toUpperCase()||'*',basePrice,price:pricing.total,quantity:1},existing=cart.findIndex(entry=>entry.id===id);
   let storageWarning=false;
-  if(!item.catalogDesignSlug||item.catalogDesignCustomerImage){
+  if(petDraft){
+   const references=petFiles(petDraft),error=petPhotoError(references);
+   if(error)throw new Error(error);
+   const petPersonalization={references,name:petDraft.petName||'',notes:petDraft.notes||''};
+   item.petPhotoReview=true;
+   cartDesignMemory.set(id,{petPersonalization});
+   try{await saveCartDesignFiles(id,null,null,{},petPersonalization)}catch{storageWarning=true}
+  }else if(!item.catalogDesignSlug||item.catalogDesignCustomerImage){
    const front=includedSides().includes('front')?state.uploadFiles.front:null,back=includedSides().includes('back')?state.uploadFiles.back:null,prints=Object.fromEntries(state.additionalPrints.map(print=>[print.id,print.file]));
    if((includedSides().includes('front')&&!(front instanceof Blob))||(includedSides().includes('back')&&!(back instanceof Blob))||state.additionalPrints.some(print=>!(print.file instanceof Blob)))throw new Error('Falta el archivo original de un estampado. Vuelve a cargarlo antes de añadir la polera.');
    cartDesignMemory.set(id,{front,back,prints});
@@ -641,17 +686,34 @@ function cartBreakdownMarkup(item){
  const prints=item.catalogPoleraPrints&&item.printConfiguration?.prints?.length
   ?catalogPrintPriceRows(item.printConfiguration,PRINT_PRICES)
   :item.catalogDesignSlug&&breakdown.print===0?[]:[{label:'Estampados',amount:breakdown.print}];
- return `<dl class="cart-item-breakdown"><div><dt>Producto base</dt><dd>${money(breakdown.base)}</dd></div>${printChargeRowsMarkup(prints)}${breakdown.qualityReview?`<div><dt>Ajuste técnico</dt><dd>+${money(breakdown.review)}</dd></div>`:''}${item.quantity>1?`<div><dt>${item.quantity} unidades</dt><dd>${money(breakdown.unit)} c/u</dd></div>`:''}</dl>`;
+ return `<dl class="cart-item-breakdown"><div><dt>Producto base</dt><dd>${money(breakdown.base)}</dd></div>${printChargeRowsMarkup(prints)}${breakdown.qualityReview?`<div><dt>${item.petPhotoReview?'Revisión técnica de fotos':'Ajuste técnico'}</dt><dd>+${money(breakdown.review)}</dd></div>`:''}${item.quantity>1?`<div><dt>${item.quantity} unidades</dt><dd>${money(breakdown.unit)} c/u</dd></div>`:''}</dl>`;
 }
 function cartPrintConfigurationLabel(item){const sides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');return printConfigurationLabel(item.printConfiguration,sides)}
 function renderCart(){normalizeCartPrices();const target=document.querySelector('#cart-content');queueMicrotask(()=>{if(!account&&cart.length&&target.isConnected)showCartAccessGate(target)});if(!cart.length){target.innerHTML='<div class="cart-empty"><span>✳</span><h3>Aún no hay poleras aquí.</h3><p>Elige un diseño del catálogo o crea una polera desde cero.</p><div class="cart-empty-actions"><button type="button" class="button dark commerce-wide ds-cta" id="cart-choose">Elegir una polera <span aria-hidden="true">→</span></button><button type="button" class="cart-empty-create" id="cart-start">Crear mi polera</button></div></div>';document.querySelector('#cart-choose').onclick=()=>closeCartDrawer(()=>{location.hash='catalogo'});document.querySelector('#cart-start').onclick=()=>closeCartDrawer(()=>openStudio('ready'));return}const visibleItems=cartExpanded?cart:cart.slice(0,2),hiddenItems=Math.max(0,cart.length-visibleItems.length),itemLabel=cart.reduce((sum,item)=>sum+item.quantity,0)===1?'producto':'productos';target.innerHTML=`<div class="cart-overview"><strong>${cart.reduce((sum,item)=>sum+item.quantity,0)} ${itemLabel} en tu pedido</strong><span>Resumen antes de pagar</span></div><div class="cart-list cart-list--compact">${visibleItems.map(item=>`<article class="cart-item cart-item--compact"><div class="cart-art" style="--cart-color:${safe(item.color)}">${item.designPreview?`<img src="${safe(item.designPreview)}" alt="Diseño elegido">`:`<span>${safe(item.initial)}</span>`}</div><div class="cart-item-copy"><strong>${safe(cartProductLabel(item))}</strong><small>Talla ${safe(sizeLabel(item.modelCode,item.size))} · ${safe(cartColorLabel(item))} · ${safe(item.sides)}</small>${item.catalogPoleraPrints?'':`<small class="cart-item-placement">${safe(cartPrintConfigurationLabel(item))}</small>`}${cartBreakdownMarkup(item)}<button type="button" data-cart-remove="${safe(item.id)}">Quitar</button></div><div class="cart-price"><strong>${money(item.price*item.quantity)}</strong><div class="quantity"><button type="button" data-cart-quantity="${safe(item.id)}" data-change="-1" aria-label="Reducir cantidad">−</button><span>${item.quantity}</span><button type="button" data-cart-quantity="${safe(item.id)}" data-change="1" aria-label="Aumentar cantidad">+</button></div></div></article>`).join('')}</div>${hiddenItems?`<button type="button" class="cart-show-more" id="cart-show-more">Ver ${hiddenItems} diseño${hiddenItems===1?'':'s'} más <span aria-hidden="true">↓</span></button>`:''}${cartExpanded&&cart.length>2?'<button type="button" class="cart-show-more" id="cart-show-less">Mostrar resumen</button>':''}<div class="cart-total"><span>Subtotal productos</span><strong>${money(cartTotal())}</strong><div class="cart-total-detail"><span>Despacho</span><b>Por calcular</b></div><small>El total final será el subtotal de productos más el despacho calculado en el checkout.</small></div><button type="button" class="button dark commerce-wide ds-cta" id="cart-checkout">Continuar compra <span>→</span></button><button type="button" class="cart-keep-shopping" id="cart-keep-shopping">← Seguir comprando</button>`;target.querySelectorAll('.cart-art').forEach((art,index)=>{const current=visibleItems[index],preview=current?.catalogDesignCustomerImage?'':catalogPreviewForCart(current?.catalogDesignSlug,current?.modelCode);if(preview)art.innerHTML=`<img src="${safe(preview)}" alt="Diseño elegido">`});target.querySelectorAll('[data-cart-remove]').forEach(button=>button.onclick=()=>{cart=cart.filter(item=>item.id!==button.dataset.cartRemove);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelectorAll('[data-cart-quantity]').forEach(button=>button.onclick=()=>{const item=cart.find(entry=>entry.id===button.dataset.cartQuantity);if(!item)return;item.quantity+=Number(button.dataset.change);if(item.quantity<1)cart=cart.filter(entry=>entry!==item);if(cart.length<=2)cartExpanded=false;saveLocal(CART_KEY,cart);updateCommerceNav();renderCart()});target.querySelector('#cart-show-more')?.addEventListener('click',()=>{cartExpanded=true;renderCart()});target.querySelector('#cart-show-less')?.addEventListener('click',()=>{cartExpanded=false;renderCart()});document.querySelector('#cart-keep-shopping').onclick=()=>closeCartDrawer();document.querySelector('#cart-checkout').onclick=()=>account?closeCartDrawer(()=>beginCheckout(false)):showCartAccessGate(target)}
 document.querySelector('#cart-content').addEventListener('click',event=>{const id=event.target.closest('[data-cart-remove],[data-cart-quantity]')?.dataset.cartRemove||event.target.closest('[data-cart-quantity]')?.dataset.cartQuantity;if(id&&!cart.some(item=>item.id===id))removeCartDesignFiles(id).catch(()=>{})});
-async function checkoutItems(withArtwork=true){const items=[];for(const item of cart){const artwork=withArtwork?await paymentArtworkFor(item,(await supabase.auth.getUser()).data.user?.id):{frontDesignPath:null,backDesignPath:null},printSides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');items.push({modelCode:item.modelCode||Object.entries(products).find(([,product])=>product.name===item.kind)?.[0]||'basic',size:item.size,color:item.color,printSides,printConfiguration:normalizePrintConfiguration(item.printConfiguration,printSides),quantity:item.quantity,qualityReview:effectiveQualityReview(item),variantId:item.variantId||null,catalogDesignSlug:item.catalogDesignSlug||null,catalogDesignCustomerImage:Boolean(item.catalogDesignCustomerImage),...artwork})}return items}
+async function checkoutItems(userId){
+ const items=[];
+ for(const item of cart){
+  const artwork=await paymentArtworkFor(item,userId);
+  const printSides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');
+  items.push({modelCode:item.modelCode||Object.entries(products).find(([,product])=>product.name===item.kind)?.[0]||'basic',size:item.size,color:item.color,printSides,printConfiguration:normalizePrintConfiguration(item.printConfiguration,printSides),quantity:item.quantity,qualityReview:effectiveQualityReview(item),variantId:item.variantId||null,catalogDesignSlug:item.catalogDesignSlug||null,catalogDesignCustomerImage:Boolean(item.catalogDesignCustomerImage),...artwork});
+ }
+ return items;
+}
+async function requestCheckoutPayment(paymentMethod,errorMessage){
+ const {data:{user},error:userError}=await supabase.auth.getUser();
+ if(userError||!user)throw new Error('Inicia sesión o continúa como invitado antes de pagar.');
+ const items=await checkoutItems(user.id);
+ const payload={paymentMethod,draftOrderId:state.checkoutDraftId,items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
+ const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});
+ if(error||!data?.orderId)throw new Error(data?.error||await paymentFunctionError(error,errorMessage));
+ return data;
+}
 async function createCheckoutDraft(){
- const {data:{user},error:userError}=await supabase.auth.getUser();if(userError||!user)throw new Error('Inicia sesión o continúa como invitado antes de pagar.');
- const items=await checkoutItems(true);
- const payload={paymentMethod:'draft',draftOrderId:state.checkoutDraftId,items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
- const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});if(error||!data?.orderId)throw new Error(data?.error||await paymentFunctionError(error,'No pudimos registrar tu pedido en el admin.'));state.checkoutDraftId=data.orderId;persistDraft();return data;
+ const data=await requestCheckoutPayment('draft','No pudimos registrar tu pedido en el admin.');
+ state.checkoutDraftId=data.orderId;
+ persistDraft();
+ return data;
 }
 function setCheckoutButtonLoading(button,loading,label){
  if(!button)return;
@@ -683,11 +745,13 @@ async function openPaymentConfirmation(){
  if(back)back.disabled=true;
  if(close)close.disabled=true;
  setCheckoutButtonLoading(next,true,'Preparando tu pedido…');
- try{await createCheckoutDraft()}catch(error){showCommerceReceipt({title:'No pudimos preparar el pago',message:error.message||'No pudimos confirmar el pedido.',nextStep:'Tu selección sigue en el carro. Vuelve a «Datos y pago» y reintenta la confirmación.',tone:'error'});return}finally{checkoutOpening=false;setCheckoutButtonLoading(next,false,originalLabel);if(progress){progress.textContent='';progress.hidden=true}if(content)content.inert=false;if(back)back.disabled=false;if(close)close.disabled=false}
+ let draft;
+ try{draft=await createCheckoutDraft()}catch(error){showCommerceReceipt({title:'No pudimos preparar el pago',message:error.message||'No pudimos confirmar el pedido.',nextStep:'Tu selección sigue en el carro. Vuelve a «Datos y pago» y reintenta la confirmación.',tone:'error'});return}finally{checkoutOpening=false;setCheckoutButtonLoading(next,false,originalLabel);if(progress){progress.textContent='';progress.hidden=true}if(content)content.inert=false;if(back)back.disabled=false;if(close)close.disabled=false}
+ if(draft?.paymentMethod==='transfer'){studio.close();return showCheckoutTransferReceipt(draft)}
  const target=document.querySelector('#payment-content'),shipping=state.shippingQuote?.amount||0,total=cartTotal()+shipping-state.couponDiscount,items=cart.reduce((sum,item)=>sum+item.quantity,0);
  studio.close();
  preparedCheckoutUrl='';preparedCheckoutTotal=0;
- target.innerHTML=`<div class="mp-payment-head"><img class="mp-payment-logo" src="/mercado-pago-logo.svg" alt="Mercado Pago"><button type="button" class="close-button mp-payment-close ds-icon-button" aria-label="Cerrar confirmación de pago"><span aria-hidden="true"></span></button></div><div class="mp-payment-body"><span class="eyebrow">ELIGE CÓMO PAGAR</span><h2 id="payment-title">Revisa tu pedido.</h2><p class="mp-payment-lead">El despacho ya fue calculado. Confirmaremos el importe con los precios vigentes antes de crear tu pedido.</p><div class="mp-payment-summary"><span>${items} ${items===1?'producto':'productos'}<small>Despacho ${money(shipping)}</small></span><strong>${money(total)}</strong></div><div class="payment-methods" role="radiogroup" aria-label="Medio de pago"><label class="payment-method is-selected"><input type="radio" name="payment-method" value="mercado_pago" checked><span><strong>Mercado Pago</strong><small>Tarjetas, transferencia y otros medios disponibles en Checkout Pro.</small></span></label><label class="payment-method"><input type="radio" name="payment-method" value="transfer" data-available="false" disabled><span><strong>Transferencia bancaria</strong><small data-transfer-availability>Comprobando disponibilidad…</small></span></label></div><p class="mp-payment-error" role="alert" hidden></p><button type="button" class="button mp-payment-button" id="continue-to-payment">Continuar a Mercado Pago</button><p class="mp-payment-wait" id="payment-wait-status" role="status" aria-live="polite" hidden></p><small class="mp-payment-legal">Comenzaremos a preparar tu pedido cuando confirmemos el pago.</small></div>`;
+ target.innerHTML=`<div class="mp-payment-head"><img class="mp-payment-logo" src="/mercado-pago-logo.svg" alt="Mercado Pago"><button type="button" class="close-button mp-payment-close ds-icon-button" aria-label="Cerrar confirmación de pago"><span aria-hidden="true"></span></button></div><div class="mp-payment-body"><span class="eyebrow">ELIGE CÓMO PAGAR</span><h2 id="payment-title">Revisa tu pedido.</h2><p class="mp-payment-lead">El despacho ya fue calculado. Confirmaremos el importe con los precios vigentes antes de crear tu pedido.</p><div class="mp-payment-summary"><span>${items} ${items===1?'producto':'productos'}<small>Despacho ${money(shipping)}</small></span><strong>${money(total)}</strong></div><div class="payment-methods" role="radiogroup" aria-label="Medio de pago"><label class="payment-method is-selected"><input type="radio" name="payment-method" value="mercado_pago" checked><span><strong>Mercado Pago</strong><small>Paga en el sitio seguro de Mercado Pago.</small></span></label><label class="payment-method"><input type="radio" name="payment-method" value="transfer" data-available="false" disabled><span><strong>Transferencia bancaria</strong><small data-transfer-availability>Comprobando disponibilidad…</small></span></label></div><p class="mp-payment-error" role="alert" hidden></p><button type="button" class="button mp-payment-button" id="continue-to-payment">Continuar a Mercado Pago</button><p class="mp-payment-wait" id="payment-wait-status" role="status" aria-live="polite" hidden></p><small class="mp-payment-legal">Comenzaremos a preparar tu pedido cuando confirmemos el pago.</small></div>`;
  openDialog(paymentModal);
  target.querySelector('.mp-payment-close').onclick=()=>paymentModal.close();
  const transferInput=target.querySelector('[name="payment-method"][value="transfer"]'),transferHelp=target.querySelector('[data-transfer-availability]');
@@ -696,7 +760,7 @@ async function openPaymentConfirmation(){
   const available=!error&&data?.bankTransferAvailable===true;
   transferInput.dataset.available=String(available);
   transferInput.disabled=!available||paymentSubmitting;
-  transferHelp.textContent=available?'Ingresa el pedido y te enviaremos los datos para transferir. Quedará pendiente de confirmación.':error?'No pudimos comprobar esta opción. Usa Mercado Pago por ahora.':'No disponible por ahora. Puedes pagar con Mercado Pago.';
+  transferHelp.textContent=available?BANK_TRANSFER_POLICY:error?'No pudimos comprobar esta opción. Usa Mercado Pago por ahora.':'No disponible por ahora. Puedes pagar con Mercado Pago.';
  }).catch(()=>{if(transferInput?.isConnected)transferHelp.textContent='No pudimos comprobar esta opción. Usa Mercado Pago por ahora.'});
  const submit=target.querySelector('#continue-to-payment'),methods=[...target.querySelectorAll('[name="payment-method"]')];const syncMethod=()=>{if(paymentSubmitting)return;const selected=target.querySelector('[name="payment-method"]:checked')?.value==='transfer';target.querySelectorAll('.payment-method').forEach(method=>method.classList.toggle('is-selected',method.querySelector('input')?.checked));submit.textContent=selected?'Solicitar pago por transferencia':preparedCheckoutUrl?`Confirmar ${money(preparedCheckoutTotal)} e ir a Mercado Pago`:'Continuar a Mercado Pago'};methods.forEach(method=>method.onchange=syncMethod);submit.onclick=()=>{if(paymentSubmitting)return;if(target.querySelector('[name="payment-method"]:checked')?.value==='transfer')return submitTransferOrder();if(preparedCheckoutUrl){setPaymentLoading(true,'Abriendo Mercado Pago…','Te estamos llevando al sitio seguro de pago.');window.location.assign(preparedCheckoutUrl);return}return openMercadoPagoCheckout()};
 }
@@ -2308,21 +2372,26 @@ function renderStep(){
  if(state.catalogDesignCustomerImage&&state.step>1){
   const draft=state.petRequest||(state.petRequest=newPetRequest(state.catalogDesignSlug));
   const variant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;
+  const paidPet=isPayingForPet();
   const selection={variantId:variant?.id,model:products[state.kind].name,size:sizeLabel(state.kind,state.size),color:variant?.colorName||state.color,side:state.printSide,preliminaryPrice:preliminarySelectionPrice(variant,{personalized:true})};
-  document.querySelector('.steps').innerHTML='<div class="steps-rail" style="--step-count:3;--rail-progress:'+((state.step-1)/3*100)+'%;--rail-edge:16.67%"><i aria-hidden="true"></i>'+['Detalles',selectedCatalogDesign()?.customerPhotoSubject==='people'?'Tu foto':'Tu mascota','Enviar solicitud'].map((label,index)=>`<span class="${state.step===index+1?'active':''}" ${state.step===index+1?'aria-current="step"':''}><b>${index+1}</b><small>${label}</small></span>`).join('')+'</div>';
+  if(paidPet&&variant){
+   const base=variantPriceForPurchase(variant,true)??variant.priceClp,review=qualityReviewFee(),pricing=currentPrintPricing(base,review);
+   selection.purchasePrice={base:money(base),print:pricing.print?money(pricing.print):'',review:money(review),subtotal:money(pricing.total)};
+  }
+  document.querySelector('.steps').innerHTML='<div class="steps-rail" style="--step-count:3;--rail-progress:'+((state.step-1)/3*100)+'%;--rail-edge:16.67%"><i aria-hidden="true"></i>'+['Detalles',selectedCatalogDesign()?.customerPhotoSubject==='people'?'Tu foto':'Tu mascota',paidPet?'Datos y pago':'Enviar solicitud'].map((label,index)=>`<span class="${state.step===index+1?'active':''}" ${state.step===index+1?'aria-current="step"':''}><b>${index+1}</b><small>${label}</small></span>`).join('')+'</div>';
   stepContent.innerHTML=petStepHtml({step:state.step,draft,selection,designName:state.catalogDesignName,subject:selectedCatalogDesign()?.customerPhotoSubject,purchaseMethod:currentPurchaseMethod(),escapeText});
   bindPetStep(stepContent,draft,()=>activePublicFlow?.refresh(),selectedCatalogDesign()?.customerPhotoSubject);
   applyDesignSystemClasses(stepContent);
   next.hidden=Boolean(draft.orderId);back.hidden=Boolean(draft.orderId);next.disabled=false;
-  next.textContent=petSubmitLabel(state.step,currentPurchaseMethod());
+  next.textContent=paidPet?'Continuar a la compra':petSubmitLabel(state.step,currentPurchaseMethod());
   stepContent.querySelector('[data-pet-done]')?.addEventListener('click',()=>studio.close());
   if(!draft.orderId)activePublicFlow=mountPetFlow({container:stepContent,button:next,draft,step:state.step,disclosure:publicFlowState(`pet:${draft.designId}:${state.step}:${currentPurchaseMethod()}`),purchaseMethod:currentPurchaseMethod()});
   restorePublicFocus();syncPreview();return;
  }
- const labels=state.catalogDesignCustomerImage?['Detalles',selectedCatalogDesign()?.customerPhotoSubject==='people'?'Tu foto':'Tu mascota','Enviar solicitud']:['Detalles','Resumen','Datos y pago'];
+ const labels=state.catalogDesignCustomerImage?['Detalles',selectedCatalogDesign()?.customerPhotoSubject==='people'?'Tu foto':'Tu mascota',isPayingForPet()?'Datos y pago':'Enviar solicitud']:['Detalles','Resumen','Datos y pago'];
  const railProgress=((state.step-1)/labels.length)*100,railEdge=50/labels.length;
  document.querySelector('.steps').innerHTML=`<div class="steps-rail" style="--step-count:${labels.length};--rail-progress:${railProgress.toFixed(2)}%;--rail-edge:${railEdge.toFixed(2)}%"><i aria-hidden="true"></i>${labels.map((label,index)=>`<span class="${index+1===state.step?'active':''} ${index+1<state.step?'done':''}" aria-label="Paso ${index+1} de ${labels.length}: ${label}" ${index+1===state.step?'aria-current="step"':''}><b aria-hidden="true">${index+1<state.step?'✓':String(index+1).padStart(2,'0')}</b><small>${label}</small></span>`).join('')}</div>`;
-  const p=products[state.kind],personalizedSelection=currentPurchaseType()==='personalized',choice=printChoice(),selectedVariant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant,selectedPrice=variantPriceForPurchase(selectedVariant,personalizedSelection),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:state.qualityReview}),pricing=currentPrintPricing(selectedPrice??0,qualityReview?QUALITY_ADJUSTMENT_CLP:0),whatsappPurchase=currentPurchaseMethod()==='whatsapp';
+  const p=products[state.kind],personalizedSelection=currentPurchaseType()==='personalized',choice=printChoice(),selectedVariant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant,selectedPrice=variantPriceForPurchase(selectedVariant,personalizedSelection),qualityReview=effectiveQualityReview({catalogDesignSlug:state.catalogDesignSlug,catalogDesignCustomerImage:state.catalogDesignCustomerImage,qualityReview:isPayingForPet()||state.qualityReview}),pricing=currentPrintPricing(selectedPrice??0,qualityReview?QUALITY_ADJUSTMENT_CLP:0),whatsappPurchase=currentPurchaseMethod()==='whatsapp';
  next.hidden=false;next.disabled=state.checking||state.step===1&&!resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;back.hidden=state.step===1;
  const ctas=['Ver resumen',whatsappPurchase?purchaseMethodLabel('whatsapp',{purchaseType:currentPurchaseType()}):'Añadir al carro','Confirmar pedido'];next.textContent=state.catalogDesignCustomerImage?(selectedCatalogDesign()?.customerPhotoSubject==='people'?'Continuar · Tu foto':'Continuar · Foto de tu mascota'):ctas[state.step-1];
  let html='';
@@ -2476,7 +2545,7 @@ function renderStep(){
  const editContact=document.querySelector('#edit-contact');if(editContact)editContact.onclick=()=>{state.editingContact=true;renderStep()};
  const finishContactEdit=document.querySelector('#finish-contact-edit');if(finishContactEdit)finishContactEdit.onclick=()=>{const fields=[document.querySelector('#summary-first-name'),document.querySelector('#summary-last-name'),document.querySelector('#summary-email'),document.querySelector('#summary-phone')];for(const field of fields)if(!field?.checkValidity())return field?.reportValidity();state.firstName=fields[0].value.trim();state.lastName=fields[1].value.trim();state.email=fields[2].value.trim();state.phone=fullChilePhone(fields[3].value);storeCustomerDetails();state.editingContact=false;renderStep()};
  const checkoutEmail=document.querySelector('#checkout-email');if(checkoutEmail)checkoutEmail.oninput=()=>{state.email=checkoutEmail.value.trim();storeCustomerDetails()};
- const editOrder=document.querySelector('#edit-order');if(editOrder)editOrder.onclick=()=>{state.checkoutDraftId=null;state.shippingQuote=null;state.checkoutReady=false;state.step=1;renderStep();faceSelectedSide()};
+ const editOrder=document.querySelector('#edit-order');if(editOrder)editOrder.onclick=()=>{if(cart.some(item=>item.petPhotoReview))return reopenCartFromCheckout();state.checkoutDraftId=null;state.shippingQuote=null;state.checkoutReady=false;state.step=1;renderStep();faceSelectedSide()};
  const applyCoupon=document.querySelector('#apply-coupon');if(applyCoupon)applyCoupon.onclick=applyCheckoutCoupon;
  document.querySelectorAll('[data-fulfillment]').forEach(button=>button.onclick=()=>{state.fulfillment=button.dataset.fulfillment;state.shippingQuote=null;recalculateShippingQuote();confirmCheckoutDecision('fulfillment');persistDraft();renderStep()});
  if(state.step===2&&currentPurchaseMethod()==='whatsapp'){
@@ -2581,13 +2650,20 @@ async function restoreSavedDesigns(){
  }catch{}
 }
 function persistDraft(){syncFullName();try{saveForFifteenDays(DRAFT_KEY,{kind:state.kind,size:state.size,color:state.color,variantId:state.variantId,printSides:state.printSides,printConfigurations:normalizePrintConfiguration(state.printConfigurations,printChoice()),additionalPrints:state.additionalPrints.map(item=>({id:item.id,side:item.side,configuration:item.configuration,fileName:item.fileName})),qualityReview:state.qualityReview,fulfillment:state.fulfillment,checkoutDraftId:state.checkoutDraftId,disclosure:{version:1,scope:detailsDisclosureScope,confirmed:detailsDisclosure.confirmed},date:new Date().toISOString()});saveForFifteenDays(CATALOG_DRAFT_KEY,{catalogDesignSlug:state.catalogDesignSlug,catalogDesignName:state.catalogDesignName,catalogDesignCustomerImage:Boolean(state.catalogDesignCustomerImage),catalogDesignPurchaseMode:state.catalogDesignPurchaseMode})}catch{toast('No pudimos guardar el avance en este navegador.')}}
-document.querySelector('#back').onclick=()=>{state.step=Math.max(1,state.step-1);renderStep()};
+document.querySelector('#back').onclick=()=>{
+ if(state.step===3&&!state.catalogDesignCustomerImage&&cart.some(item=>item.petPhotoReview))return reopenCartFromCheckout();
+ state.step=Math.max(1,state.step-1);renderStep();
+};
+function reopenCartFromCheckout(){
+ studio.close();renderCart();openDialog(cartModal);
+}
 document.querySelector('#design-form').onsubmit=e=>{
  e.preventDefault();if(state.checking||checkoutOpening||state.petRequest?.busy||publicRequestBusy)return;
  if(activePublicFlow&&!activePublicFlow.guardFinal(e))return;
  if(state.mode==='custom'){document.querySelector('#custom-submit')?.click();return;}
  if(state.catalogDesignCustomerImage&&state.step>1){
   const draft=state.petRequest;
+  if(isPayingForPet())return addCurrentToCart(draft||newPetRequest(state.catalogDesignSlug));
   if(state.step===2){if(currentPurchaseMethod()!=='whatsapp'){const error=petPhotoError(draft?.files?.length?draft.files:draft?.file,selectedCatalogDesign()?.customerPhotoSubject);if(error)return toast(error,'error')}state.step=3;return renderStep()}
   if(draft.orderId)return;
   const variant=resolveAvailableVariant(state.kind,state.size,state.color,selectedCatalogDesign()).variant;
@@ -2627,6 +2703,20 @@ document.querySelector('#design-form').onsubmit=e=>{
  storeCustomerDetails();state.editingContact=false;state.checkoutReady=true;persistDraft();if(!state.shippingQuote){const scroller=studio.querySelector('.studio-controls');checkoutScrollSnapshot={scroller,top:scroller?.scrollTop||0};state.shippingQuote=quoteShipping(state.fulfillment,state.region,cart.reduce((sum,item)=>sum+item.quantity,0));renderStep();return}openPaymentConfirmation()
 };
 async function paymentArtworkFor(item,userId){
+ if(item.petPhotoReview){
+  const originals=await cartDesignFiles(item.id);
+  const pet=originals?.petPersonalization;
+  const error=petPhotoError(pet?.references);
+  if(error)throw new Error('Faltan las fotos de una personalización de mascota. Vuelve al estudio a adjuntarlas antes de pagar.');
+  const uploads=originals.referenceUploads?.userId===userId?originals.referenceUploads:{userId,references:[]};
+  originals.referenceUploads=uploads;
+  cartDesignMemory.set(item.id,originals);
+  for(let i=uploads.references.length;i<pet.references.length;i++){
+   const file=pet.references[i];
+   uploads.references.push({name:file.name,path:await uploadPrivateDesign(supabase,userId,'reference',file)});
+  }
+  return {petPersonalization:{name:pet.name,notes:pet.notes,references:uploads.references}};
+ }
   if(item.catalogDesignSlug&&!item.catalogDesignCustomerImage)return {frontDesignPath:null,backDesignPath:null,printConfiguration:normalizePrintConfiguration(item.printConfiguration,item.printSides)};
  const sides=item.printSides==='both'?['front','back']:[item.printSides];
  let originals=await cartDesignFiles(item.id);
@@ -2661,18 +2751,8 @@ async function openMercadoPagoCheckout(){
  setPaymentLoading(true,'Guardando diseños…','Estamos guardando tus diseños. Espera aquí mientras preparamos el pago.');
  if(errorNode)errorNode.hidden=true;
  try{
-  const {data:{user},error:userError}=await supabase.auth.getUser();
-  if(userError||!user)throw new Error('Inicia sesión o continúa como invitado antes de pagar.');
-  const items=[];
-  for(const item of cart){
-   const artwork=await paymentArtworkFor(item,user.id);
-   const printSides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');
-   items.push({modelCode:item.modelCode||Object.entries(products).find(([,product])=>product.name===item.kind)?.[0]||'basic',size:item.size,color:item.color,printSides,printConfiguration:normalizePrintConfiguration(item.printConfiguration,printSides),quantity:item.quantity,qualityReview:effectiveQualityReview(item),variantId:item.variantId||null,catalogDesignSlug:item.catalogDesignSlug||null,catalogDesignCustomerImage:Boolean(item.catalogDesignCustomerImage),...artwork});
-  }
-  setPaymentLoading(true,'Preparando Mercado Pago…','Estamos creando el enlace seguro de pago. No necesitas pulsar de nuevo.');
-  const payload={draftOrderId:state.checkoutDraftId,items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
-  const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});
-  if(error||!data?.initPoint)throw new Error(data?.error||await paymentFunctionError(error,'No pudimos iniciar el pago con Mercado Pago. Intenta nuevamente.'));
+  const data=await requestCheckoutPayment('mercado_pago','No pudimos iniciar el pago con Mercado Pago. Intenta nuevamente.');
+  if(!data.initPoint)throw new Error('No recibimos el enlace de Mercado Pago. Intenta nuevamente.');
   persistDraft();
   const confirmedTotal=cartTotal()+(state.shippingQuote?.amount||0)-state.couponDiscount;
   if(Number.isInteger(data.totalClp)&&data.totalClp!==confirmedTotal){
@@ -2697,34 +2777,33 @@ async function submitTransferOrder(){
  setPaymentLoading(true,'Guardando pedido…','Estamos registrando tu pedido y preparando los datos de transferencia.');
  if(errorNode)errorNode.hidden=true;
  try{
-  const {data:{user},error:userError}=await supabase.auth.getUser();
-  if(userError||!user)throw new Error('Inicia sesión o continúa como invitado antes de solicitar el pago.');
-  const items=[];
-  for(const item of cart){const artwork=await paymentArtworkFor(item,user.id),printSides=item.printSides||(/^Espalda$/i.test(item.sides)?'back':item.sides?.includes('+')?'both':'front');items.push({modelCode:item.modelCode||Object.entries(products).find(([,product])=>product.name===item.kind)?.[0]||'basic',size:item.size,color:item.color,printSides,printConfiguration:normalizePrintConfiguration(item.printConfiguration,printSides),quantity:item.quantity,qualityReview:effectiveQualityReview(item),variantId:item.variantId||null,catalogDesignSlug:item.catalogDesignSlug||null,catalogDesignCustomerImage:Boolean(item.catalogDesignCustomerImage),...artwork})}
-  const payload={paymentMethod:'transfer',draftOrderId:state.checkoutDraftId,items,couponCode:state.couponCode||null,fulfillment:state.fulfillment,shippingQuoteClp:state.shippingQuote?.amount??null,customer:{firstName:state.firstName,lastName:state.lastName,email:state.email,phone:state.phone},shippingAddress:state.fulfillment==='delivery'?{region:state.region,commune:state.commune,address:state.address,addressExtra:state.addressExtra,notes:state.deliveryNotes}:null};
-  const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:payload});
-  if(error||!data?.orderId)throw new Error(data?.error||await paymentFunctionError(error,'No pudimos ingresar el pedido por transferencia. Intenta nuevamente.'));
+  const data=await requestCheckoutPayment('transfer','No pudimos ingresar el pedido por transferencia. Intenta nuevamente.');
+  if(!data.paymentInstructions?.transfer)throw new Error('No recibimos los datos para transferir.');
+  setPaymentLoading(false,'Solicitar pago por transferencia');
+  showCheckoutTransferReceipt(data);
+ }catch(error){setPaymentLoading(false,'Solicitar pago por transferencia');if(errorNode){errorNode.textContent=`${error.message||'No pudimos confirmar el pedido por transferencia.'} Tu selección sigue en el carro. Reintenta para obtener los datos bancarios del pedido.`;errorNode.hidden=false}}
+}
+function showCheckoutTransferReceipt(data){
   const contents=cart.map(item=>`${item.quantity} × ${[cartProductLabel(item),catalogDesigns.find(design=>design.id===item.catalogDesignSlug)?.name||(!item.catalogDesignSlug?'Diseño propio':''),sizeLabel(item.modelCode,item.size),cartColorLabel(item)].filter(Boolean).join(' · ')}`);
   contents.push(`A nombre de ${[state.firstName,state.lastName].filter(Boolean).join(' ')}`);
   contents.push(state.fulfillment==='delivery'?'Tus datos de contacto y despacho':'Tus datos de contacto y la opción de retiro');
   clearSubmittedCart();
-  setPaymentLoading(false,'Solicitar pago por transferencia');
   showTransferReceipt(data,{contents,email:state.email});
- }catch(error){setPaymentLoading(false,'Solicitar pago por transferencia');if(errorNode){errorNode.textContent=`${error.message||'No pudimos confirmar el pedido por transferencia.'} Tu selección sigue en el carro. Reintenta para obtener los datos bancarios del pedido.`;errorNode.hidden=false}}
 }
 function showTransferReceipt(data,{contents,email,creative=false}){
  const transfer=data.paymentInstructions?.transfer||{};
+ const deadline=data.paymentInstructions?.transfer_due_at;
  const fields=[
   ['Monto a transferir',money(data.totalClp)],
   ['Titular',transfer.holder],['Banco',transfer.bank],
   ['Cuenta',`${transfer.account_type||''} ${transfer.account_number||''}`.trim()],['RUT',transfer.rut],['Email',transfer.email]
  ];
- const accountDetails=`<dl class="account-order-payment">${fields.filter(([,value])=>value).map(([label,value])=>`<div><dt>${label}</dt><dd>${safe(value)}</dd></div>`).join('')}</dl>`;
+ const accountDetails=isBankTransferExpired(deadline)?'':`<dl class="account-order-payment">${fields.filter(([,value])=>value).map(([label,value])=>`<div><dt>${label}</dt><dd>${safe(value)}</dd></div>`).join('')}</dl>`;
  const emailNote=receiptEmailFeedback(data.email,email,'Los datos para transferir');
  showCommerceReceipt({
   label:creative?'Datos de transferencia':'Comprobante de pedido',title:creative?'Transferencia habilitada':'Pedido recibido',reference:`${creative?'Solicitud':'Pedido'} #${data.orderId}`,
-  message:'El pago está pendiente. Haz la transferencia con estos datos y usa «Avisar que ya pagué» en «Mis pedidos».',
-  nextStep:paymentConfirmationFollowUp(email),
+  message:bankTransferWindowNotice(deadline),
+  nextStep:'Si ya transferiste, usa «Avisar que ya pagué» en «Mis pedidos». '+paymentConfirmationFollowUp(email),
   contents,details:`${accountDetails}<p>${safe(emailNote||'Puedes volver a consultar estos datos bancarios en «Mis pedidos».')}</p>`
  });
 }

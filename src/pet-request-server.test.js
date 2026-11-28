@@ -65,11 +65,12 @@ test('admin recibe diseño, foto privada e indicaciones en el mismo pedido',asyn
   assert.equal(saved.order_items.catalog_design_id,'design-uuid');
   assert.equal(saved.orders.price_snapshot.catalog_design_slug,'pet-design');
 });
-test('servidor acepta hasta tres fotos de mascota',async()=>{
+test('la ruta de cotización deriva las fotos de mascota al checkout',async()=>{
   const references=[1,2,3].map((_,index)=>({name:`mascota-${index+1}.jpg`,path:photoPath}));
   const {response,saved}=await send(references,{variantId:42,side:'front'},{},'pets');
-  assert.equal(response.status,201);
-  assert.equal(saved.orders.request_references.length,3);
+  assert.equal(response.status,409);
+  assert.match((await response.json()).error,/continuar al pago/);
+  assert.equal(saved.orders,undefined);
 });
 
 test('guarda variante y formato de tote verificados para administración',async()=>{

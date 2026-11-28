@@ -2,7 +2,8 @@ import { catalogPoleraComposition, catalogChargeablePrints, catalogOrderConfigur
 import { printPrice } from '../_shared/print-pricing.js'
 import {designProductArtworks,modelProductSlug} from '../_shared/catalog-product-artworks.js'
 import {bodyCommerceReady,normalizeVariantRows,resolveExactVariant,variantPriceForPurchase} from '../_shared/variant-selection.js'
-import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage,isCatalogPrintIncluded,isUnmodifiedCatalogItem} from '../_shared/catalog-personalization.js'
+import {catalogDesignForVariantSelection,catalogDesignRequiresCustomerImage,isCatalogPrintIncluded,isPetPhotoDesign,isUnmodifiedCatalogItem} from '../_shared/catalog-personalization.js'
+import { bankTransferDeadline } from '../_shared/bank-transfer.js'
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
 import { sendAdminOrderNotice, sendOrderEmail } from '../_shared/order-email.ts'
 import { headPrivateDesign } from '../_shared/private-design-r2.ts'
@@ -62,7 +63,30 @@ Deno.serve(async request => {
   if (slugs.length) { const { data, error } = await admin.from('catalog_designs').select('id,slug,name,active,accepts_customer_image,customer_photo_subject,allowed_colors,allowed_product_colors,sample_color,product_artworks,polera_prints').in('slug', slugs); if (error) return json({ error: 'No pudimos validar los diseños.' }, 503); for (const design of data || []) if (design.active) designs.set(design.slug, design); if (slugs.some(slug => !designs.has(slug))) return json({ error: 'Uno de los diseños ya no está disponible.' }, 409) }
   if (items.some((item: any) => item.catalogDesignCustomerImage && !designs.get(item.catalogDesignSlug)?.accepts_customer_image)) return json({ error: 'Este diseño no admite una imagen del cliente.' }, 409)
   if (items.some((item: any) => item.catalogDesignSlug && catalogDesignRequiresCustomerImage(designs.get(item.catalogDesignSlug), item.catalogDesignCustomerImage))) return json({ error: 'Este diseño requiere una foto del cliente.' }, 409)
-  if (items.some((item: any) => item.catalogDesignSlug && !item.catalogDesignCustomerImage && !designProductArtworks(designs.get(item.catalogDesignSlug))[modelProductSlug(item.modelCode)])) return json({ error: 'El diseño no tiene un archivo para el producto elegido. Vuelve a elegir el producto.' }, 409)
+  const petPhotoItems = items.map((item: any) => isPetPhotoDesign(designs.get(item.catalogDesignSlug)))
+  if (items.some((item: any, index: number) => item.catalogDesignSlug && (!item.catalogDesignCustomerImage || petPhotoItems[index]) && !designProductArtworks(designs.get(item.catalogDesignSlug))[modelProductSlug(item.modelCode)])) return json({ error: 'El diseño no tiene un archivo para el producto elegido. Vuelve a elegir el producto.' }, 409)
+  const requestReferences = []
+  const requestDetails = []
+  const referencePath = new RegExp(`^${userData.user.id}/reference/[0-9a-f-]{36}\\.(png|jpg|webp)$`, 'i')
+  for (const [index, item] of items.entries()) {
+    if (!petPhotoItems[index]) continue
+    const photos = item.petPersonalization?.references
+    if (!Array.isArray(photos) || photos.length < 1 || photos.length > 3) return json({ error: 'Adjunta entre una y tres fotos para cada diseño de mascota.' }, 400)
+    const designName = designs.get(item.catalogDesignSlug).name
+    const itemLabel = `Producto ${index + 1} · ${designName}`
+    const name = String(item.petPersonalization.name || '').trim().slice(0, 100)
+    const notes = String(item.petPersonalization.notes || '').trim().slice(0, 2000)
+    const paths = new Set<string>()
+    for (const photo of photos) {
+      const path = typeof photo?.path === 'string' ? photo.path : ''
+      if (!referencePath.test(path) || paths.has(path)) return json({ error: 'Una foto de mascota no pertenece a este pedido o está repetida.' }, 400)
+      paths.add(path)
+      const file = await headPrivateDesign(path).catch(() => null)
+      if (!file?.size || file.size > 3 * 1024 * 1024) return json({ error: 'No pudimos encontrar una foto optimizada de tu mascota.' }, 409)
+      requestReferences.push({ path, name: `${itemLabel} · ${String(photo.name || 'Foto').trim().slice(0, 120)}`, item_index: index })
+    }
+    requestDetails.push([itemLabel, name && `Mascota: ${name}`, notes && `Indicaciones: ${notes}`].filter(Boolean).join('\n'))
+  }
   const catalogCompositions = items.map((item: any) => catalogPoleraComposition(designs.get(item.catalogDesignSlug), item.modelCode))
   if (printConfigurations.some((configuration: any, index: number) => {
     if (catalogCompositions[index]) return false
@@ -86,7 +110,7 @@ Deno.serve(async request => {
   const personalizedFlows = ['own_artwork', 'people_personalization', 'pet_personalization']
   const purchaseType = flowTypes.some(type => personalizedFlows.includes(type)) ? (flowTypes.every(type => personalizedFlows.includes(type)) ? 'personalized' : 'mixed') : 'catalog'
   if (paymentMethod !== 'draft') for (const [itemIndex, item] of items.entries()) {
-    if (item.catalogDesignSlug && !item.catalogDesignCustomerImage) continue
+    if (petPhotoItems[itemIndex] || (item.catalogDesignSlug && !item.catalogDesignCustomerImage)) continue
     const composition = catalogCompositions[itemIndex]
     const configuredPrints = composition ? composition.configuration.prints.slice(0, 1).map(print => ({ ...print, designPath: print.side === 'front' ? item.frontDesignPath : item.backDesignPath })) : printConfigurations[itemIndex].prints
     const files = configuredPrints?.length ? configuredPrints.map((print: any) => ({ side: print.side, path: print.designPath })) : (item.printSides === 'both' ? ['front', 'back'] : [item.printSides]).map(side => ({ side, path: side === 'front' ? item.frontDesignPath : item.backDesignPath }))
@@ -109,10 +133,10 @@ Deno.serve(async request => {
     const composition = catalogCompositions[index]
     const printSides = composition?.printSides ?? item.printSides
     const configuration = composition ? catalogOrderConfiguration(composition, item.catalogDesignCustomerImage) : printConfigurations[index]
-    const qualityReview = Boolean(item.qualityReview) && !isUnmodifiedCatalogItem(item)
+    const qualityReview = petPhotoItems[index] || (Boolean(item.qualityReview) && !isUnmodifiedCatalogItem(item))
     const personalized = !design || Boolean(item.catalogDesignCustomerImage)
     const catalogPrimarySide = composition?.configuration.prints[0].side
-    const saveCustomerArtwork = !design || item.catalogDesignCustomerImage
+    const saveCustomerArtwork = !petPhotoItems[index] && (!design || item.catalogDesignCustomerImage)
     const basePrice = variantPriceForPurchase(variant, personalized) ?? variant.priceClp
     const printExtra = composition
       ? printPrice(catalogChargeablePrints(configuration), printSides, storeSettings)
@@ -141,38 +165,57 @@ Deno.serve(async request => {
   const total = subtotal + shipping - discount, now = new Date().toISOString(), address = { fulfillment, customer: { first_name: String(customer.firstName).trim(), last_name: String(customer.lastName).trim(), email: String(customer.email).trim(), phone: String(customer.phone).trim() }, ...(fulfillment === 'delivery' ? { region: String(body.shippingAddress.region).trim(), commune: String(body.shippingAddress.commune).trim(), address: String(body.shippingAddress.address).trim(), address_extra: String(body.shippingAddress.addressExtra || '').trim(), delivery_notes: String(body.shippingAddress.notes || '').trim() } : {}) }
   const draftOrderId = Number.isSafeInteger(Number(body?.draftOrderId)) ? Number(body.draftOrderId) : null
   let order: any = null
+  const paymentInstructions = transfer ? { transfer, transfer_due_at: bankTransferDeadline(now, null) } : null
+  const petDetails = requestReferences.length ? { request_details: requestDetails.join('\n\n'), request_references: requestReferences } : {}
   const priceSnapshot = { provider: paymentMethod === 'transfer' ? 'bank_transfer' : paymentMethod === 'draft' ? 'checkout_draft' : 'mercado_pago', purchase_type: purchaseType, flow_type: flowType, flow_types: flowTypes, quality_review_fee_clp: qualityReviewFee, shipping_calculated: true, shipping_quote_clp: shipping, coupon_code: coupon?.code || null }
   const orderEmailDetails = { items: prepared, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, coupon_code: coupon?.code || undefined, total_clp: total, shipping_address: address, price_snapshot: priceSnapshot }
   if (draftOrderId) {
-    const { data: existing, error: existingError } = await admin.from('orders').select('id,total_clp,status,price_snapshot').eq('id', draftOrderId).eq('user_id', userData.user.id).in('status', ['draft', 'submitted']).maybeSingle()
+    const { data: existing, error: existingError } = await admin.from('orders').select('id,total_clp,status,price_snapshot,payment_instructions,updated_at').eq('id', draftOrderId).eq('user_id', userData.user.id).eq('request_type', 'purchase').eq('source', 'online').in('status', ['draft', 'submitted']).maybeSingle()
     if (existingError || !existing) return json({ error: 'El borrador de compra ya no está disponible.' }, 409)
-    if (paymentMethod === 'mercado_pago' && existing.status === 'submitted') {
-      const { data: prior } = await admin.from('payments').select('status,amount_clp,provider_preference_id').eq('order_id', existing.id).eq('provider', 'mercado_pago').maybeSingle()
-      if (prior?.status === 'approved') return json({ error: 'Este pedido ya tiene un pago aprobado.' }, 409)
-      if (prior?.status === 'pending' && prior.amount_clp === total && prior.provider_preference_id === existing.price_snapshot?.mp_preference_id && existing.price_snapshot?.mp_checkout_url) return json({ orderId: existing.id, totalClp: total, preferenceId: prior.provider_preference_id, initPoint: existing.price_snapshot.mp_checkout_url }, 200)
+    if (existing.status === 'submitted' && existing.payment_instructions?.transfer) {
+      if (paymentMethod === 'mercado_pago') return json({ error: 'Este pedido ya tiene datos de transferencia. Revísalos en Mis pedidos.' }, 409)
+      const { data: prior, error: priorError } = await admin.from('payments').select('status').eq('order_id', existing.id).eq('provider', 'transferencia_bancaria').maybeSingle()
+      if (priorError || prior?.status !== 'pending') return json({ error: 'No pudimos recuperar la transferencia pendiente. Revisa el estado en Mis pedidos.' }, 409)
+      return json({ orderId: existing.id, totalClp: existing.total_clp, paymentMethod: 'transfer', paymentInstructions: existing.payment_instructions })
     }
-    const { data: updated, error: updateError } = await admin.from('orders').update({ status: paymentMethod === 'draft' ? 'draft' : 'submitted', coupon_code: coupon?.code || null, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, total_clp: total, price_snapshot: priceSnapshot, shipping_address: address, payment_instructions: transfer ? { transfer } : null, submitted_at: paymentMethod === 'draft' ? null : now, updated_at: now }).eq('id', draftOrderId).select('id,total_clp').single()
+    if (existing.status === 'submitted') {
+      const { data: prior, error: priorError } = await admin.from('payments').select('status,amount_clp,provider_preference_id').eq('order_id', existing.id).eq('provider', 'mercado_pago').maybeSingle()
+      if (priorError) return json({ error: 'No pudimos comprobar el estado del pago. Intenta nuevamente.' }, 503)
+      if (prior?.status === 'approved') return json({ error: 'Este pedido ya tiene un pago aprobado.' }, 409)
+      if (prior?.status === 'pending') {
+        if (paymentMethod === 'transfer') return json({ error: 'Este pedido ya tiene un pago pendiente en Mercado Pago. Contáctanos para cambiar el medio de pago.' }, 409)
+        if (paymentMethod === 'draft') return json({ orderId: existing.id, totalClp: existing.total_clp, paymentMethod })
+        if (prior.provider_preference_id === existing.price_snapshot?.mp_preference_id && existing.price_snapshot?.mp_checkout_url) return json({ orderId: existing.id, totalClp: existing.total_clp, preferenceId: prior.provider_preference_id, initPoint: existing.price_snapshot.mp_checkout_url }, 200)
+        return json({ error: 'No pudimos recuperar el enlace de Mercado Pago. Revisa el estado en Mis pedidos.' }, 409)
+      }
+      if (!prior) return json({ error: 'El medio de pago se está preparando. Intenta nuevamente en unos segundos.' }, 409)
+      if (!['rejected', 'cancelled'].includes(prior.status)) return json({ error: 'Revisa el estado de este pago en Mis pedidos antes de continuar.' }, 409)
+    }
+    const { data: updated, error: updateError } = await admin.from('orders').update({ status: paymentMethod === 'draft' ? 'draft' : 'submitted', coupon_code: coupon?.code || null, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, total_clp: total, price_snapshot: priceSnapshot, shipping_address: address, payment_instructions: paymentInstructions, request_details: null, request_references: [], ...petDetails, submitted_at: paymentMethod === 'draft' ? null : now, updated_at: now }).eq('id', draftOrderId).eq('updated_at', existing.updated_at).select('id,total_clp').single()
     if (updateError || !updated) return json({ error: 'No pudimos actualizar el pedido.' }, 503)
     order = updated
-    await admin.from('order_items').delete().eq('order_id', order.id)
   } else {
-    const { data: created, error: orderError } = await admin.from('orders').insert({ user_id: userData.user.id, status: paymentMethod === 'draft' ? 'draft' : 'submitted', source: 'online', coupon_code: coupon?.code || null, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, total_clp: total, price_snapshot: priceSnapshot, shipping_address: address, payment_instructions: transfer ? { transfer } : null, submitted_at: paymentMethod === 'draft' ? null : now }).select('id,total_clp').single()
+    const { data: created, error: orderError } = await admin.from('orders').insert({ user_id: userData.user.id, status: paymentMethod === 'draft' ? 'draft' : 'submitted', source: 'online', coupon_code: coupon?.code || null, subtotal_clp: subtotal, shipping_clp: shipping, discount_clp: discount, total_clp: total, price_snapshot: priceSnapshot, shipping_address: address, payment_instructions: paymentInstructions, ...petDetails, submitted_at: paymentMethod === 'draft' ? null : now }).select('id,total_clp').single()
     if (orderError || !created) return json({ error: 'No pudimos crear el pedido.' }, 503)
     order = created
   }
   try {
+    if (draftOrderId) {
+      const { error: removeError } = await admin.from('order_items').delete().eq('order_id', order.id)
+      if (removeError) throw removeError
+    }
     const { error: itemError } = await admin.from('order_items').insert(prepared.map(item => ({ ...item, order_id: order.id }))); if (itemError) throw itemError
     if (paymentMethod === 'draft') return json({ orderId: order.id, totalClp: total, paymentMethod }, 201)
-    if (paymentMethod === 'transfer') {
-      const { error: paymentError } = await admin.from('payments').insert({ order_id: order.id, provider: 'transferencia_bancaria', kind: 'full', status: 'pending', amount_clp: total }); if (paymentError) throw paymentError
+    if (paymentInstructions) {
+      const { error: paymentError } = await admin.from('payments').insert({ order_id: order.id, provider: 'transferencia_bancaria', provider_reference: `DROSKA-TRANSFER-${order.id}`, kind: 'full', status: 'pending', amount_clp: total }); if (paymentError) throw paymentError
       await admin.from('order_status_history').insert({ order_id: order.id, status: 'submitted', note: 'Pedido creado; esperando confirmación de transferencia bancaria.' })
       try { await sendAdminOrderNotice(String(order.id), 'Pedido por transferencia', address.customer.email, orderEmailDetails) } catch (error) { console.error('Admin notice failed', error) }
       let email: { sent: boolean; reason?: string; id?: string } = { sent: false, reason: 'email_not_configured' }
       try {
-        email = await sendOrderEmail(address.customer.email, address.customer.first_name, String(order.id), 'submitted', fulfillment === 'pickup', { ...orderEmailDetails, price_snapshot: { provider: 'bank_transfer', purchase_type: purchaseType, flow_type: flowType, flow_types: flowTypes }, payment_instructions: { transfer } })
+        email = await sendOrderEmail(address.customer.email, address.customer.first_name, String(order.id), 'submitted', fulfillment === 'pickup', { ...orderEmailDetails, payment_instructions: paymentInstructions })
         if (email.sent) await admin.from('orders').update({ payment_email_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', order.id)
       } catch (emailError) { console.error('No pudimos enviar los datos de transferencia', emailError); email = { sent: false, reason: 'provider_error' } }
-      return json({ orderId: order.id, totalClp: total, paymentMethod, paymentInstructions: { transfer }, email }, 201)
+      return json({ orderId: order.id, totalClp: total, paymentMethod, paymentInstructions, email }, 201)
     }
     const externalReference = `DROSKA-${order.id}`
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', { method: 'POST', headers: { Authorization: `Bearer ${mpToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ id: externalReference, title: `Pedido Droska #${order.id}`, description: `${quantity} producto${quantity === 1 ? '' : 's'} personalizados`, currency_id: 'CLP', quantity: 1, unit_price: total }], payer: { name: address.customer.first_name, surname: address.customer.last_name, email: address.customer.email }, external_reference: externalReference, notification_url: `${url}/functions/v1/mercado-pago-webhook`, back_urls: { success: `${siteUrl}/?mp_status=success&order_id=${order.id}`, failure: `${siteUrl}/?mp_status=failure&order_id=${order.id}`, pending: `${siteUrl}/?mp_status=pending&order_id=${order.id}` }, auto_return: 'approved' }) })
@@ -195,6 +238,6 @@ Deno.serve(async request => {
       try { await sendAdminOrderNotice(String(order.id), 'Intento de pago no completado', address.customer.email, orderEmailDetails) } catch (noticeError) { console.error('Admin notice failed', noticeError) }
     }
     console.error(error)
-    return json({ error: 'No pudimos iniciar el pago con Mercado Pago. Tu pedido quedó guardado para reintentar.', orderId: order?.id || null }, 503)
+    return json({ error: 'No pudimos preparar el pago. Tu pedido quedó guardado para reintentar.', orderId: order?.id || null }, 503)
   }
 })

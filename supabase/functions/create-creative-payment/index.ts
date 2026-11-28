@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0'
+import { bankTransferDeadline } from '../_shared/bank-transfer.js'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } })
@@ -18,7 +19,7 @@ Deno.serve(async request => {
   if (paymentMethod === 'mercado_pago' && (!mpToken || !siteUrl)) return json({ error: 'Mercado Pago no está configurado.' }, 503)
   const orderId = Number(body?.orderId)
   if (!Number.isSafeInteger(orderId) || orderId < 1) return json({ error: 'Solicitud inválida.' }, 400)
-  const { data: order, error } = await admin.from('orders').select('id,user_id,request_type,status,quoted_total_clp,total_clp,shipping_address,price_snapshot').eq('id', orderId).eq('user_id', identity.user.id).single()
+  const { data: order, error } = await admin.from('orders').select('id,user_id,request_type,status,quoted_total_clp,total_clp,shipping_address,price_snapshot,payment_instructions').eq('id', orderId).eq('user_id', identity.user.id).single()
   if (error || !order || order.request_type !== 'creative') return json({ error: 'No encontramos tu cotización.' }, 404)
   if (!['quoted', 'awaiting_deposit'].includes(order.status) || !Number.isSafeInteger(order.quoted_total_clp) || order.quoted_total_clp <= 0 || order.total_clp !== order.quoted_total_clp) return json({ error: 'La cotización ya no está disponible para pago.' }, 409)
   const email = String(order.shipping_address?.customer?.email || identity.user.email || '')
@@ -31,7 +32,7 @@ Deno.serve(async request => {
     rut: String(Deno.env.get('BANK_TRANSFER_RUT') || '').trim(),
     email: String(Deno.env.get('BANK_TRANSFER_EMAIL') || '').trim(),
   }
-  const { data: existingPayments, error: paymentLookupError } = await admin.from('payments').select('id,provider,status,amount_clp,provider_preference_id').eq('order_id',order.id)
+  const { data: existingPayments, error: paymentLookupError } = await admin.from('payments').select('id,provider,status,amount_clp,provider_preference_id,created_at').eq('order_id',order.id)
   if (paymentLookupError) return json({ error: 'No pudimos comprobar los pagos anteriores.' }, 503)
   if (existingPayments?.some((item:any)=>item.status === 'approved')) return json({ error: 'Esta cotización ya está pagada.' }, 409)
   if (paymentMethod === 'transfer') {
@@ -39,13 +40,19 @@ Deno.serve(async request => {
     if (existingPayments?.some((item:any)=>item.provider === 'mercado_pago' && item.status === 'pending')) return json({ error: 'Ya existe un pago pendiente en Mercado Pago. Contáctanos para cambiar el medio de pago.' }, 409)
     const previous = existingPayments?.find((item:any)=>item.provider === 'transferencia_bancaria' && item.status === 'pending')
     if (previous && previous.amount_clp !== order.total_clp) return json({ error: 'La cotización cambió. Actualiza Mis pedidos antes de pagar.' }, 409)
-    if (!previous) {
-      const { error: insertError } = await admin.from('payments').insert({order_id:order.id,provider:'transferencia_bancaria',kind:'full',status:'pending',amount_clp:order.total_clp})
-      if (insertError) return json({ error: 'No pudimos registrar la transferencia. Intenta nuevamente.' }, 503)
+    if (previous && order.payment_instructions?.transfer && order.payment_instructions.transfer_due_at) {
+      return json({ orderId: order.id, totalClp: order.total_clp, paymentMethod, paymentInstructions: order.payment_instructions })
     }
-    const { data: saved, error: saveError } = await admin.from('orders').update({status:'awaiting_deposit',payment_instructions:{transfer:bankTransfer},price_snapshot:{...(order.price_snapshot||{}),provider:'bank_transfer'}}).eq('id',order.id).in('status',['quoted','awaiting_deposit']).eq('total_clp',order.total_clp).select('id').maybeSingle()
+    let issuedAt = previous?.created_at
+    if (!previous) {
+      const { data: payment, error: insertError } = await admin.from('payments').insert({order_id:order.id,provider:'transferencia_bancaria',provider_reference:`DROSKA-TRANSFER-${order.id}`,kind:'full',status:'pending',amount_clp:order.total_clp}).select('created_at').single()
+      if (insertError || !payment) return json({ error: 'No pudimos registrar la transferencia. Intenta nuevamente.' }, 503)
+      issuedAt = payment.created_at
+    }
+    const paymentInstructions = { transfer: bankTransfer, transfer_due_at: bankTransferDeadline(issuedAt || new Date(), order.payment_instructions?.transfer_due_at) }
+    const { data: saved, error: saveError } = await admin.from('orders').update({status:'awaiting_deposit',payment_instructions:paymentInstructions,price_snapshot:{...(order.price_snapshot||{}),provider:'bank_transfer'}}).eq('id',order.id).in('status',['quoted','awaiting_deposit']).eq('total_clp',order.total_clp).select('id').maybeSingle()
     if (saveError || !saved) return json({ error: 'La cotización cambió. Actualiza Mis pedidos.' }, 409)
-    return json({orderId:order.id,totalClp:order.total_clp,paymentMethod:'transfer',paymentInstructions:{transfer:bankTransfer}},previous?200:201)
+    return json({orderId:order.id,totalClp:order.total_clp,paymentMethod,paymentInstructions},previous?200:201)
   }
   if (existingPayments?.some((item:any)=>item.provider === 'transferencia_bancaria' && item.status === 'pending')) return json({ error: 'Ya elegiste transferencia. Revisa los datos de pago en Mis pedidos.' }, 409)
   const externalReference = `DROSKA-${order.id}`
